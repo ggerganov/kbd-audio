@@ -7,6 +7,8 @@
 
 #include <ApplicationServices/ApplicationServices.h>
 
+#include <thread>
+
 namespace {
     CGEventRef CGEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void * userData) {
         if (type != kCGEventKeyDown && type != kCGEventFlagsChanged && type != kCGEventKeyUp) {
@@ -22,29 +24,44 @@ namespace {
     }
 }
 
-KeyLogger::KeyLogger() {}
+struct KeyLogger::Data {
+    Callback callback;
+
+    std::thread worker;
+    CFRunLoopRef runLoopRef;
+};
+
+KeyLogger::KeyLogger() : data_(new Data()) {}
+
+KeyLogger::~KeyLogger() {
+    CFRunLoopStop(data_->runLoopRef);
+    data_->worker.join();
+}
 
 bool KeyLogger::install(std::function<void(int)> callback) {
-    CGEventMask eventMask = (CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventFlagsChanged));
-    CFMachPortRef eventTap = CGEventTapCreate(
-        kCGSessionEventTap, kCGHeadInsertEventTap, (CGEventTapOptions) 0, eventMask, CGEventCallback, this);
+    data_->callback = std::move(callback);
+    data_->worker = std::thread([this]() {
+        CGEventMask eventMask = (CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventFlagsChanged));
+        CFMachPortRef eventTap = CGEventTapCreate(
+            kCGSessionEventTap, kCGHeadInsertEventTap, (CGEventTapOptions) 0, eventMask, CGEventCallback, this);
 
-    if (!eventTap) {
-        return false;
-    }
+        if (!eventTap) {
+            return;
+        }
 
-    CFRunLoopSourceRef runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0);
-    CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, kCFRunLoopCommonModes);
-    CGEventTapEnable(eventTap, true);
+        CFRunLoopSourceRef runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0);
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, kCFRunLoopCommonModes);
+        CGEventTapEnable(eventTap, true);
 
-    callback_ = std::move(callback);
-    CFRunLoopRun();
+        this->data_->runLoopRef = CFRunLoopGetCurrent();
+        CFRunLoopRun();
+    });
 
     return true;
 }
 
 const KeyLogger::Callback & KeyLogger::getCallback() const {
-    return callback_;
+    return data_->callback;
 }
 
 const char * KeyLogger::codeToText(const Code & code) {

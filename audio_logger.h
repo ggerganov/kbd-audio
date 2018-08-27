@@ -6,20 +6,28 @@
 #pragma once
 
 #include <memory>
+#include <array>
+#include <list>
+#include <functional>
 
 class AudioLogger {
     public:
+        static constexpr uint64_t kSampleRate = 44100;
         static constexpr uint64_t kSamplesPerFrame = 1024;
-        static constexpr uint64_t kFramesPerPatch = 1024;
+        static constexpr float kBufferSize_s = 1.0f;
+        static constexpr uint64_t kBufferSize_frames = kBufferSize_s*kSampleRate/kSamplesPerFrame;
 
         using Sample = int16_t;
         using Frame = std::array<Sample, kSamplesPerFrame>;
-        using Patch = std::array<Frame, kFramesPerPatch>;
+        using Record = std::list<Frame>;
+        using Callback = std::function<void(const Record & frames)>;
 
         AudioLogger();
         ~AudioLogger();
 
-        bool install();
+        bool install(Callback callback);
+        bool addFrame(const Sample * stream);
+        bool record();
 
     private:
         struct Data;

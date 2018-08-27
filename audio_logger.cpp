@@ -8,9 +8,13 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_audio.h>
 
+#include <mutex>
+#include <algorithm>
+
 namespace {
     void cbAudioReady(void * userData, uint8_t * stream, int32_t nbytes) {
-        printf("Callback, %d bytes\n", nbytes);
+        AudioLogger * logger = (AudioLogger *)(userData);
+        logger->addFrame((AudioLogger::Sample *)(stream));
     }
 }
 
@@ -18,14 +22,24 @@ struct AudioLogger::Data {
     SDL_AudioDeviceID deviceIdIn = 0;
     //SDL_AudioDeviceID deviceIdOut = 0;
 
-    int sampleSize_bytes = 4;
+    Callback callback;
+
+    int32_t nFramesToRecord = 0;
+    int32_t sampleSize_bytes = 4;
+
+    int32_t bufferId = 0;
+    std::array<Frame, kBufferSize_frames> buffer;
+
+    Record record;
+
+    std::mutex mutex;
 };
 
 AudioLogger::AudioLogger() : data_(new AudioLogger::Data()) {}
 
 AudioLogger::~AudioLogger() {}
 
-bool AudioLogger::install() {
+bool AudioLogger::install(AudioLogger::Callback callback) {
     auto & data = getData();
 
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
@@ -42,12 +56,12 @@ bool AudioLogger::install() {
     SDL_AudioSpec captureSpec;
     SDL_zero(captureSpec);
 
-    captureSpec.freq = 44100;
+    captureSpec.freq = kSampleRate;
     captureSpec.format = AUDIO_F32SYS;
     captureSpec.channels = 1;
-    captureSpec.samples = 1024;
+    captureSpec.samples = kSamplesPerFrame;
     captureSpec.callback = ::cbAudioReady;
-    captureSpec.userdata = NULL;
+    captureSpec.userdata = this;
 
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
@@ -82,6 +96,41 @@ bool AudioLogger::install() {
     printf("    Samples:    %d\n", obtainedSpec.samples);
 
     SDL_PauseAudioDevice(data.deviceIdIn, 0);
+
+    data.callback = std::move(callback);
+
+    return true;
+}
+
+bool AudioLogger::addFrame(const Sample * stream) {
+    std::lock_guard<std::mutex> lock(data_->mutex);
+
+    auto & curFrame = data_->buffer[data_->bufferId];
+    std::copy(stream, stream + kSamplesPerFrame, curFrame.data());
+    if (data_->nFramesToRecord > 0) {
+        data_->record.push_back(curFrame);
+        if (--data_->nFramesToRecord == 0) {
+            printf("Callback with %d frames\n", (int) data_->record.size());
+            data_->record.clear();
+        }
+    }
+    if (++data_->bufferId >= data_->buffer.size()) {
+        data_->bufferId = 0;
+    }
+
+    return true;
+}
+
+bool AudioLogger::record() {
+    std::lock_guard<std::mutex> lock(data_->mutex);
+
+    if (data_->record.size() == 0) {
+        for (size_t i = 0; i < data_->buffer.size(); ++i) {
+            data_->record.push_back(data_->buffer[(data_->bufferId + i)%data_->buffer.size()]);
+        }
+    }
+
+    data_->nFramesToRecord = kBufferSize_frames;
 
     return true;
 }

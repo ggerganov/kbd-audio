@@ -13,12 +13,15 @@ class KeyLogger {
         using Callback = std::function<void(Code)>;
 
         KeyLogger();
+        ~KeyLogger();
 
         bool install(Callback callback);
+        bool terminate();
         const Callback & getCallback() const;
 
         static const char * codeToText(const Code & code);
 
     private:
-        Callback callback_;
+        struct Data;
+        std::unique_ptr<Data> data_;
 };
