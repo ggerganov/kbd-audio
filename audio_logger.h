@@ -16,12 +16,13 @@ class AudioLogger {
         using Frame = std::array<Sample, kSamplesPerFrame>;
         using Patch = std::array<Frame, kFramesPerPatch>;
 
-
         AudioLogger();
+        ~AudioLogger();
 
         bool install();
 
     private:
         struct Data;
         std::unique_ptr<Data> data_;
+        Data & getData() { return *data_; }
 };
