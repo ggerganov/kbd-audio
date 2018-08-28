@@ -17,7 +17,7 @@ class AudioLogger {
         static constexpr float kBufferSize_s = 1.0f;
         static constexpr uint64_t kBufferSize_frames = kBufferSize_s*kSampleRate/kSamplesPerFrame;
 
-        using Sample = int16_t;
+        using Sample = float;
         using Frame = std::array<Sample, kSamplesPerFrame>;
         using Record = std::list<Frame>;
         using Callback = std::function<void(const Record & frames)>;

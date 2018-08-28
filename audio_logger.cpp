@@ -103,34 +103,38 @@ bool AudioLogger::install(AudioLogger::Callback callback) {
 }
 
 bool AudioLogger::addFrame(const Sample * stream) {
-    std::lock_guard<std::mutex> lock(data_->mutex);
+    auto & data = getData();
 
-    auto & curFrame = data_->buffer[data_->bufferId];
+    std::lock_guard<std::mutex> lock(data.mutex);
+
+    auto & curFrame = data.buffer[data.bufferId];
     std::copy(stream, stream + kSamplesPerFrame, curFrame.data());
-    if (data_->nFramesToRecord > 0) {
-        data_->record.push_back(curFrame);
-        if (--data_->nFramesToRecord == 0) {
-            printf("Callback with %d frames\n", (int) data_->record.size());
-            data_->record.clear();
+    if (data.nFramesToRecord > 0) {
+        data.record.push_back(curFrame);
+        if (--data.nFramesToRecord == 0) {
+            if (data.callback) data.callback(data.record);
+            data.record.clear();
         }
     }
-    if (++data_->bufferId >= data_->buffer.size()) {
-        data_->bufferId = 0;
+    if (++data.bufferId >= data.buffer.size()) {
+        data.bufferId = 0;
     }
 
     return true;
 }
 
 bool AudioLogger::record() {
-    std::lock_guard<std::mutex> lock(data_->mutex);
+    auto & data = getData();
 
-    if (data_->record.size() == 0) {
-        for (size_t i = 0; i < data_->buffer.size(); ++i) {
-            data_->record.push_back(data_->buffer[(data_->bufferId + i)%data_->buffer.size()]);
+    std::lock_guard<std::mutex> lock(data.mutex);
+
+    if (data.record.size() == 0) {
+        for (size_t i = 0; i < data.buffer.size() - 1; ++i) {
+            data.record.push_back(data.buffer[(data.bufferId + i + 1)%data.buffer.size()]);
         }
     }
 
-    data_->nFramesToRecord = kBufferSize_frames;
+    data.nFramesToRecord = kBufferSize_frames;
 
     return true;
 }
