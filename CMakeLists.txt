@@ -27,7 +27,9 @@ add_library(Core STATIC
 
 target_link_libraries(Core PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
+    ${SDL2_LIBRARIES}
     ${COREGRAPHICS_LIBRARY}
+    ${COREFOUNDATION_LIBRARY}
     )
 
 add_library(ImGui STATIC
@@ -46,13 +48,11 @@ target_link_libraries(ImGui PRIVATE
     ${COREFOUNDATION_LIBRARY}
     )
 
-set (CUR_TARGET key_average_gui)
+add_executable(key_average_gui key_average_gui.cpp)
+target_link_libraries(key_average_gui PRIVATE Core ImGui)
 
-add_executable(${CUR_TARGET}
-    key_average_gui.cpp
-    )
+add_executable(record record.cpp)
+target_link_libraries(record PRIVATE Core)
 
-target_link_libraries(${CUR_TARGET} PRIVATE
-    Core
-    ImGui
-    )
+add_executable(play play.cpp)
+target_link_libraries(play PRIVATE Core)
