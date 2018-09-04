@@ -13,13 +13,19 @@
 #include <SDL.h>
 #include <GL/gl3w.h>
 
+#include <map>
+#include <mutex>
+#include <string>
+
 int main(int, char**) {
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
 
-    // Decide GL+GLSL versions
+    int windowSizeX = 1920;
+    int windowSizeY = 1080;
+
 #if __APPLE__
     // GL 3.2 Core + GLSL 150
     const char* glsl_version = "#version 150";
@@ -42,7 +48,7 @@ int main(int, char**) {
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
-    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_SetSwapInterval(1); // Enable vsync
 
@@ -67,11 +73,27 @@ int main(int, char**) {
     //ImGui::StyleColorsClassic();
 
     // Project specific
+    std::mutex mutex;
+
+    using TKey = char;
+    using TKeyAverage = std::array<AudioLogger::Frame, 2*AudioLogger::kBufferSize_frames>;
+
+    TKey keyPressed = -1;
+    std::map<TKey, TKeyAverage> keySoundAverage;
+
     AudioLogger audioLogger;
-    AudioLogger::Callback cbAudio = [](const auto & frames) {
-        printf("Record callback with %d frames\n", (int) frames.size());
+    AudioLogger::Callback cbAudio = [&](const auto & frames) {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        int fid = 0;
         for (const auto & frame : frames) {
+            for (auto i = 0; i < AudioLogger::kSamplesPerFrame; ++i) {
+                keySoundAverage[keyPressed][fid][i] += frame[i];
+            }
+            if (++fid >= keySoundAverage[keyPressed].size()) break;
         }
+
+        keyPressed = -1;
     };
 
     if (audioLogger.install(cbAudio) == false) {
@@ -80,9 +102,11 @@ int main(int, char**) {
     }
 
     KeyLogger keyLogger;
-    KeyLogger::Callback cbKey = [&audioLogger](int key) -> void {
-        //printf("%s\n", KeyLogger::codeToText(key));
-        audioLogger.record();
+    KeyLogger::Callback cbKey = [&audioLogger, &keyPressed](int key) -> void {
+        if (keyPressed == -1) {
+            keyPressed = key;
+            audioLogger.record();
+        }
     };
 
     if (keyLogger.install(cbKey) == false) {
@@ -106,7 +130,33 @@ int main(int, char**) {
         ImGui_ImplSDL2_NewFrame(window);
         ImGui::NewFrame();
 
-        ImGui::Text("Foo");
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
+        ImGui::SetNextWindowSize(ImVec2(windowSizeX, windowSizeY), ImGuiCond_Once);
+        ImGui::Begin("Average Key Waveform");
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+
+            for (const auto & key : keySoundAverage) {
+                struct SampleGetter {
+                    static float f(void * data, int i) {
+                        int fid = i/AudioLogger::kSamplesPerFrame;
+                        int sid = i - fid*AudioLogger::kSamplesPerFrame;
+                        const auto & frames = *(TKeyAverage *)(data);
+                        const auto & frame = frames[fid];
+                        return frame[sid];
+                    }
+                };
+
+                float (*getter)(void *, int) = SampleGetter::f;
+
+                std::string skey(KeyLogger::codeToText(key.first));
+                ImGui::PlotLines(
+                    skey.c_str(),
+                    getter, (void *)(intptr_t)(&key.second), key.second.size()*AudioLogger::kSamplesPerFrame,
+                    0, skey.c_str(), FLT_MAX, FLT_MAX, ImVec2(windowSizeX, 0.1f*windowSizeY));
+            }
+        }
+        ImGui::End();
 
         ImGui::Render();
         SDL_GL_MakeCurrent(window, gl_context);

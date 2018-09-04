@@ -42,6 +42,10 @@ add_library(ImGui STATIC
     imgui/examples/imgui_impl_opengl3.cpp
     )
 
+target_compile_definitions(ImGui PRIVATE
+    IMGUI_USER_CONFIG="../imconfig-vtx32.h"
+    )
+
 target_link_libraries(ImGui PRIVATE
     ${SDL2_LIBRARIES}
     ${OPENGL_LIBRARIES}
