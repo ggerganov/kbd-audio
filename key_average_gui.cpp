@@ -17,6 +17,7 @@
 
 #include <map>
 #include <mutex>
+#include <cmath>
 #include <string>
 
 int main(int, char**) {
@@ -77,11 +78,12 @@ int main(int, char**) {
     // Project specific
     std::mutex mutex;
 
-    auto fftIn = (float*) fftwf_malloc(sizeof(float)*AudioLogger::kSamplesPerFrame);
-    auto fftOut = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex)*AudioLogger::kSamplesPerFrame);
-    auto fftPlan = fftwf_plan_dft_r2c_1d(1*AudioLogger::kSamplesPerFrame, fftIn, fftOut, FFTW_ESTIMATE);
+    printf("sizeof fftwf_complex = %d\n", (int) sizeof(fftwf_complex));
+    fftwf_complex * fftIn = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex)*AudioLogger::kSamplesPerFrame);
+    fftwf_complex * fftOut = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex)*AudioLogger::kSamplesPerFrame);
+    fftwf_plan fftPlan = fftwf_plan_dft_1d(AudioLogger::kSamplesPerFrame, fftIn, fftOut, FFTW_FORWARD, FFTW_ESTIMATE);
 
-    using TKey = char;
+    using TKey = int;
     using TKeyAverage = std::array<AudioLogger::Frame, 2*AudioLogger::kBufferSize_frames - 1>;
 
     TKey keyPressed = -1;
@@ -98,13 +100,14 @@ int main(int, char**) {
         for (const auto & frame : frames) {
             for (auto i = 0; i < AudioLogger::kSamplesPerFrame; ++i) {
                 buffersAmpl[fid][i] += frame[i];
+                fftIn[i][0] = buffersAmpl[fid][i];
+                fftIn[i][1] = 0;
             }
-            std::copy(buffersAmpl[fid].begin(), buffersAmpl[fid].end(), fftIn);
             fftwf_execute(fftPlan);
             for (auto i = 0; i < AudioLogger::kSamplesPerFrame; ++i) {
                 buffersFreq[fid][i] = fftOut[i][0]*fftOut[i][0] + fftOut[i][1]*fftOut[i][1];
             }
-            for (auto i = 0; i < AudioLogger::kSamplesPerFrame/2; ++i) {
+            for (auto i = 1; i < AudioLogger::kSamplesPerFrame/2; ++i) {
                 buffersFreq[fid][i] += buffersFreq[fid][AudioLogger::kSamplesPerFrame - i];
             }
 
@@ -151,7 +154,7 @@ int main(int, char**) {
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
         ImGui::SetNextWindowSize(ImVec2(windowSizeX, windowSizeY), ImGuiCond_Once);
         ImGui::Begin("Average Key Waveform");
-        ImGui::Text("Frames in buffer: %d\n", (int) AudioLogger::kBufferSize_frames);
+        ImGui::Text("Frames in buffer: %d\n", (int) (2*AudioLogger::kBufferSize_frames - 1));
         {
             std::lock_guard<std::mutex> lock(mutex);
 
@@ -180,7 +183,7 @@ int main(int, char**) {
                     ImGui::PlotHistogram(
                         ("##" + skey + " frame " + std::to_string(fid)).c_str(),
                         freq.data(), freq.size()/2,
-                        0, ("##" + skey + " frame " + std::to_string(fid)).c_str(), 0.0f, 50.0f, ImVec2(windowSizeX/nFrames, 0.1f*windowSizeY));
+                        0, ("frame " + std::to_string(fid)).c_str(), 0.0f, 50.0f, ImVec2(windowSizeX/nFrames, 0.1f*windowSizeY));
                     ImGui::SameLine();
                 }
                 ImGui::Text("%s", "");

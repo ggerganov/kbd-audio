@@ -19,10 +19,18 @@ namespace {
 }
 
 struct AudioLogger::Data {
+    Data() {
+        for (auto & frame : buffer) {
+            frame.fill(0);
+        }
+
+        record.clear();
+    }
+
     SDL_AudioDeviceID deviceIdIn = 0;
     //SDL_AudioDeviceID deviceIdOut = 0;
 
-    Callback callback;
+    Callback callback = nullptr;
 
     int32_t nFramesToRecord = 0;
     int32_t sampleSize_bytes = 4;
