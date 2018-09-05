@@ -3,12 +3,15 @@ project (KBD-Audio)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "on")
 
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
 set (CMAKE_CXX_STANDARD 14)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Threads REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(OpenGL REQUIRED)
+find_package(FFTW REQUIRED)
 
 if (APPLE)
     find_library(COREFOUNDATION_LIBRARY CoreFoundation )
@@ -25,9 +28,14 @@ add_library(Core STATIC
     audio_logger.cpp
     )
 
+target_include_directories(Core PRIVATE
+    ${FFTW_INCLUDE_DIRS}
+    )
+
 target_link_libraries(Core PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
     ${SDL2_LIBRARIES}
+    ${FFTWF_LIBRARIES}
     ${COREGRAPHICS_LIBRARY}
     ${COREFOUNDATION_LIBRARY}
     )

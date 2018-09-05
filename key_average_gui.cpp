@@ -6,6 +6,8 @@
 #include "key_logger.h"
 #include "audio_logger.h"
 
+#include "fftw3.h"
+
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
@@ -48,7 +50,7 @@ int main(int, char**) {
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
-    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+    SDL_Window* window = SDL_CreateWindow("Average key stroke audio information", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_SetSwapInterval(1); // Enable vsync
 
@@ -75,22 +77,38 @@ int main(int, char**) {
     // Project specific
     std::mutex mutex;
 
+    auto fftIn = (float*) fftwf_malloc(sizeof(float)*AudioLogger::kSamplesPerFrame);
+    auto fftOut = (fftwf_complex*) fftwf_malloc(sizeof(fftwf_complex)*AudioLogger::kSamplesPerFrame);
+    auto fftPlan = fftwf_plan_dft_r2c_1d(1*AudioLogger::kSamplesPerFrame, fftIn, fftOut, FFTW_ESTIMATE);
+
     using TKey = char;
-    using TKeyAverage = std::array<AudioLogger::Frame, 2*AudioLogger::kBufferSize_frames>;
+    using TKeyAverage = std::array<AudioLogger::Frame, 2*AudioLogger::kBufferSize_frames - 1>;
 
     TKey keyPressed = -1;
-    std::map<TKey, TKeyAverage> keySoundAverage;
+    std::map<TKey, TKeyAverage> keySoundAverageAmpl;
+    std::map<TKey, TKeyAverage> keySoundAverageFreq;
 
     AudioLogger audioLogger;
     AudioLogger::Callback cbAudio = [&](const auto & frames) {
         std::lock_guard<std::mutex> lock(mutex);
 
         int fid = 0;
+        auto & buffersAmpl = keySoundAverageAmpl[keyPressed];
+        auto & buffersFreq = keySoundAverageFreq[keyPressed];
         for (const auto & frame : frames) {
             for (auto i = 0; i < AudioLogger::kSamplesPerFrame; ++i) {
-                keySoundAverage[keyPressed][fid][i] += frame[i];
+                buffersAmpl[fid][i] += frame[i];
             }
-            if (++fid >= keySoundAverage[keyPressed].size()) break;
+            std::copy(buffersAmpl[fid].begin(), buffersAmpl[fid].end(), fftIn);
+            fftwf_execute(fftPlan);
+            for (auto i = 0; i < AudioLogger::kSamplesPerFrame; ++i) {
+                buffersFreq[fid][i] = fftOut[i][0]*fftOut[i][0] + fftOut[i][1]*fftOut[i][1];
+            }
+            for (auto i = 0; i < AudioLogger::kSamplesPerFrame/2; ++i) {
+                buffersFreq[fid][i] += buffersFreq[fid][AudioLogger::kSamplesPerFrame - i];
+            }
+
+            if (++fid >= buffersAmpl.size()) break;
         }
 
         keyPressed = -1;
@@ -133,10 +151,11 @@ int main(int, char**) {
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
         ImGui::SetNextWindowSize(ImVec2(windowSizeX, windowSizeY), ImGuiCond_Once);
         ImGui::Begin("Average Key Waveform");
+        ImGui::Text("Frames in buffer: %d\n", (int) AudioLogger::kBufferSize_frames);
         {
             std::lock_guard<std::mutex> lock(mutex);
 
-            for (const auto & key : keySoundAverage) {
+            for (const auto & ampl : keySoundAverageAmpl) {
                 struct SampleGetter {
                     static float f(void * data, int i) {
                         int fid = i/AudioLogger::kSamplesPerFrame;
@@ -149,11 +168,22 @@ int main(int, char**) {
 
                 float (*getter)(void *, int) = SampleGetter::f;
 
-                std::string skey(KeyLogger::codeToText(key.first));
+                std::string skey(KeyLogger::codeToText(ampl.first));
                 ImGui::PlotLines(
                     skey.c_str(),
-                    getter, (void *)(intptr_t)(&key.second), key.second.size()*AudioLogger::kSamplesPerFrame,
+                    getter, (void *)(intptr_t)(&ampl.second), ampl.second.size()*AudioLogger::kSamplesPerFrame,
                     0, skey.c_str(), FLT_MAX, FLT_MAX, ImVec2(windowSizeX, 0.1f*windowSizeY));
+
+                int nFrames = keySoundAverageFreq[ampl.first].size();
+                for (int fid = 0; fid < (int) keySoundAverageFreq[ampl.first].size(); ++fid) {
+                    const auto & freq = keySoundAverageFreq[ampl.first][fid];
+                    ImGui::PlotHistogram(
+                        ("##" + skey + " frame " + std::to_string(fid)).c_str(),
+                        freq.data(), freq.size()/2,
+                        0, ("##" + skey + " frame " + std::to_string(fid)).c_str(), 0.0f, 50.0f, ImVec2(windowSizeX/nFrames, 0.1f*windowSizeY));
+                    ImGui::SameLine();
+                }
+                ImGui::Text("%s", "");
             }
         }
         ImGui::End();
@@ -168,6 +198,10 @@ int main(int, char**) {
     }
 
     // Cleanup
+    if (fftPlan) fftwf_destroy_plan(fftPlan);
+    if (fftIn) fftwf_free(fftIn);
+    if (fftOut) fftwf_free(fftOut);
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
