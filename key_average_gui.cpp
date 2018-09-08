@@ -3,7 +3,6 @@
  *  \author Georgi Gerganov
  */
 
-#include "key_logger.h"
 #include "audio_logger.h"
 
 #include "fftw3.h"
@@ -19,15 +18,19 @@
 #include <mutex>
 #include <cmath>
 #include <string>
+#include <cstdlib>
+#include <chrono>
 
 int main(int, char**) {
+    auto t0 = std::chrono::high_resolution_clock::now();
+
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
 
-    int windowSizeX = 1920;
-    int windowSizeY = 1080;
+    int windowSizeX = 1280;
+    int windowSizeY = 800;
 
 #if __APPLE__
     // GL 3.2 Core + GLSL 150
@@ -92,6 +95,9 @@ int main(int, char**) {
 
     AudioLogger audioLogger;
     AudioLogger::Callback cbAudio = [&](const auto & frames) {
+        //auto t1 = std::chrono::high_resolution_clock::now();
+        //printf("Received: %d\n", (int) std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+
         std::lock_guard<std::mutex> lock(mutex);
 
         int fid = 0;
@@ -99,7 +105,7 @@ int main(int, char**) {
         auto & buffersFreq = keySoundAverageFreq[keyPressed];
         for (const auto & frame : frames) {
             for (auto i = 0; i < AudioLogger::kSamplesPerFrame; ++i) {
-                buffersAmpl[fid][i] += frame[i];
+                buffersAmpl[fid][i] = frame[i];
                 fftIn[i][0] = buffersAmpl[fid][i];
                 fftIn[i][1] = 0;
             }
@@ -122,29 +128,29 @@ int main(int, char**) {
         return -1;
     }
 
-    KeyLogger keyLogger;
-    KeyLogger::Callback cbKey = [&audioLogger, &keyPressed](int key) -> void {
-        if (keyPressed == -1) {
-            keyPressed = key;
-            audioLogger.record();
-        }
-    };
-
-    if (keyLogger.install(cbKey) == false) {
-        fprintf(stderr, "Failed to install key logger\n");
-        return -2;
-    }
+    bool done = false;
 
     // Main loop
-    bool done = false;
     while (!done) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT)
-                done = true;
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
-                done = true;
+            switch (event.type) {
+                case SDL_KEYDOWN:
+                    if (keyPressed == -1) {
+                        //auto t1 = std::chrono::high_resolution_clock::now();
+                        //printf("Event: %d\n", (int) std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+                        keyPressed = event.key.keysym.sym;
+                        audioLogger.record();
+                    }
+                    break;
+                case SDL_QUIT:
+                    done = true;
+                    break;
+                case SDL_WINDOWEVENT:
+                    if (event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) done = true;
+                    break;
+            };
         }
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -171,9 +177,10 @@ int main(int, char**) {
 
                 float (*getter)(void *, int) = SampleGetter::f;
 
-                std::string skey(KeyLogger::codeToText(ampl.first));
+                std::string skey(" ");
+                skey[0] = ampl.first;
                 ImGui::PlotLines(
-                    skey.c_str(),
+                    ("##" + skey).c_str(),
                     getter, (void *)(intptr_t)(&ampl.second), ampl.second.size()*AudioLogger::kSamplesPerFrame,
                     0, skey.c_str(), FLT_MAX, FLT_MAX, ImVec2(windowSizeX, 0.1f*windowSizeY));
 
@@ -183,7 +190,7 @@ int main(int, char**) {
                     ImGui::PlotHistogram(
                         ("##" + skey + " frame " + std::to_string(fid)).c_str(),
                         freq.data(), freq.size()/2,
-                        0, ("frame " + std::to_string(fid)).c_str(), 0.0f, 50.0f, ImVec2(windowSizeX/nFrames, 0.1f*windowSizeY));
+                        0, ("frame " + std::to_string(fid)).c_str(), 0.0f, 50.0f, ImVec2(0.95f*windowSizeX/nFrames, 0.1f*windowSizeY));
                     ImGui::SameLine();
                 }
                 ImGui::Text("%s", "");
