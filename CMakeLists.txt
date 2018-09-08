@@ -13,6 +13,8 @@ find_package(SDL2 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(FFTW REQUIRED)
 
+string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
+
 if (APPLE)
     find_library(COREFOUNDATION_LIBRARY CoreFoundation )
     find_library(COREGRAPHICS_LIBRARY CoreGraphics )
@@ -58,6 +60,7 @@ target_compile_definitions(ImGui PRIVATE
     )
 
 target_link_libraries(ImGui PRIVATE
+    ${CMAKE_DL_LIBS}
     ${SDL2_LIBRARIES}
     ${OPENGL_LIBRARIES}
     ${COREFOUNDATION_LIBRARY}
