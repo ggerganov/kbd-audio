@@ -172,7 +172,7 @@ int main(int, char**) {
                     int s1 = s0 + besto;
                     int k1 = s1/n;
                     int i1 = s1%n;
-                    frames[k0][i0] = s1 < nFrames*n ? frames[k1][i1] : 0.0f;
+                    frames[k0][i0] = s1 >= 0 ? frames[k1][i1] : 0.0f;
                 }
             }
         }
