@@ -94,18 +94,97 @@ int main(int, char**) {
     std::map<TKey, TKeyAverage> keySoundAverageFreq;
 
     AudioLogger audioLogger;
-    AudioLogger::Callback cbAudio = [&](const auto & frames) {
+    AudioLogger::Callback cbAudio = [&](const auto & framesOriginal) {
         //auto t1 = std::chrono::high_resolution_clock::now();
         //printf("Received: %d\n", (int) std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+
+        auto frames = framesOriginal;
+
+        int nFrames = frames.size();
+        bool exist = keySoundAverageAmpl.find(keyPressed) != keySoundAverageAmpl.end();
+        if (exist) {
+            int kmax = 0;
+            int imax = 0;
+            float amax = 0.0f;
+
+            int n = AudioLogger::kSamplesPerFrame;
+            for (int k = 0; k < nFrames; ++k) {
+                auto & curFrame = frames[k];
+                for (int i = 0; i < n; ++i) {
+                    float a = std::abs(curFrame[i]);
+                    if (a > amax) {
+                        kmax = k;
+                        imax = i;
+                        amax = a;
+                    }
+                }
+            }
+
+            int besto = 0;
+            float bestcc = 0.0f;
+
+            for (int o = -n; o < n; ++o) {
+                int w = n;
+
+                int s00 = kmax*n + imax - w;
+                int s01 = kmax*n + imax + w;
+                if (s00 < 0 || s01 >= nFrames*n) continue;
+
+                int s10 = kmax*n + imax + o - w;
+                int s11 = kmax*n + imax + o + w;
+                if (s10 < 0 || s11 >= nFrames*n) continue;
+
+                float cc = 0.0f;
+                for (int s0 = s00; s0 < s01; ++s0) {
+                    int k0 = s0/n;
+                    int i0 = s0%n;
+
+                    int s1 = s0 + o;
+                    int k1 = s1/n;
+                    int i1 = s1%n;
+
+                    cc += frames[k1][i1]*keySoundAverageAmpl[keyPressed][k0][i0];
+                }
+
+                if (cc > bestcc) {
+                    besto = o;
+                    bestcc = cc;
+                }
+            }
+
+            printf("besto = %d\n", besto);
+
+            if (besto > 0) {
+                for (int s0 = 0; s0 < nFrames*n; ++s0) {
+                    int k0 = s0/n;
+                    int i0 = s0%n;
+
+                    int s1 = s0 + besto;
+                    int k1 = s1/n;
+                    int i1 = s1%n;
+                    frames[k0][i0] = s1 < nFrames*n ? frames[k1][i1] : 0.0f;
+                }
+            } else {
+                for (int s0 = nFrames*n - 1; s0 >= 0; --s0) {
+                    int k0 = s0/n;
+                    int i0 = s0%n;
+
+                    int s1 = s0 + besto;
+                    int k1 = s1/n;
+                    int i1 = s1%n;
+                    frames[k0][i0] = s1 < nFrames*n ? frames[k1][i1] : 0.0f;
+                }
+            }
+        }
 
         std::lock_guard<std::mutex> lock(mutex);
 
         int fid = 0;
         auto & buffersAmpl = keySoundAverageAmpl[keyPressed];
         auto & buffersFreq = keySoundAverageFreq[keyPressed];
-        for (const auto & frame : frames) {
+        for (int k = 0; k < nFrames; ++k) {
             for (auto i = 0; i < AudioLogger::kSamplesPerFrame; ++i) {
-                buffersAmpl[fid][i] = frame[i];
+                buffersAmpl[fid][i] = frames[k][i];
                 fftIn[i][0] = buffersAmpl[fid][i];
                 fftIn[i][1] = 0;
             }

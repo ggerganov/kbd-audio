@@ -7,7 +7,7 @@
 
 #include <memory>
 #include <array>
-#include <list>
+#include <vector>
 #include <functional>
 
 class AudioLogger {
@@ -19,7 +19,7 @@ class AudioLogger {
 
         using Sample = float;
         using Frame = std::array<Sample, kSamplesPerFrame>;
-        using Record = std::list<Frame>;
+        using Record = std::vector<Frame>;
         using Callback = std::function<void(const Record & frames)>;
 
         AudioLogger();
