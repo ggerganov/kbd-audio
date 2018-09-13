@@ -93,6 +93,8 @@ int main(int, char**) {
     std::map<TKey, TKeyAverage> keySoundAverageAmpl;
     std::map<TKey, TKeyAverage> keySoundAverageFreq;
 
+    std::vector<float> similarityForOffset(4*AudioLogger::kSamplesPerFrame);
+
     AudioLogger audioLogger;
     AudioLogger::Callback cbAudio = [&](const auto & framesOriginal) {
         //auto t1 = std::chrono::high_resolution_clock::now();
@@ -122,6 +124,10 @@ int main(int, char**) {
 
             int besto = 0;
             float bestcc = 0.0f;
+            float bestccq = 0.0f;
+            float bestccp = 0.0f;
+
+            std::fill(similarityForOffset.begin(), similarityForOffset.end(), 0);
 
             for (int o = -n; o < n; ++o) {
                 int w = n;
@@ -135,6 +141,12 @@ int main(int, char**) {
                 if (s10 < 0 || s11 >= nFrames*n) continue;
 
                 float cc = 0.0f;
+                float ccq = 0.0f;
+                float ccp = 0.0f;
+
+                float suma = 0.0f, suma2 = 0.0f, sumb = 0.0f, sumb2 = 0.0f, sumab = 0.0f;
+                float sumaq = 0.0f, suma2q = 0.0f, sumabq = 0.0f;
+                float sumap = 0.0f, suma2p = 0.0f, sumabp = 0.0f;
                 for (int s0 = s00; s0 < s01; ++s0) {
                     int k0 = s0/n;
                     int i0 = s0%n;
@@ -143,16 +155,64 @@ int main(int, char**) {
                     int k1 = s1/n;
                     int i1 = s1%n;
 
-                    cc += frames[k1][i1]*keySoundAverageAmpl[keyPressed][k0][i0];
+                    sumb += frames[k1][i1];
+                    sumb2 += frames[k1][i1]*frames[k1][i1];
+
+                    suma += keySoundAverageAmpl[keyPressed][k0][i0];
+                    suma2 += keySoundAverageAmpl[keyPressed][k0][i0]*keySoundAverageAmpl[keyPressed][k0][i0];
+                    sumab += frames[k1][i1]*keySoundAverageAmpl[keyPressed][k0][i0];
+                    sumaq += keySoundAverageAmpl['q'][k0][i0];
+                    suma2q += keySoundAverageAmpl['q'][k0][i0]*keySoundAverageAmpl['q'][k0][i0];
+                    sumabq += frames[k1][i1]*keySoundAverageAmpl['q'][k0][i0];
+                    sumap += keySoundAverageAmpl['p'][k0][i0];
+                    suma2p += keySoundAverageAmpl['p'][k0][i0]*keySoundAverageAmpl['p'][k0][i0];
+                    sumabp += frames[k1][i1]*keySoundAverageAmpl['p'][k0][i0];
+
+                    //cc += frames[k1][i1]*keySoundAverageAmpl[keyPressed][k0][i0];
+                    //ccq += frames[k1][i1]*keySoundAverageAmpl['q'][k0][i0];
+                    //ccp += frames[k1][i1]*keySoundAverageAmpl['p'][k0][i0];
                 }
+
+                int ncc = s01 - s00;
+                {
+                    float nom = sumab*ncc - suma*sumb;
+                    float den2a = suma2*ncc - suma*suma;
+                    float den2b = sumb2*ncc - sumb*sumb;
+                    cc = (nom)/(sqrt(den2a*den2b));
+                }
+
+                {
+                    float nom = sumabq*ncc - sumaq*sumb;
+                    float den2a = suma2q*ncc - sumaq*sumaq;
+                    float den2b = sumb2*ncc - sumb*sumb;
+                    ccq = (nom)/(sqrt(den2a*den2b));
+                }
+
+                {
+                    float nom = sumab*ncc - sumap*sumb;
+                    float den2a = suma2p*ncc - sumap*sumap;
+                    float den2b = sumb2*ncc - sumb*sumb;
+                    ccp = (nom)/(sqrt(den2a*den2b));
+                }
+
+                similarityForOffset[o + 2*n] = cc;
 
                 if (cc > bestcc) {
                     besto = o;
                     bestcc = cc;
                 }
+
+                if (ccq > bestccq) {
+                    bestccq = ccq;
+                }
+
+                if (ccp > bestccp) {
+                    bestccp = ccp;
+                }
             }
 
             printf("besto = %d\n", besto);
+            printf("more similar to '%c'\n", (bestccq > bestccp) ? 'q' : 'p');
 
             if (besto > 0) {
                 for (int s0 = 0; s0 < nFrames*n; ++s0) {
@@ -184,7 +244,7 @@ int main(int, char**) {
         auto & buffersFreq = keySoundAverageFreq[keyPressed];
         for (int k = 0; k < nFrames; ++k) {
             for (auto i = 0; i < AudioLogger::kSamplesPerFrame; ++i) {
-                buffersAmpl[fid][i] = frames[k][i];
+                buffersAmpl[fid][i] += frames[k][i];
                 fftIn[i][0] = buffersAmpl[fid][i];
                 fftIn[i][1] = 0;
             }
@@ -242,6 +302,11 @@ int main(int, char**) {
         ImGui::Text("Frames in buffer: %d\n", (int) (2*AudioLogger::kBufferSize_frames - 1));
         {
             std::lock_guard<std::mutex> lock(mutex);
+
+            ImGui::PlotLines(
+                "##Similarity for offset",
+                similarityForOffset.data(), similarityForOffset.size(),
+                0, "Similarity for offset", FLT_MAX, FLT_MAX, ImVec2(windowSizeX, 0.1f*windowSizeY));
 
             for (const auto & ampl : keySoundAverageAmpl) {
                 struct SampleGetter {
