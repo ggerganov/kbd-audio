@@ -96,7 +96,7 @@ int main(int, char**) {
     std::vector<float> similarityForOffset(4*AudioLogger::kSamplesPerFrame);
 
     AudioLogger audioLogger;
-    AudioLogger::Callback cbAudio = [&](const auto & framesOriginal) {
+    AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & framesOriginal) {
         //auto t1 = std::chrono::high_resolution_clock::now();
         //printf("Received: %d\n", (int) std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
 
