@@ -12,7 +12,7 @@
 #include <algorithm>
 
 namespace {
-    void cbAudioReady(void * userData, uint8_t * stream, int32_t nbytes) {
+    void cbAudioReady(void * userData, uint8_t * stream, int32_t /*nbytes*/) {
         AudioLogger * logger = (AudioLogger *)(userData);
         logger->addFrame((AudioLogger::Sample *)(stream));
     }
@@ -124,7 +124,7 @@ bool AudioLogger::addFrame(const Sample * stream) {
             data.record.clear();
         }
     }
-    if (++data.bufferId >= data.buffer.size()) {
+    if (++data.bufferId >= (int) data.buffer.size()) {
         data.bufferId = 0;
     }
 

@@ -12,9 +12,9 @@
 
 class AudioLogger {
     public:
-        static constexpr uint64_t kSampleRate = 44100;
+        static constexpr uint64_t kSampleRate = 12000;
         static constexpr uint64_t kSamplesPerFrame = 1024;
-        static constexpr float kBufferSize_s = 0.100;
+        static constexpr float kBufferSize_s = 1.000;
         static constexpr uint64_t kBufferSize_frames = kBufferSize_s*kSampleRate/kSamplesPerFrame;
 
         using Sample = float;

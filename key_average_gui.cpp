@@ -104,6 +104,7 @@ int main(int, char**) {
 
         int nFrames = frames.size();
         bool exist = keySoundAverageAmpl.find(keyPressed) != keySoundAverageAmpl.end();
+        exist = false;
         if (exist) {
             int kmax = 0;
             int imax = 0;
@@ -244,7 +245,7 @@ int main(int, char**) {
         auto & buffersFreq = keySoundAverageFreq[keyPressed];
         for (int k = 0; k < nFrames; ++k) {
             for (auto i = 0; i < AudioLogger::kSamplesPerFrame; ++i) {
-                buffersAmpl[fid][i] += frames[k][i];
+                buffersAmpl[fid][i] = frames[k][i];
                 fftIn[i][0] = buffersAmpl[fid][i];
                 fftIn[i][1] = 0;
             }

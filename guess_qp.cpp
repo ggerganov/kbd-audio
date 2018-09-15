@@ -4,6 +4,7 @@
  */
 
 #ifdef __EMSCRIPTEN__
+#include "build_timestamp.h"
 #include "emscripten/emscripten.h"
 #endif
 
@@ -20,17 +21,38 @@
 #include <thread>
 #include <vector>
 
-std::function<void()> g_update;
-std::function<void(int)> g_handleKey;
+static int g_predictedKey = -1;
+static bool g_isInitialized = false;
 
-extern "C" {
-    void keyPressedCallback(int key) {
-        g_handleKey(key);
-    }
+static std::function<int()> g_init;
+static std::function<void()> g_update;
+static std::function<void(int)> g_handleKey;
+
+int init() {
+    if (g_isInitialized) return 1;
+
+    return g_init();
 }
 
 void update() {
+    if (g_isInitialized == false) return;
+
     g_update();
+}
+
+// JS interface
+extern "C" {
+    int doInit() {
+        return init();
+    }
+
+    void keyPressedCallback(int key) {
+        g_handleKey(key);
+    }
+
+    int getPredictedKey() {
+        return g_predictedKey;
+    }
 }
 
 int main(int, char**) {
@@ -50,6 +72,8 @@ int main(int, char**) {
 
     bool printStatus = true;
     bool isReadyToPredict = false;
+
+    AudioLogger audioLogger;
 
     auto calcCC = [](const TKeyWaveform & waveform0, const TKeyWaveform & waveform1, int nSamplesPerFrame, int scmp0, int scmp1, int alignWindow) {
         Offset besto = -1;
@@ -96,7 +120,6 @@ int main(int, char**) {
         return std::tuple<ValueCC, Offset>{ bestcc, besto };
     };
 
-    AudioLogger audioLogger;
     AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & frames) {
         if (frames.size() != keySoundAverageAmpl[keyPressed].size()) {
             printf("Unexpected number of frames - %d. Should never happen\n", (int) frames.size());
@@ -114,18 +137,20 @@ int main(int, char**) {
             int nFramesPerWaveform = ampl.size();
             int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
             int centerSample = nFramesPerWaveform*nSamplesPerFrame/2;
-            int alignWindow = nSamplesPerFrame;
+            int alignWindow = centerSample/2;
 
-            int scmp0 = centerSample - alignWindow;
-            int scmp1 = centerSample + alignWindow;
+            int scmp0 = centerSample - nSamplesPerFrame/4;
+            int scmp1 = centerSample + nSamplesPerFrame/4;
 
-            auto resq = calcCC(keySoundAverageAmpl['q'], ampl, nSamplesPerFrame, scmp0, scmp1, 2*alignWindow);
-            auto resp = calcCC(keySoundAverageAmpl['p'], ampl, nSamplesPerFrame, scmp0, scmp1, 2*alignWindow);
+            auto resq = calcCC(keySoundAverageAmpl['q'], ampl, nSamplesPerFrame, scmp0, scmp1, alignWindow);
+            auto resp = calcCC(keySoundAverageAmpl['p'], ampl, nSamplesPerFrame, scmp0, scmp1, alignWindow);
 
             char res = resq > resp ? 'q' : 'p';
 
             printf("    Prediction: '%c'        ('q' %8.5g vs %8.5g 'p')    (offsets    %5d %5d)\n",
                    res, std::get<0>(resq), std::get<0>(resp), std::get<1>(resq), std::get<1>(resp));
+
+            g_predictedKey = res;
         } else {
             auto & history = keySoundHistoryAmpl[keyPressed];
             history.push_back(TKeyWaveform());
@@ -137,8 +162,7 @@ int main(int, char**) {
             if (keyPressed == 'q' && timesToPressQ > 0) {
                 --timesToPressQ;
                 printStatus = true;
-            }
-            if (keyPressed == 'p' && timesToPressP > 0) {
+            } else if (keyPressed == 'p' && timesToPressP > 0) {
                 --timesToPressP;
                 printStatus = true;
             }
@@ -147,13 +171,20 @@ int main(int, char**) {
         keyPressed = -1;
     };
 
-    if (audioLogger.install(cbAudio) == false) {
-        fprintf(stderr, "Failed to install audio logger\n");
-        return -1;
-    }
+    g_init = [&]() {
+        if (audioLogger.install(cbAudio) == false) {
+            fprintf(stderr, "Failed to install audio logger\n");
+            return -1;
+        }
+
+        printf("[+] Collecting training data\n");
+        g_isInitialized = true;
+        return 0;
+    };
 
     g_handleKey = [&](int key) {
         if (keyPressed == -1) {
+            g_predictedKey = -1;
             keyPressed = key;
             audioLogger.record();
         }
@@ -185,7 +216,6 @@ int main(int, char**) {
                 }
                 printStatus = false;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
             return;
         }
@@ -293,13 +323,13 @@ int main(int, char**) {
                     waveform = std::move(newWaveform);
                 }
 
-                int alignToWaveform = 0;
-                int alignWindow = nSamplesPerFrame;
+                int alignToWaveform = nWaveforms/2;
+                int alignWindow = centerSample/2;
                 printf("    - Aligning all waveforms to waveform %d using cross correlation\n", alignToWaveform);
                 printf("      Align window = %d\n", alignWindow);
 
-                int scmp0 = centerSample - alignWindow;
-                int scmp1 = centerSample + alignWindow;
+                int scmp0 = centerSample - nSamplesPerFrame/4;
+                int scmp1 = centerSample + nSamplesPerFrame/4;
 
                 float sum0 = 0.0f;
                 float sum02 = 0.0f;
@@ -328,10 +358,6 @@ int main(int, char**) {
 
                         float sum1 = 0.0f, sum12 = 0.0f, sum01 = 0.0f;
                         for (int is = scmp0; is < scmp1; ++is) {
-                            int is0 = is;
-                            int f0 = is0/nSamplesPerFrame;
-                            int s0 = is0 - f0*nSamplesPerFrame;
-
                             int is1 = is + o;
                             int f1 = is1/nSamplesPerFrame;
                             int s1 = is1 - f1*nSamplesPerFrame;
@@ -339,6 +365,10 @@ int main(int, char**) {
                             auto a1 = waveform1[f1][s1];
                             sum1 += a1;
                             sum12 += a1*a1;
+
+                            int is0 = is;
+                            int f0 = is0/nSamplesPerFrame;
+                            int s0 = is0 - f0*nSamplesPerFrame;
 
                             auto a0 = waveform0[f0][s0];
                             sum01 += a0*a1;
@@ -361,7 +391,6 @@ int main(int, char**) {
                     printf("        Best offset for waveform %d = %d (cc = %g)\n", iwaveform, besto, bestcc);
 
                     auto newWaveform = TKeyWaveform();
-                    auto & waveform = history[iwaveform];
                     for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
                         for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
                             int icur = iframe*nSamplesPerFrame + isample;
@@ -370,14 +399,14 @@ int main(int, char**) {
                             if (iorg >= 0 && iorg < nFramesPerWaveform*nSamplesPerFrame) {
                                 int f = iorg/nSamplesPerFrame;
                                 int s = iorg - f*nSamplesPerFrame;
-                                newWaveform[iframe][isample] = waveform[f][s];
+                                newWaveform[iframe][isample] = waveform1[f][s];
                             } else {
                                 newWaveform[iframe][isample] = 0.0f;
                             }
                         }
                     }
 
-                    waveform = std::move(newWaveform);
+                    waveform1 = std::move(newWaveform);
                 }
 
                 printf("    - Calculating average waveform\n");
@@ -408,18 +437,21 @@ int main(int, char**) {
             trainKey('p');
             isReadyToPredict = true;
 
+            printf("[+] Ready to predict. Keep pressing 'q' or 'p' and the program will guess which key was pressed\n");
+            printf("    based on the captured audio from the microphone.\n");
             printf("[+] Predicting\n");
         }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     };
 
-    printf("[+] Collecting training data\n");
 #ifdef __EMSCRIPTEN__
-    emscripten_set_main_loop(update, 0, 1);
+    printf("Build time: %s\n", BUILD_TIMESTAMP);
+    printf("Press the Init button to start\n");
+    emscripten_set_main_loop(update, 60, 1);
 #else
+    init();
     while (true) {
         update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 #endif
 
