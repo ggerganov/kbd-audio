@@ -111,9 +111,9 @@ int main(int, char**) {
                 ampl[k] = frames[k];
             }
 
-            int nFramesPerStroke = ampl.size();
+            int nFramesPerWaveform = ampl.size();
             int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
-            int centerSample = nFramesPerStroke*nSamplesPerFrame/2;
+            int centerSample = nFramesPerWaveform*nSamplesPerFrame/2;
             int alignWindow = nSamplesPerFrame;
 
             int scmp0 = centerSample - alignWindow;
@@ -196,24 +196,24 @@ int main(int, char**) {
             auto trainKey = [&](TKey key) {
                 auto & history = keySoundHistoryAmpl[key];
 
-                int nStrokes = history.size();
-                int nFramesPerStroke = history[0].size();
+                int nWaveforms = history.size();
+                int nFramesPerWaveform = history[0].size();
                 int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
 
                 printf("    - Training key '%c'\n", key);
-                printf("    - History size = %d key strokes\n", nStrokes);
-                printf("    - Frames per key stroke     = %d\n", nFramesPerStroke);
-                printf("    - Total frames available    = %d\n", nStrokes*nFramesPerStroke);
+                printf("    - History size = %d key waveforms\n", nWaveforms);
+                printf("    - Frames per key waveform   = %d\n", nFramesPerWaveform);
+                printf("    - Total frames available    = %d\n", nWaveforms*nFramesPerWaveform);
                 printf("    - Samples per frame         = %d\n", nSamplesPerFrame);
-                printf("    - Total samples available   = %d\n", nStrokes*nFramesPerStroke*nSamplesPerFrame);
+                printf("    - Total samples available   = %d\n", nWaveforms*nFramesPerWaveform*nSamplesPerFrame);
 
-                printf("    - Estimating stroke peaks ...\n");
+                printf("    - Estimating waveform peaks ...\n");
                 std::vector<int> peakSum;
                 std::vector<int> peakMax;
 
                 peakSum.clear();
                 peakMax.clear();
-                for (int istroke = 0; istroke < nStrokes; ++istroke) {
+                for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     int isum = -1;
                     float asum = 0.0f;
                     float aisum = 0.0f;
@@ -221,12 +221,12 @@ int main(int, char**) {
                     int imax = -1;
                     float amax = 0.0f;
 
-                    const auto & stroke = history[istroke];
+                    const auto & waveform = history[iwaveform];
 
-                    for (int iframe = 0; iframe < nFramesPerStroke; ++iframe) {
+                    for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
                         for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
                             int icur = iframe*nSamplesPerFrame + isample;
-                            float acur = std::abs(stroke[iframe][isample]);
+                            float acur = std::abs(waveform[iframe][isample]);
                             float acur2 = acur*acur;
 
                             asum += acur2;
@@ -266,36 +266,36 @@ int main(int, char**) {
                 const auto & peakUsed = peakMax;
                 printf("    - Using 'max' estimation\n");
 
-                int centerSample = nFramesPerStroke*nSamplesPerFrame/2;
+                int centerSample = nFramesPerWaveform*nSamplesPerFrame/2;
 
-                printf("    - Centering strokes at sample %d\n", centerSample);
-                for (int istroke = 0; istroke < nStrokes; ++istroke) {
-                    int offset = peakUsed[istroke] - centerSample;
-                    printf("        Offset for stroke %d = %d\n", istroke, offset);
+                printf("    - Centering waveforms at sample %d\n", centerSample);
+                for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
+                    int offset = peakUsed[iwaveform] - centerSample;
+                    printf("        Offset for waveform %d = %d\n", iwaveform, offset);
 
-                    auto newStroke = TKeyWaveform();
-                    auto & stroke = history[istroke];
-                    for (int iframe = 0; iframe < nFramesPerStroke; ++iframe) {
+                    auto newWaveform = TKeyWaveform();
+                    auto & waveform = history[iwaveform];
+                    for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
                         for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
                             int icur = iframe*nSamplesPerFrame + isample;
                             int iorg = icur + offset;
 
-                            if (iorg >= 0 && iorg < nFramesPerStroke*nSamplesPerFrame) {
+                            if (iorg >= 0 && iorg < nFramesPerWaveform*nSamplesPerFrame) {
                                 int f = iorg/nSamplesPerFrame;
                                 int s = iorg - f*nSamplesPerFrame;
-                                newStroke[iframe][isample] = stroke[f][s];
+                                newWaveform[iframe][isample] = waveform[f][s];
                             } else {
-                                newStroke[iframe][isample] = 0.0f;
+                                newWaveform[iframe][isample] = 0.0f;
                             }
                         }
                     }
 
-                    stroke = std::move(newStroke);
+                    waveform = std::move(newWaveform);
                 }
 
-                int alignToStroke = 0;
+                int alignToWaveform = 0;
                 int alignWindow = nSamplesPerFrame;
-                printf("    - Aligning all strokes to stroke %d using cross correlation\n", alignToStroke);
+                printf("    - Aligning all waveforms to waveform %d using cross correlation\n", alignToWaveform);
                 printf("      Align window = %d\n", alignWindow);
 
                 int scmp0 = centerSample - alignWindow;
@@ -304,21 +304,21 @@ int main(int, char**) {
                 float sum0 = 0.0f;
                 float sum02 = 0.0f;
 
-                const auto & stroke0 = history[alignToStroke];
+                const auto & waveform0 = history[alignToWaveform];
 
                 for (int is = scmp0; is < scmp1; ++is) {
                     int f = is/nSamplesPerFrame;
                     int s = is - f*nSamplesPerFrame;
 
-                    auto a = stroke0[f][s];
+                    auto a = waveform0[f][s];
                     sum0 += a;
                     sum02 += a*a;
                 }
 
-                for (int istroke = 0; istroke < nStrokes; ++istroke) {
-                    if (istroke == alignToStroke) continue;
+                for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
+                    if (iwaveform == alignToWaveform) continue;
 
-                    auto & stroke1 = history[istroke];
+                    auto & waveform1 = history[iwaveform];
 
                     int besto = 0;
                     float bestcc = 0.0f;
@@ -336,11 +336,11 @@ int main(int, char**) {
                             int f1 = is1/nSamplesPerFrame;
                             int s1 = is1 - f1*nSamplesPerFrame;
 
-                            auto a1 = stroke1[f1][s1];
+                            auto a1 = waveform1[f1][s1];
                             sum1 += a1;
                             sum12 += a1*a1;
 
-                            auto a0 = stroke0[f0][s0];
+                            auto a0 = waveform0[f0][s0];
                             sum01 += a0*a1;
                         }
 
@@ -358,43 +358,43 @@ int main(int, char**) {
                         }
                     }
 
-                    printf("        Best offset for stroke %d = %d (cc = %g)\n", istroke, besto, bestcc);
+                    printf("        Best offset for waveform %d = %d (cc = %g)\n", iwaveform, besto, bestcc);
 
-                    auto newStroke = TKeyWaveform();
-                    auto & stroke = history[istroke];
-                    for (int iframe = 0; iframe < nFramesPerStroke; ++iframe) {
+                    auto newWaveform = TKeyWaveform();
+                    auto & waveform = history[iwaveform];
+                    for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
                         for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
                             int icur = iframe*nSamplesPerFrame + isample;
                             int iorg = icur + besto;
 
-                            if (iorg >= 0 && iorg < nFramesPerStroke*nSamplesPerFrame) {
+                            if (iorg >= 0 && iorg < nFramesPerWaveform*nSamplesPerFrame) {
                                 int f = iorg/nSamplesPerFrame;
                                 int s = iorg - f*nSamplesPerFrame;
-                                newStroke[iframe][isample] = stroke[f][s];
+                                newWaveform[iframe][isample] = waveform[f][s];
                             } else {
-                                newStroke[iframe][isample] = 0.0f;
+                                newWaveform[iframe][isample] = 0.0f;
                             }
                         }
                     }
 
-                    stroke = std::move(newStroke);
+                    waveform = std::move(newWaveform);
                 }
 
                 printf("    - Calculating average waveform\n");
                 auto & avgWaveform = keySoundAverageAmpl[key];
                 for (auto & f : avgWaveform) f.fill(0.0f);
-                for (int istroke = 0; istroke < nStrokes; ++istroke) {
-                    auto & stroke = history[istroke];
-                    for (int iframe = 0; iframe < nFramesPerStroke; ++iframe) {
+                for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
+                    auto & waveform = history[iwaveform];
+                    for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
                         for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
-                            avgWaveform[iframe][isample] += stroke[iframe][isample];
+                            avgWaveform[iframe][isample] += waveform[iframe][isample];
                         }
                     }
                 }
 
                 {
-                    float norm = 1.0f/(nFramesPerStroke*nSamplesPerFrame);
-                    for (int iframe = 0; iframe < nFramesPerStroke; ++iframe) {
+                    float norm = 1.0f/(nFramesPerWaveform*nSamplesPerFrame);
+                    for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
                         for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
                             avgWaveform[iframe][isample] *= norm;
                         }
