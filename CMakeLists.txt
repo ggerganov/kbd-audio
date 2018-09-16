@@ -74,6 +74,9 @@ target_link_libraries(guess_qp PRIVATE Core)
 add_executable(guess_qp2 guess_qp2.cpp)
 target_link_libraries(guess_qp2 PRIVATE Core)
 
+add_executable(guess_all guess_all.cpp)
+target_link_libraries(guess_all PRIVATE Core)
+
 add_executable(key_detector key_detector.cpp)
 target_link_libraries(key_detector PRIVATE Core)
 

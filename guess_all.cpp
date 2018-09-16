@@ -1,18 +1,9 @@
-/*! \file guess_qp2.cpp
+/*! \file guess_all.cpp
  *  \brief Enter description here.
  *  \author Georgi Gerganov
  */
 
-#ifdef __EMSCRIPTEN__
-#include "build_timestamp.h"
-#include "emscripten/emscripten.h"
-#endif
-
 #include "audio_logger.h"
-
-#include <stdio.h>
-#include <termios.h>
-#include <unistd.h>
 
 #include <map>
 #include <cmath>
@@ -20,6 +11,8 @@
 #include <chrono>
 #include <thread>
 #include <vector>
+#include <deque>
+#include <fstream>
 
 static int g_predictedKey = -1;
 static bool g_isInitialized = false;
@@ -55,20 +48,31 @@ extern "C" {
     }
 }
 
-int main(int, char**) {
-#ifdef __EMSCRIPTEN__
-    constexpr float kBufferSize_s = 1.0f;
-    constexpr uint64_t kSampleRate = 12000;
-#else
+int main(int argc, char ** argv) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s input.kbd\n", argv[0]);
+        return -127;
+    }
+
     constexpr float kBufferSize_s = 0.1f;
     constexpr uint64_t kSampleRate = 48000;
-#endif
 
     constexpr uint64_t kRingBufferSize = 16*1024;
     constexpr int bkgrStep_samples = 7;
     constexpr int keyDuration_samples = 0.100*kSampleRate;
 
     constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+
+    std::ifstream fin(argv[1], std::ios::binary);
+
+    {
+        int bufferSize_frames = 1;
+        fin.read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
+        if (bufferSize_frames != kBufferSize_frames) {
+            printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kBufferSize_frames);
+            return -1;
+        }
+    }
 
     using ValueCC = float;
     using Offset = int;
@@ -81,14 +85,10 @@ int main(int, char**) {
     std::map<TKey, TKeyHistory> keySoundHistoryAmpl;
     std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
 
-    float bufferSize_s = 1.000f;
-
-    int timesToPressQ = 5;
-    int timesToPressP = 5;
-
     bool doRecord = false;
     bool printStatus = true;
     bool isReadyToPredict = false;
+    bool processingInput = true;
 
     // rig buffer
     int rbBegin = 0;
@@ -99,51 +99,137 @@ int main(int, char**) {
     AudioLogger audioLogger;
 
     auto calcCC = [](const TKeyWaveform & waveform0, const TKeyWaveform & waveform1, int nSamplesPerFrame, int scmp0, int scmp1, int alignWindow) {
+        int is00 = waveform0.size()*nSamplesPerFrame/2 - (scmp1 - scmp0)/2;
+
         Offset besto = -1;
         ValueCC bestcc = -1.0f;
 
-        int is00 = waveform0.size()*nSamplesPerFrame/2 - (scmp1 - scmp0)/2;
+        float sum0 = 0.0f, sum02 = 0.0f;
+        for (int is = 0; is < scmp1 - scmp0; ++is) {
+            int is0 = is00 + is;
+            int f0 = is0/nSamplesPerFrame;
+            int s0 = is0 - f0*nSamplesPerFrame;
 
-        for (int o = -alignWindow; o < alignWindow; ++o) {
-            float cc = -1.0f;
-
-            float sum0 = 0.0f, sum02 = 0.0f, sum1 = 0.0f, sum12 = 0.0f, sum01 = 0.0f;
-            for (int is = 0; is < scmp1 - scmp0; ++is) {
-                int is0 = is00 + is;
-                int f0 = is0/nSamplesPerFrame;
-                int s0 = is0 - f0*nSamplesPerFrame;
-
-                int is1 = is + scmp0 + o;
-                int f1 = is1/nSamplesPerFrame;
-                int s1 = is1 - f1*nSamplesPerFrame;
-
-                auto a0 = waveform0[f0][s0];
-                sum0 += a0;
-                sum02 += a0*a0;
-
-                auto a1 = waveform1[f1][s1];
-                sum1 += a1;
-                sum12 += a1*a1;
-
-                sum01 += a0*a1;
-            }
-
-            int ncc = scmp1 - scmp0;
-            {
-                float nom = sum01*ncc - sum0*sum1;
-                float den2a = sum02*ncc - sum0*sum0;
-                float den2b = sum12*ncc - sum1*sum1;
-                cc = (nom)/(sqrt(den2a*den2b));
-            }
-
-            if (cc > bestcc) {
-                besto = o;
-                bestcc = cc;
-            }
+            auto a0 = waveform0[f0][s0];
+            sum0 += a0;
+            sum02 += a0*a0;
         }
 
+        int nWorkers = 4;
+        std::mutex mutex;
+        std::vector<std::thread> workers(nWorkers);
+        for (int i = 0; i < workers.size(); ++i) {
+            auto & worker = workers[i];
+            worker = std::thread([&, i]() {
+                Offset cbesto = -1;
+                ValueCC cbestcc = -1.0f;
+
+                for (int o = -alignWindow + i; o < alignWindow; o += nWorkers) {
+                    float cc = -1.0f;
+
+                    float sum1 = 0.0f, sum12 = 0.0f, sum01 = 0.0f;
+                    for (int is = 0; is < scmp1 - scmp0; ++is) {
+                        int is0 = is00 + is;
+                        int f0 = is0/nSamplesPerFrame;
+                        int s0 = is0 - f0*nSamplesPerFrame;
+
+                        int is1 = is + scmp0 + o;
+                        int f1 = is1/nSamplesPerFrame;
+                        int s1 = is1 - f1*nSamplesPerFrame;
+
+                        auto a0 = waveform0[f0][s0];
+                        auto a1 = waveform1[f1][s1];
+                        sum1 += a1;
+                        sum12 += a1*a1;
+
+                        sum01 += a0*a1;
+                    }
+
+                    int ncc = scmp1 - scmp0;
+                    {
+                        float nom = sum01*ncc - sum0*sum1;
+                        float den2a = sum02*ncc - sum0*sum0;
+                        float den2b = sum12*ncc - sum1*sum1;
+                        cc = (nom)/(sqrt(den2a*den2b));
+                    }
+
+                    if (cc > cbestcc) {
+                        cbesto = o;
+                        cbestcc = cc;
+                    }
+                }
+                {
+                    std::lock_guard<std::mutex> lock(mutex);
+                    if (cbestcc > bestcc) {
+                        bestcc = cbestcc;
+                        besto = cbesto;
+                    }
+                }
+            });
+        }
+        for (auto & worker : workers) worker.join();
         return std::tuple<ValueCC, Offset>{ bestcc, besto };
     };
+
+    struct WorkData {
+        TKeyWaveform ampl;
+        std::vector<int> positionsToPredict;
+    };
+
+    std::mutex mutex;
+    std::deque<WorkData> workQueue;
+    std::thread worker([&]() {
+        int lastkey = -1;
+        float lastcc = -1.0f;
+
+        while(true) {
+            bool process = false;
+            WorkData workData;
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                if (workQueue.size() > 0) {
+                    workData = std::move(workQueue.front());
+                    workQueue.pop_front();
+                    process = true;
+                }
+            }
+            if (process) {
+                int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
+                const auto & ampl = workData.ampl;
+                const auto & positionsToPredict = workData.positionsToPredict;
+
+                int nFramesPerWaveform = ampl.size();
+                int alignWindow = 2*nSamplesPerFrame;
+
+                for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
+                    int scmp0 = positionsToPredict[ipos] - nSamplesPerFrame/2;
+                    int scmp1 = positionsToPredict[ipos] + nSamplesPerFrame/2;
+
+                    char res = -1;
+                    float maxcc = -1.0f;
+                    for (const auto & ka : keySoundAverageAmpl) {
+                        auto curcc = calcCC(keySoundAverageAmpl[ka.first], ampl, nSamplesPerFrame, scmp0, scmp1, alignWindow);
+                        if (std::get<0>(curcc) > maxcc) {
+                            res = ka.first;
+                            maxcc = std::get<0>(curcc);
+                        }
+                    }
+
+                    if (maxcc > 0.50f) {
+                        if (lastkey != res || lastcc != maxcc) {
+                            printf("    Prediction: '%c'        (%8.5g)\n", res, maxcc);
+                        }
+                        lastkey = res;
+                        lastcc = maxcc;
+                    }
+
+                    g_predictedKey = res;
+                }
+            } else {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        }
+    });
 
     AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & frames) {
         if (frames.size() != keySoundAverageAmpl[keyPressed].size()) {
@@ -177,7 +263,8 @@ int main(int, char**) {
 
                 int skip_samples = 0;
                 int nFrames = frames.size();
-                for (int f = nFrames/4; f <= 3*nFrames/4; ++f) {
+                int nFrames2 = std::max(1, nFrames/2);
+                for (int f = nFrames2 - nFrames2/2; f <= nFrames2 + nFrames2/2; ++f) {
                     for (int s = 0; s < frames[f].size(); ++s) {
                         if (s + skip_samples >= frames[f].size()) {
                             skip_samples -= frames[f].size() - s;
@@ -200,30 +287,15 @@ int main(int, char**) {
             }
 
             if (positionsToPredict.size() > 0) {
-                TKeyWaveform ampl;
+                WorkData workData;
                 for (int k = 0; k < nFrames; ++k) {
-                    ampl[k] = frames[k];
+                    workData.ampl[k] = frames[k];
                 }
+                workData.positionsToPredict = positionsToPredict;
 
-                int nFramesPerWaveform = ampl.size();
-                int centerSample = nFramesPerWaveform*nSamplesPerFrame/2;
-                int alignWindow = nSamplesPerFrame;
-
-                for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
-                    int scmp0 = positionsToPredict[ipos] - nSamplesPerFrame/4;
-                    int scmp1 = positionsToPredict[ipos] + nSamplesPerFrame/4;
-
-                    auto resq = calcCC(keySoundAverageAmpl['q'], ampl, nSamplesPerFrame, scmp0, scmp1, alignWindow);
-                    auto resp = calcCC(keySoundAverageAmpl['p'], ampl, nSamplesPerFrame, scmp0, scmp1, alignWindow);
-
-                    char res = std::get<0>(resq) > std::get<0>(resp) ? 'q' : 'p';
-
-                    if (std::max(std::get<0>(resp), std::get<0>(resq)) > 0.50) {
-                        printf("    Prediction: '%c'        ('q' %8.5g vs %8.5g 'p')    (offsets    %5d %5d)\n",
-                               res, std::get<0>(resq), std::get<0>(resp), std::get<1>(resq), std::get<1>(resp));
-                    }
-
-                    g_predictedKey = res;
+                {
+                    std::lock_guard<std::mutex> lock(mutex);
+                    workQueue.push_back(std::move(workData));
                 }
             }
 
@@ -234,14 +306,6 @@ int main(int, char**) {
             auto & ampl = history.back();
             for (int k = 0; k < nFrames; ++k) {
                 ampl[k] = frames[k];
-            }
-
-            if (keyPressed == 'q' && timesToPressQ > 0) {
-                --timesToPressQ;
-                printStatus = true;
-            } else if (keyPressed == 'p' && timesToPressP > 0) {
-                --timesToPressP;
-                printStatus = true;
             }
         }
 
@@ -267,38 +331,31 @@ int main(int, char**) {
         }
     };
 
-#ifdef __EMSCRIPTEN__
-#else
-    std::thread keyReader = std::thread([&]() {
-        struct termios oldt, newt;
-        tcgetattr ( STDIN_FILENO, &oldt );
-        newt = oldt;
-        newt.c_lflag &= ~( ICANON | ECHO );
-        tcsetattr ( STDIN_FILENO, TCSANOW, &newt );
-        while (true) {
-            int key = getchar();
-            g_handleKey(key);
-        }
-        tcsetattr ( STDIN_FILENO, TCSANOW, &oldt );
-    });
-#endif
-
     g_update = [&]() {
-        if (timesToPressQ > 0 || timesToPressP > 0) {
-            if (printStatus) {
-                if (timesToPressQ > 0) {
-                    printf("    - press the letter 'q' %d more times\n", timesToPressQ);
-                } else if (timesToPressP > 0) {
-                    printf("    - press the letter 'p' %d more times\n", timesToPressP);
+        if (processingInput) {
+            if (keyPressed == -1) {
+                AudioLogger::Frame frame;
+                AudioLogger::Record record;
+                fin.read((char *)(&keyPressed), sizeof(keyPressed));
+                if (fin.eof()) {
+                    processingInput = false;
+                } else {
+                    printf("%c", keyPressed);
+                    fflush(stdout);
+                    for (int i = 0; i < kBufferSize_frames; ++i) {
+                        fin.read((char *)(frame.data()), sizeof(AudioLogger::Sample)*frame.size());
+                        record.push_back(frame);
+                    }
+                    cbAudio(record);
                 }
-                printStatus = false;
             }
-
             return;
         }
 
         if (isReadyToPredict == false) {
             printf("[+] Training\n");
+
+            std::vector<TKey> failedToTrain;
 
             auto trainKey = [&](TKey key) {
                 auto & history = keySoundHistoryAmpl[key];
@@ -510,8 +567,11 @@ int main(int, char**) {
                 printf("\n");
             };
 
-            trainKey('q');
-            trainKey('p');
+            for (const auto & kh : keySoundHistoryAmpl) {
+                if (kh.second.size() > 2) {
+                    trainKey(kh.first);
+                }
+            }
             isReadyToPredict = true;
             doRecord = true;
 
@@ -526,17 +586,11 @@ int main(int, char**) {
         }
     };
 
-#ifdef __EMSCRIPTEN__
-    printf("Build time: %s\n", BUILD_TIMESTAMP);
-    printf("Press the Init button to start\n");
-    emscripten_set_main_loop(update, 60, 1);
-#else
     init();
     while (true) {
         update();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-#endif
 
     return 0;
 }
