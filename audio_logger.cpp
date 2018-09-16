@@ -32,11 +32,13 @@ struct AudioLogger::Data {
 
     Callback callback = nullptr;
 
+    uint64_t sampleRate = kMaxSampleRate;
+
     int32_t nFramesToRecord = 0;
     int32_t sampleSize_bytes = 4;
 
     int32_t bufferId = 0;
-    std::array<Frame, kBufferSize_frames> buffer;
+    std::array<Frame, getBufferSize_frames(kMaxSampleRate, kMaxBufferSize_s)> buffer;
 
     Record record;
 
@@ -47,8 +49,10 @@ AudioLogger::AudioLogger() : data_(new AudioLogger::Data()) {}
 
 AudioLogger::~AudioLogger() {}
 
-bool AudioLogger::install(AudioLogger::Callback callback) {
+bool AudioLogger::install(uint64_t sampleRate, AudioLogger::Callback callback) {
     auto & data = getData();
+
+    data.sampleRate = sampleRate;
 
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
@@ -64,7 +68,7 @@ bool AudioLogger::install(AudioLogger::Callback callback) {
     SDL_AudioSpec captureSpec;
     SDL_zero(captureSpec);
 
-    captureSpec.freq = kSampleRate;
+    captureSpec.freq = data.sampleRate;
     captureSpec.format = AUDIO_F32SYS;
     captureSpec.channels = 1;
     captureSpec.samples = kSamplesPerFrame;
@@ -131,18 +135,24 @@ bool AudioLogger::addFrame(const Sample * stream) {
     return true;
 }
 
-bool AudioLogger::record() {
+bool AudioLogger::record(float bufferSize_s) {
     auto & data = getData();
+
+    if (bufferSize_s > kMaxBufferSize_s) return false;
+
+    auto bufferSize_frames = getBufferSize_frames(data.sampleRate, bufferSize_s);
 
     std::lock_guard<std::mutex> lock(data.mutex);
 
     if (data.record.size() == 0) {
-        for (size_t i = 0; i < data.buffer.size() - 1; ++i) {
-            data.record.push_back(data.buffer[(data.bufferId + i + 1)%data.buffer.size()]);
+        int fStart = data.bufferId - bufferSize_frames + 1;
+        if (fStart < 0) fStart += data.buffer.size();
+        for (size_t i = 0; i < bufferSize_frames - 1; ++i) {
+            data.record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
         }
     }
 
-    data.nFramesToRecord = kBufferSize_frames;
+    data.nFramesToRecord = bufferSize_frames;
 
     return true;
 }

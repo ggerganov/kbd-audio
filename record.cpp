@@ -18,6 +18,8 @@ int main(int argc, const char ** argv) {
     }
 
     size_t totalSize_bytes = 0;
+    constexpr float kBufferSize_s = 0.1f;
+    constexpr uint64_t kSampleRate = 48000;
 
     std::ofstream fout(argv[1], std::ios::binary);
 
@@ -32,7 +34,7 @@ int main(int argc, const char ** argv) {
         printf("Total data saved: %g MB\n", ((float)(totalSize_bytes)/1024.0f/1024.0f));
     };
 
-    if (audioLogger.install(cbAudio) == false) {
+    if (audioLogger.install(kSampleRate, cbAudio) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
         return -1;
     }
@@ -40,7 +42,7 @@ int main(int argc, const char ** argv) {
     KeyLogger keyLogger;
     KeyLogger::Callback cbKey = [&audioLogger](int key) -> void {
         //printf("%s\n", KeyLogger::codeToText(key));
-        audioLogger.record();
+        audioLogger.record(kBufferSize_s);
     };
 
     if (keyLogger.install(cbKey) == false) {

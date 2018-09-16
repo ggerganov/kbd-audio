@@ -32,6 +32,10 @@ int main(int, char**) {
     int windowSizeX = 1280;
     int windowSizeY = 800;
 
+    constexpr float kBufferSize_s = 0.1f;
+    constexpr uint64_t kSampleRate = 48000;
+    constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+
 #if __APPLE__
     // GL 3.2 Core + GLSL 150
     const char* glsl_version = "#version 150";
@@ -87,11 +91,11 @@ int main(int, char**) {
     fftwf_plan fftPlan = fftwf_plan_dft_1d(AudioLogger::kSamplesPerFrame, fftIn, fftOut, FFTW_FORWARD, FFTW_ESTIMATE);
 
     using TKey = int;
-    using TKeyAverage = std::array<AudioLogger::Frame, 2*AudioLogger::kBufferSize_frames - 1>;
+    using TKeyWaveform = std::array<AudioLogger::Frame, kBufferSize_frames>;
 
     TKey keyPressed = -1;
-    std::map<TKey, TKeyAverage> keySoundAverageAmpl;
-    std::map<TKey, TKeyAverage> keySoundAverageFreq;
+    std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
+    std::map<TKey, TKeyWaveform> keySoundAverageFreq;
 
     std::vector<float> similarityForOffset(4*AudioLogger::kSamplesPerFrame);
 
@@ -263,7 +267,7 @@ int main(int, char**) {
         keyPressed = -1;
     };
 
-    if (audioLogger.install(cbAudio) == false) {
+    if (audioLogger.install(kSampleRate, cbAudio) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
         return -1;
     }
@@ -281,7 +285,7 @@ int main(int, char**) {
                         //auto t1 = std::chrono::high_resolution_clock::now();
                         //printf("Event: %d\n", (int) std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
                         keyPressed = event.key.keysym.sym;
-                        audioLogger.record();
+                        audioLogger.record(kBufferSize_s);
                     }
                     break;
                 case SDL_QUIT:
@@ -300,7 +304,7 @@ int main(int, char**) {
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
         ImGui::SetNextWindowSize(ImVec2(windowSizeX, windowSizeY), ImGuiCond_Once);
         ImGui::Begin("Average Key Waveform");
-        ImGui::Text("Frames in buffer: %d\n", (int) (2*AudioLogger::kBufferSize_frames - 1));
+        ImGui::Text("Frames in buffer: %d\n", (int) kBufferSize_frames);
         {
             std::lock_guard<std::mutex> lock(mutex);
 
@@ -314,7 +318,7 @@ int main(int, char**) {
                     static float f(void * data, int i) {
                         int fid = i/AudioLogger::kSamplesPerFrame;
                         int sid = i - fid*AudioLogger::kSamplesPerFrame;
-                        const auto & frames = *(TKeyAverage *)(data);
+                        const auto & frames = *(TKeyWaveform *)(data);
                         const auto & frame = frames[fid];
                         return frame[sid];
                     }

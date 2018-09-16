@@ -12,10 +12,13 @@
 
 class AudioLogger {
     public:
-        static constexpr uint64_t kSampleRate = 12000;
+        constexpr static uint64_t getBufferSize_frames(uint64_t sampleRate, float bufferSize_s) {
+            return (bufferSize_s*sampleRate)/kSamplesPerFrame;
+        }
+
         static constexpr uint64_t kSamplesPerFrame = 1024;
-        static constexpr float kBufferSize_s = 1.000;
-        static constexpr uint64_t kBufferSize_frames = kBufferSize_s*kSampleRate/kSamplesPerFrame;
+        static constexpr uint64_t kMaxSampleRate = 44100;
+        static constexpr float    kMaxBufferSize_s = 1.000f;
 
         using Sample = float;
         using Frame = std::array<Sample, kSamplesPerFrame>;
@@ -25,9 +28,9 @@ class AudioLogger {
         AudioLogger();
         ~AudioLogger();
 
-        bool install(Callback callback);
+        bool install(uint64_t sampleRate, Callback callback);
         bool addFrame(const Sample * stream);
-        bool record();
+        bool record(float bufferSize_s);
 
     private:
         struct Data;

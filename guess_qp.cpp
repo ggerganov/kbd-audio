@@ -56,16 +56,28 @@ extern "C" {
 }
 
 int main(int, char**) {
+#ifdef __EMSCRIPTEN__
+    constexpr float kBufferSize_s = 1.0f;
+    constexpr uint64_t kSampleRate = 12000;
+#else
+    constexpr float kBufferSize_s = 0.1f;
+    constexpr uint64_t kSampleRate = 48000;
+#endif
+
+    constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+
     using ValueCC = float;
     using Offset = int;
 
     using TKey = int;
-    using TKeyWaveform = std::array<AudioLogger::Frame, 2*AudioLogger::kBufferSize_frames - 1>;
+    using TKeyWaveform = std::array<AudioLogger::Frame, kBufferSize_frames>;
     using TKeyHistory = std::vector<TKeyWaveform>;
 
     TKey keyPressed = -1;
     std::map<TKey, TKeyHistory> keySoundHistoryAmpl;
     std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
+
+    float bufferSize_s = 1.000f;
 
     int timesToPressQ = 5;
     int timesToPressP = 5;
@@ -122,7 +134,8 @@ int main(int, char**) {
 
     AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & frames) {
         if (frames.size() != keySoundAverageAmpl[keyPressed].size()) {
-            printf("Unexpected number of frames - %d. Should never happen\n", (int) frames.size());
+            printf("Unexpected number of frames - %d, expected - %d. Should never happen\n",
+                   (int) frames.size(), (int) keySoundAverageAmpl[keyPressed].size());
             return;
         }
 
@@ -172,7 +185,7 @@ int main(int, char**) {
     };
 
     g_init = [&]() {
-        if (audioLogger.install(cbAudio) == false) {
+        if (audioLogger.install(kSampleRate, cbAudio) == false) {
             fprintf(stderr, "Failed to install audio logger\n");
             return -1;
         }
@@ -186,7 +199,7 @@ int main(int, char**) {
         if (keyPressed == -1) {
             g_predictedKey = -1;
             keyPressed = key;
-            audioLogger.record();
+            audioLogger.record(kBufferSize_s);
         }
     };
 
