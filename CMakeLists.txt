@@ -71,6 +71,9 @@ target_link_libraries(key_average_gui PRIVATE Core ImGui)
 add_executable(guess_qp guess_qp.cpp)
 target_link_libraries(guess_qp PRIVATE Core)
 
+add_executable(key_detector key_detector.cpp)
+target_link_libraries(key_detector PRIVATE Core)
+
 if (APPLE)
     add_executable(record record.cpp key_logger.cpp)
     target_link_libraries(record PRIVATE Core)
