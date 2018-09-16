@@ -16,8 +16,8 @@ int main(int argc, const char ** argv) {
     constexpr uint64_t kSampleRate = 48000;
     constexpr uint64_t kRingBufferSize = 16*1024;
 
-    int bkgrStep_samples = 7;
-    int keyDuration_samples = 0.100*kSampleRate;
+    constexpr int bkgrStep_samples = 7;
+    constexpr int keyDuration_samples = 0.100*kSampleRate;
 
     // rig buffer
     int rbBegin = 0;

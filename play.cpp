@@ -12,6 +12,14 @@ bool g_terminate = false;
 
 void cbPlayback(void * userdata, uint8_t * stream, int len) {
     std::ifstream * fin = (std::ifstream *)(userdata);
+    int keyPressed = -1;
+    fin->read((char *)(&keyPressed), sizeof(keyPressed));
+    if (fin->eof()) {
+        g_terminate = true;
+        return;
+    }
+    printf("%c", keyPressed);
+    fflush(stdout);
     fin->read((char *)(stream), len); // todo
     if (fin->eof()) g_terminate = true;
 }
@@ -23,6 +31,9 @@ int main(int argc, char ** argv) {
     }
 
     std::ifstream fin(argv[1], std::ios::binary);
+
+    int bufferSize_frames = 1;
+    fin.read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
 
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
@@ -38,10 +49,10 @@ int main(int argc, char ** argv) {
     SDL_AudioSpec playbackSpec;
     SDL_zero(playbackSpec);
 
-    playbackSpec.freq = 44100;
+    playbackSpec.freq = 48000;
     playbackSpec.format = AUDIO_F32SYS;
     playbackSpec.channels = 1;
-    playbackSpec.samples = 1024;
+    playbackSpec.samples = bufferSize_frames*1024;
     playbackSpec.callback = cbPlayback;
     playbackSpec.userdata = (void *)(&fin);
 

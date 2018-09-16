@@ -21,17 +21,23 @@ int main(int argc, const char ** argv) {
     constexpr float kBufferSize_s = 0.1f;
     constexpr uint64_t kSampleRate = 48000;
 
+    int keyPressed = -1;
+    int bufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+
     std::ofstream fout(argv[1], std::ios::binary);
+    fout.write((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
 
     AudioLogger audioLogger;
-    AudioLogger::Callback cbAudio = [&fout, &totalSize_bytes](const auto & frames) {
+    AudioLogger::Callback cbAudio = [&](const auto & frames) {
         printf("Record callback with %d frames\n", (int) frames.size());
+        fout.write((char *)(&keyPressed), sizeof(keyPressed));
         for (const auto & frame : frames) {
             totalSize_bytes += sizeof(frame[0])*frame.size();
             fout.write((char *)(frame.data()), sizeof(frame[0])*frame.size());
             fout.flush();
         }
         printf("Total data saved: %g MB\n", ((float)(totalSize_bytes)/1024.0f/1024.0f));
+        keyPressed = -1;
     };
 
     if (audioLogger.install(kSampleRate, cbAudio) == false) {
@@ -40,9 +46,18 @@ int main(int argc, const char ** argv) {
     }
 
     KeyLogger keyLogger;
-    KeyLogger::Callback cbKey = [&audioLogger](int key) -> void {
-        //printf("%s\n", KeyLogger::codeToText(key));
-        audioLogger.record(kBufferSize_s);
+    KeyLogger::Callback cbKey = [&](int key) -> void {
+        const char * ascii = KeyLogger::codeToText(key);
+        if (strlen(ascii) > 1) return;
+        char c = ascii[0];
+        if (keyPressed == -1 &&
+            ((c >= 'a' && c <= 'z') ||
+             (c >= '0' && c <= '9') ||
+             (c == ' ')
+             )) {
+            keyPressed = c;
+            audioLogger.record(kBufferSize_s);
+        }
     };
 
     if (keyLogger.install(cbKey) == false) {
