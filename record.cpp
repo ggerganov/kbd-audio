@@ -18,8 +18,8 @@ int main(int argc, const char ** argv) {
     }
 
     size_t totalSize_bytes = 0;
-    constexpr float kBufferSize_s = 0.1f;
-    constexpr uint64_t kSampleRate = 48000;
+    constexpr float kBufferSize_s = 0.075f;
+    constexpr uint64_t kSampleRate = 96000;
 
     int keyPressed = -1;
     int bufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;

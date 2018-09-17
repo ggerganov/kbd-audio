@@ -12,12 +12,12 @@
 #include <thread>
 
 int main(int argc, const char ** argv) {
-    constexpr float kBufferSize_s = 0.3f;
-    constexpr uint64_t kSampleRate = 48000;
+    constexpr float kBufferSize_s = 0.150f;
+    constexpr uint64_t kSampleRate = 96000;
     constexpr uint64_t kRingBufferSize = 16*1024;
 
     constexpr int bkgrStep_samples = 7;
-    constexpr int keyDuration_samples = 0.100*kSampleRate;
+    constexpr int keyDuration_samples = 0.150f*kSampleRate;
 
     // rig buffer
     int rbBegin = 0;
@@ -46,7 +46,8 @@ int main(int argc, const char ** argv) {
 
         int skip_samples = 0;
         int nFrames = frames.size();
-        for (int f = nFrames/4; f <= 3*nFrames/4; ++f) {
+        int nFrames2 = std::max(1, nFrames/2);
+        for (int f = nFrames2 - nFrames2/2; f <= nFrames2 + nFrames2/2; ++f) {
             for (int s = 0; s < frames[f].size(); ++s) {
                 if (s + skip_samples >= frames[f].size()) {
                     skip_samples -= frames[f].size() - s;

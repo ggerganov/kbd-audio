@@ -80,10 +80,13 @@ target_link_libraries(guess_all PRIVATE Core)
 add_executable(key_detector key_detector.cpp)
 target_link_libraries(key_detector PRIVATE Core)
 
+add_executable(play play.cpp)
+target_link_libraries(play PRIVATE Core)
+
+add_executable(scale scale.cpp)
+target_link_libraries(scale PRIVATE Core)
+
 if (APPLE)
     add_executable(record record.cpp key_logger.cpp)
     target_link_libraries(record PRIVATE Core)
-
-    add_executable(play play.cpp key_logger.cpp)
-    target_link_libraries(play PRIVATE Core)
 endif (APPLE)

@@ -54,12 +54,12 @@ int main(int argc, char ** argv) {
         return -127;
     }
 
-    constexpr float kBufferSize_s = 0.1f;
-    constexpr uint64_t kSampleRate = 48000;
+    constexpr float kBufferSize_s = 0.075f;
+    constexpr uint64_t kSampleRate = 96000;
 
     constexpr uint64_t kRingBufferSize = 16*1024;
     constexpr int bkgrStep_samples = 7;
-    constexpr int keyDuration_samples = 0.100*kSampleRate;
+    constexpr int keyDuration_samples = 0.050f*kSampleRate;
 
     constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
 
@@ -151,7 +151,7 @@ int main(int argc, char ** argv) {
                         sum01 += a0*a1;
                     }
 
-                    int ncc = scmp1 - scmp0;
+                    int ncc = (scmp1 - scmp0);
                     {
                         float nom = sum01*ncc - sum0*sum1;
                         float den2a = sum02*ncc - sum0*sum0;
@@ -195,6 +195,7 @@ int main(int argc, char ** argv) {
                 std::lock_guard<std::mutex> lock(mutex);
                 while (workQueue.size() > 30) {
                     workQueue.pop_front();
+                    printf("pop\n");
                 }
 
                 if (workQueue.size() > 0) {
@@ -349,7 +350,7 @@ int main(int argc, char ** argv) {
                 fins[curFile].read((char *)(&keyPressed), sizeof(keyPressed));
                 if (fins[curFile].eof()) {
                     ++curFile;
-                    if (curFile >= fins.size()) { 
+                    if (curFile >= fins.size()) {
                         processingInput = false;
                     }
                 } else {
@@ -542,7 +543,7 @@ int main(int argc, char ** argv) {
                             }
                         }
 
-                        if (bestcc > 0.60f) ++nconf;
+                        if (bestcc > 0.65f) ++nconf;
                         sumcc += bestcc;
                         aligncc[iwaveform] = bestcc;
                         printf("        Best offset for waveform %-4d = %-4d (cc = %g)\n", iwaveform, besto, bestcc);
@@ -581,7 +582,7 @@ int main(int argc, char ** argv) {
                 auto & avgWaveform = keySoundAverageAmpl[key];
                 for (auto & f : avgWaveform) f.fill(0.0f);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
-                    if (aligncc[iwaveform] < 0.60f) continue;
+                    if (aligncc[iwaveform] < 0.65f) continue;
                     auto & waveform = history[iwaveform];
                     for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
                         for (int isample = 0; isample < nSamplesPerFrame; ++isample) {

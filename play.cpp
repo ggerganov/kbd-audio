@@ -34,6 +34,7 @@ int main(int argc, char ** argv) {
 
     int bufferSize_frames = 1;
     fin.read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
+    printf("Buffer size = %d frames\n", bufferSize_frames);
 
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
@@ -49,7 +50,7 @@ int main(int argc, char ** argv) {
     SDL_AudioSpec playbackSpec;
     SDL_zero(playbackSpec);
 
-    playbackSpec.freq = 48000;
+    playbackSpec.freq = 96000;
     playbackSpec.format = AUDIO_F32SYS;
     playbackSpec.channels = 1;
     playbackSpec.samples = bufferSize_frames*1024;
