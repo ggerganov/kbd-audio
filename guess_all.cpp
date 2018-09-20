@@ -14,6 +14,118 @@
 #include <deque>
 #include <fstream>
 
+// constants
+
+constexpr float kBufferSize_s = 0.075f;
+constexpr uint64_t kSampleRate = 96000;
+
+constexpr uint64_t kRingBufferSize = 16*1024;
+constexpr int bkgrStep_samples = 7;
+constexpr int keyDuration_samples = 0.050f*kSampleRate;
+
+constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+
+constexpr auto kSamplesPerFrame = AudioLogger::kSamplesPerFrame;
+constexpr auto kSamplesPerWaveform = kSamplesPerFrame*kBufferSize_frames;
+
+// types
+
+using TKey = int;
+using TKeyWaveform = std::array<AudioLogger::Sample, kSamplesPerFrame*kBufferSize_frames>;
+using TKeyHistory = std::vector<TKeyWaveform>;
+
+// helpers
+
+using TSum = double;
+using TSum2 = double;
+std::tuple<TSum, TSum2> calcSum(const TKeyWaveform & waveform, int is0, int is1) {
+    TSum sum = 0.0f;
+    TSum2 sum2 = 0.0f;
+    for (int is = is0; is < is1; ++is) {
+        auto a0 = waveform[is];
+        sum += a0;
+        sum2 += a0*a0;
+    }
+
+    return { sum, sum2 };
+}
+
+using TValueCC = double;
+using TOffset = int;
+TValueCC calcCC(
+    const TKeyWaveform & waveform0,
+    const TKeyWaveform & waveform1,
+    TSum sum0, TSum2 sum02,
+    int is00, int is0, int is1) {
+    TValueCC cc = -1.0f;
+
+    TSum sum1 = 0.0f;
+    TSum2 sum12 = 0.0f;
+    TSum2 sum01 = 0.0f;
+    for (int is = 0; is < is1 - is0; ++is) {
+        auto a0 = waveform0[is00 + is];
+        auto a1 = waveform1[is0 + is];
+
+        sum1 += a1;
+        sum12 += a1*a1;
+        sum01 += a0*a1;
+    }
+
+    int ncc = (is1 - is0);
+    {
+        double nom = sum01*ncc - sum0*sum1;
+        double den2a = sum02*ncc - sum0*sum0;
+        double den2b = sum12*ncc - sum1*sum1;
+        cc = (nom)/(sqrt(den2a*den2b));
+    }
+
+    return cc;
+}
+
+std::tuple<TValueCC, TOffset> findBestCC(
+    const TKeyWaveform & waveform0,
+    const TKeyWaveform & waveform1,
+    int is0, int is1,
+    int alignWindow) {
+    TOffset besto = -1;
+    TValueCC bestcc = -1.0f;
+
+    int is00 = waveform0.size()/2 - (is1 - is0)/2;
+    auto [sum0, sum02] = calcSum(waveform0, is00, is00 + is1 - is0);
+
+    int nWorkers = std::thread::hardware_concurrency();
+    std::mutex mutex;
+    std::vector<std::thread> workers(nWorkers);
+    for (int i = 0; i < workers.size(); ++i) {
+        auto & worker = workers[i];
+        worker = std::thread([&, sum0 = sum0, sum02 = sum02, i]() {
+            TOffset cbesto = -1;
+            TValueCC cbestcc = -1.0f;
+
+            for (int o = -alignWindow + i; o < alignWindow; o += nWorkers) {
+                auto cc = calcCC(waveform0, waveform1, sum0, sum02, is00, is0 + o, is1 + o);
+                if (cc > cbestcc) {
+                    cbesto = o;
+                    cbestcc = cc;
+                }
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                if (cbestcc > bestcc) {
+                    bestcc = cbestcc;
+                    besto = cbesto;
+                }
+            }
+        });
+    }
+    for (auto & worker : workers) worker.join();
+
+    return { bestcc, besto };
+}
+
+// globals
+
 static int g_predictedKey = -1;
 static bool g_isInitialized = false;
 
@@ -54,15 +166,6 @@ int main(int argc, char ** argv) {
         return -127;
     }
 
-    constexpr float kBufferSize_s = 0.075f;
-    constexpr uint64_t kSampleRate = 96000;
-
-    constexpr uint64_t kRingBufferSize = 16*1024;
-    constexpr int bkgrStep_samples = 7;
-    constexpr int keyDuration_samples = 0.050f*kSampleRate;
-
-    constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
-
     std::map<int, std::ifstream> fins;
     for (int i = 0; i < argc - 1; ++i) {
         printf("Opening file '%s'\n", argv[i + 1]);
@@ -78,13 +181,6 @@ int main(int argc, char ** argv) {
         }
     }
 
-    using ValueCC = float;
-    using Offset = int;
-
-    using TKey = int;
-    using TKeyWaveform = std::array<AudioLogger::Frame, kBufferSize_frames>;
-    using TKeyHistory = std::vector<TKeyWaveform>;
-
     TKey keyPressed = -1;
     std::map<TKey, TKeyHistory> keySoundHistoryAmpl;
     std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
@@ -96,86 +192,13 @@ int main(int argc, char ** argv) {
 
     int curFile = 0;
 
-    // rig buffer
+    // ring buffer
     int rbBegin = 0;
     float rbAverage = 0.0f;
     std::array<float, kRingBufferSize> rbSamples;
     rbSamples.fill(0.0f);
 
     AudioLogger audioLogger;
-
-    auto calcCC = [](const TKeyWaveform & waveform0, const TKeyWaveform & waveform1, int nSamplesPerFrame, int scmp0, int scmp1, int alignWindow) {
-        int is00 = waveform0.size()*nSamplesPerFrame/2 - (scmp1 - scmp0)/2;
-
-        Offset besto = -1;
-        ValueCC bestcc = -1.0f;
-
-        float sum0 = 0.0f, sum02 = 0.0f;
-        for (int is = 0; is < scmp1 - scmp0; ++is) {
-            int is0 = is00 + is;
-            int f0 = is0/nSamplesPerFrame;
-            int s0 = is0 - f0*nSamplesPerFrame;
-
-            auto a0 = waveform0[f0][s0];
-            sum0 += a0;
-            sum02 += a0*a0;
-        }
-
-        int nWorkers = 4;
-        std::mutex mutex;
-        std::vector<std::thread> workers(nWorkers);
-        for (int i = 0; i < workers.size(); ++i) {
-            auto & worker = workers[i];
-            worker = std::thread([&, i]() {
-                Offset cbesto = -1;
-                ValueCC cbestcc = -1.0f;
-
-                for (int o = -alignWindow + i; o < alignWindow; o += nWorkers) {
-                    float cc = -1.0f;
-
-                    float sum1 = 0.0f, sum12 = 0.0f, sum01 = 0.0f;
-                    for (int is = 0; is < scmp1 - scmp0; ++is) {
-                        int is0 = is00 + is;
-                        int f0 = is0/nSamplesPerFrame;
-                        int s0 = is0 - f0*nSamplesPerFrame;
-
-                        int is1 = is + scmp0 + o;
-                        int f1 = is1/nSamplesPerFrame;
-                        int s1 = is1 - f1*nSamplesPerFrame;
-
-                        auto a0 = waveform0[f0][s0];
-                        auto a1 = waveform1[f1][s1];
-                        sum1 += a1;
-                        sum12 += a1*a1;
-
-                        sum01 += a0*a1;
-                    }
-
-                    int ncc = (scmp1 - scmp0);
-                    {
-                        float nom = sum01*ncc - sum0*sum1;
-                        float den2a = sum02*ncc - sum0*sum0;
-                        float den2b = sum12*ncc - sum1*sum1;
-                        cc = (nom)/(sqrt(den2a*den2b));
-                    }
-
-                    if (cc > cbestcc) {
-                        cbesto = o;
-                        cbestcc = cc;
-                    }
-                }
-                {
-                    std::lock_guard<std::mutex> lock(mutex);
-                    if (cbestcc > bestcc) {
-                        bestcc = cbestcc;
-                        besto = cbesto;
-                    }
-                }
-            });
-        }
-        for (auto & worker : workers) worker.join();
-        return std::tuple<ValueCC, Offset>{ bestcc, besto };
-    };
 
     struct WorkData {
         TKeyWaveform ampl;
@@ -186,7 +209,7 @@ int main(int argc, char ** argv) {
     std::deque<WorkData> workQueue;
     std::thread worker([&]() {
         int lastkey = -1;
-        float lastcc = -1.0f;
+        double lastcc = -1.0f;
 
         while(true) {
             bool process = false;
@@ -205,24 +228,23 @@ int main(int argc, char ** argv) {
                 }
             }
             if (process) {
-                int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
                 const auto & ampl = workData.ampl;
                 const auto & positionsToPredict = workData.positionsToPredict;
 
-                int nFramesPerWaveform = ampl.size();
-                int alignWindow = 2*nSamplesPerFrame;
+                int nFramesPerWaveform = kBufferSize_frames;
+                int alignWindow = 2*kSamplesPerFrame;
 
                 for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
-                    int scmp0 = positionsToPredict[ipos] - nSamplesPerFrame/2;
-                    int scmp1 = positionsToPredict[ipos] + nSamplesPerFrame/2;
+                    int scmp0 = positionsToPredict[ipos] - kSamplesPerFrame/2;
+                    int scmp1 = positionsToPredict[ipos] + kSamplesPerFrame/2;
 
                     char res = -1;
-                    float maxcc = -1.0f;
+                    double maxcc = -1.0f;
                     for (const auto & ka : keySoundAverageAmpl) {
-                        auto curcc = calcCC(keySoundAverageAmpl[ka.first], ampl, nSamplesPerFrame, scmp0, scmp1, alignWindow);
-                        if (std::get<0>(curcc) > maxcc) {
+                        auto [bestcc, bestoffset] = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
+                        if (bestcc > maxcc) {
                             res = ka.first;
-                            maxcc = std::get<0>(curcc);
+                            maxcc = bestcc;
                         }
                     }
 
@@ -243,17 +265,15 @@ int main(int argc, char ** argv) {
     });
 
     AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & frames) {
-        if (frames.size() != keySoundAverageAmpl[keyPressed].size()) {
+        if (frames.size() != kBufferSize_frames) {
             printf("Unexpected number of frames - %d, expected - %d. Should never happen\n",
-                   (int) frames.size(), (int) keySoundAverageAmpl[keyPressed].size());
+                   (int) frames.size(), (int) kBufferSize_frames);
             return;
         }
 
         const int nFrames = frames.size();
 
         if (isReadyToPredict) {
-
-            int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
 
             std::vector<int> positionsToPredict;
 
@@ -288,7 +308,7 @@ int main(int argc, char ** argv) {
                         auto acur = frames[f][s];
                         if (acur > 10.0f*rbAverage) {
                             skip_samples = keyDuration_samples;
-                            positionsToPredict.push_back(f*nSamplesPerFrame + s);
+                            positionsToPredict.push_back(f*kSamplesPerFrame + s);
                             //printf("Key press detected\n");
                         }
                     }
@@ -299,8 +319,9 @@ int main(int argc, char ** argv) {
 
             if (positionsToPredict.size() > 0) {
                 WorkData workData;
+                auto & ampl = workData.ampl;
                 for (int k = 0; k < nFrames; ++k) {
-                    workData.ampl[k] = frames[k];
+                    std::copy(frames[k].begin(), frames[k].end(), ampl.begin() + k*kSamplesPerFrame);
                 }
                 workData.positionsToPredict = positionsToPredict;
 
@@ -316,7 +337,7 @@ int main(int argc, char ** argv) {
             history.push_back(TKeyWaveform());
             auto & ampl = history.back();
             for (int k = 0; k < nFrames; ++k) {
-                ampl[k] = frames[k];
+                std::copy(frames[k].begin(), frames[k].end(), ampl.begin() + k*kSamplesPerFrame);
             }
         }
 
@@ -375,15 +396,14 @@ int main(int argc, char ** argv) {
                 auto & history = keySoundHistoryAmpl[key];
 
                 int nWaveforms = history.size();
-                int nFramesPerWaveform = history[0].size();
-                int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
+                int nFramesPerWaveform = kBufferSize_frames;
 
                 printf("    - Training key '%c'\n", key);
                 printf("    - History size = %d key waveforms\n", nWaveforms);
                 printf("    - Frames per key waveform   = %d\n", nFramesPerWaveform);
                 printf("    - Total frames available    = %d\n", nWaveforms*nFramesPerWaveform);
-                printf("    - Samples per frame         = %d\n", nSamplesPerFrame);
-                printf("    - Total samples available   = %d\n", nWaveforms*nFramesPerWaveform*nSamplesPerFrame);
+                printf("    - Samples per frame         = %d\n", (int) kSamplesPerFrame);
+                printf("    - Total samples available   = %d\n", (int) (nWaveforms*nFramesPerWaveform*kSamplesPerFrame));
 
                 printf("    - Estimating waveform peaks ...\n");
                 std::vector<int> peakSum;
@@ -393,27 +413,24 @@ int main(int argc, char ** argv) {
                 peakMax.clear();
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     int isum = -1;
-                    float asum = 0.0f;
-                    float aisum = 0.0f;
+                    double asum = 0.0f;
+                    double aisum = 0.0f;
 
                     int imax = -1;
-                    float amax = 0.0f;
+                    double amax = 0.0f;
 
                     const auto & waveform = history[iwaveform];
 
-                    for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
-                        for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
-                            int icur = iframe*nSamplesPerFrame + isample;
-                            float acur = std::abs(waveform[iframe][isample]);
-                            float acur2 = acur*acur;
+                    for (int icur = 0; icur < kSamplesPerWaveform; ++icur) {
+                        double acur = std::abs(waveform[icur]);
+                        double acur2 = acur*acur;
 
-                            asum += acur2;
-                            aisum += acur2*icur;
+                        asum += acur2;
+                        aisum += acur2*icur;
 
-                            if (acur > amax) {
-                                amax = acur;
-                                imax = icur;
-                            }
+                        if (acur > amax) {
+                            amax = acur;
+                            imax = icur;
                         }
                     }
 
@@ -421,12 +438,12 @@ int main(int argc, char ** argv) {
 
                     peakSum.push_back(isum);
                     peakMax.push_back(imax);
-                    printf("        Estimated peak: %d (method - sum), %d (method - max)\n", isum, imax);
+                    //printf("        Estimated peak: %d (method - sum), %d (method - max)\n", isum, imax);
                 }
 
                 auto calcStdev = [](const std::vector<int> & data) {
-                    float sum = 0.0f;
-                    float sum2 = 0.0f;
+                    double sum = 0.0f;
+                    double sum2 = 0.0f;
                     for (const auto & p : data) {
                         sum += p;
                         sum2 += p*p;
@@ -436,168 +453,124 @@ int main(int argc, char ** argv) {
                     return sqrt(sum2 - sum*sum);
                 };
 
-                float stdevSum = calcStdev(peakSum);
-                float stdevMax = calcStdev(peakMax);
+                double stdevSum = calcStdev(peakSum);
+                double stdevMax = calcStdev(peakMax);
 
                 printf("    - Stdev of estimated peaks: %g (sum) vs %g (max)\n", stdevSum, stdevMax);
 
                 const auto & peakUsed = peakMax;
                 printf("    - Using 'max' estimation\n");
 
-                int centerSample = nFramesPerWaveform*nSamplesPerFrame/2;
+                int centerSample = kSamplesPerWaveform/2;
 
                 printf("    - Centering waveforms at sample %d\n", centerSample);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     int offset = peakUsed[iwaveform] - centerSample;
-                    printf("        Offset for waveform %-4d = %-4d\n", iwaveform, offset);
+                    //printf("        Offset for waveform %-4d = %-4d\n", iwaveform, offset);
 
                     auto newWaveform = TKeyWaveform();
                     auto & waveform = history[iwaveform];
-                    for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
-                        for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
-                            int icur = iframe*nSamplesPerFrame + isample;
-                            int iorg = icur + offset;
+                    for (int icur = 0; icur < kSamplesPerWaveform; ++icur) {
+                        int iorg = icur + offset;
 
-                            if (iorg >= 0 && iorg < nFramesPerWaveform*nSamplesPerFrame) {
-                                int f = iorg/nSamplesPerFrame;
-                                int s = iorg - f*nSamplesPerFrame;
-                                newWaveform[iframe][isample] = waveform[f][s];
-                            } else {
-                                newWaveform[iframe][isample] = 0.0f;
-                            }
+                        if (iorg >= 0 && iorg < kSamplesPerWaveform) {
+                            newWaveform[icur] = waveform[iorg];
+                        } else {
+                            newWaveform[icur] = 0.0f;
                         }
                     }
 
                     waveform = std::move(newWaveform);
                 }
 
-                bool aligned = false;
-                std::map<int, float> aligncc;
+                int alignWindow = centerSample/2;
+                printf("    - Calculating CC pairs\n");
+                printf("      Align window = %d\n", alignWindow);
+
+                int bestw = -1;
+                double bestccsum2 = -1.0f;
+                std::map<int, std::map<int, std::tuple<TValueCC, TOffset>>> ccs;
+
                 for (int alignToWaveform = 0; alignToWaveform < nWaveforms; ++alignToWaveform) {
-                    int alignWindow = centerSample/2;
-                    printf("    - Aligning all waveforms to waveform %d using cross correlation\n", alignToWaveform);
-                    printf("      Align window = %d\n", alignWindow);
+                    ccs[alignToWaveform][alignToWaveform] = { 1.0f, 0 };
 
-                    int scmp0 = centerSample - nSamplesPerFrame/4;
-                    int scmp1 = centerSample + nSamplesPerFrame/4;
-
-                    float sum0 = 0.0f;
-                    float sum02 = 0.0f;
+                    int is0 = centerSample - kSamplesPerFrame/2;
+                    int is1 = centerSample + kSamplesPerFrame/2;
 
                     const auto & waveform0 = history[alignToWaveform];
+                    auto [sum0, sum02] = calcSum(waveform0, is0, is1);
 
-                    for (int is = scmp0; is < scmp1; ++is) {
-                        int f = is/nSamplesPerFrame;
-                        int s = is - f*nSamplesPerFrame;
+                    for (int iwaveform = alignToWaveform + 1; iwaveform < nWaveforms; ++iwaveform) {
+                        const auto & waveform1 = history[iwaveform];
+                        auto [bestcc, bestoffset] = findBestCC(waveform0, waveform1, is0, is1, alignWindow);
 
-                        auto a = waveform0[f][s];
-                        sum0 += a;
-                        sum02 += a*a;
+                        ccs[iwaveform][alignToWaveform] = { bestcc, bestoffset };
+                        ccs[alignToWaveform][iwaveform] = { bestcc, -bestoffset };
                     }
 
-                    int nconf = 0;
-                    float sumcc = 0.0f;
-
-                    auto curHistory = history;
+                    double curccsum2 = 0.0f;
                     for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
-                        aligncc[iwaveform] = 1.0f;
-                        if (iwaveform == alignToWaveform) continue;
-
-                        auto & waveform1 = curHistory[iwaveform];
-
-                        int besto = 0;
-                        float bestcc = 0.0f;
-
-                        for (int o = -alignWindow; o < alignWindow; ++o) {
-                            float cc = 0.0f;
-
-                            float sum1 = 0.0f, sum12 = 0.0f, sum01 = 0.0f;
-                            for (int is = scmp0; is < scmp1; ++is) {
-                                int is1 = is + o;
-                                int f1 = is1/nSamplesPerFrame;
-                                int s1 = is1 - f1*nSamplesPerFrame;
-
-                                auto a1 = waveform1[f1][s1];
-                                sum1 += a1;
-                                sum12 += a1*a1;
-
-                                int is0 = is;
-                                int f0 = is0/nSamplesPerFrame;
-                                int s0 = is0 - f0*nSamplesPerFrame;
-
-                                auto a0 = waveform0[f0][s0];
-                                sum01 += a0*a1;
-                            }
-
-                            int ncc = scmp1 - scmp0;
-                            {
-                                float nom = sum01*ncc - sum0*sum1;
-                                float den2a = sum02*ncc - sum0*sum0;
-                                float den2b = sum12*ncc - sum1*sum1;
-                                cc = (nom)/(sqrt(den2a*den2b));
-                            }
-
-                            if (cc > bestcc) {
-                                besto = o;
-                                bestcc = cc;
-                            }
-                        }
-
-                        if (bestcc > 0.65f) ++nconf;
-                        sumcc += bestcc;
-                        aligncc[iwaveform] = bestcc;
-                        printf("        Best offset for waveform %-4d = %-4d (cc = %g)\n", iwaveform, besto, bestcc);
-
-                        auto newWaveform = TKeyWaveform();
-                        for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
-                            for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
-                                int icur = iframe*nSamplesPerFrame + isample;
-                                int iorg = icur + besto;
-
-                                if (iorg >= 0 && iorg < nFramesPerWaveform*nSamplesPerFrame) {
-                                    int f = iorg/nSamplesPerFrame;
-                                    int s = iorg - f*nSamplesPerFrame;
-                                    newWaveform[iframe][isample] = waveform1[f][s];
-                                } else {
-                                    newWaveform[iframe][isample] = 0.0f;
-                                }
-                            }
-                        }
-
-                        waveform1 = std::move(newWaveform);
+                        auto [cc, offset] = ccs[iwaveform][alignToWaveform];
+                        curccsum2 += cc;
                     }
 
-                    if (nconf > nWaveforms/2) {
-                        history = curHistory;
-                        aligned = true;
-                        break;
+                    if (curccsum2 > bestccsum2) {
+                        bestw = alignToWaveform;
+                        bestccsum2 = curccsum2;
                     }
                 }
+                bestccsum2 /= nWaveforms;
 
-                if (aligned == false) {
-                    failedToTrain.push_back(key);
+                printf("    - Aligning all waveforms to waveform %d, (cost = %g)\n", bestw, bestccsum2);
+                //std::ofstream fout(std::string("waveform_one_") + std::to_string(key) + ".plot");
+                //for (auto & v : history[bestw]) fout << v << std::endl;
+                //fout << std::endl;
+                for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
+                    if (iwaveform == bestw) continue;
+
+                    auto & waveform1 = history[iwaveform];
+                    auto [cc, offset] = ccs[iwaveform][bestw];
+
+                    auto newWaveform = TKeyWaveform();
+                    for (int icur = 0; icur < kSamplesPerWaveform; ++icur) {
+                        int iorg = icur + offset;
+
+                        if (iorg >= 0 && iorg < kSamplesPerWaveform) {
+                            newWaveform[icur] = waveform1[iorg];
+                        } else {
+                            newWaveform[icur] = 0.0f;
+                        }
+                    }
+
+                    waveform1 = std::move(newWaveform);
+                    //for (auto & v : waveform1) fout << v << std::endl;
+                    //fout << std::endl;
                 }
 
                 printf("    - Calculating average waveform\n");
+                double ccsum = 0.0f;
+                double norm = 1.0f;
                 auto & avgWaveform = keySoundAverageAmpl[key];
-                for (auto & f : avgWaveform) f.fill(0.0f);
+                avgWaveform.fill(0.0f);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
-                    if (aligncc[iwaveform] < 0.65f) continue;
+                    auto [cc, offset] = ccs[iwaveform][bestw];
+                    if (cc < 0.4f) continue;
+                    printf("        Adding waveform %d - cc = %g, offset = %d\n", iwaveform, cc, offset);
+                    ccsum += cc*cc;
+                    norm += cc*cc;
                     auto & waveform = history[iwaveform];
-                    for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
-                        for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
-                            avgWaveform[iframe][isample] += waveform[iframe][isample];
-                        }
+                    for (int is = 0; is < kSamplesPerWaveform; ++is) {
+                        avgWaveform[is] += cc*cc*waveform[is];
                     }
                 }
 
-                {
-                    float norm = 1.0f/(nFramesPerWaveform*nSamplesPerFrame);
-                    for (int iframe = 0; iframe < nFramesPerWaveform; ++iframe) {
-                        for (int isample = 0; isample < nSamplesPerFrame; ++isample) {
-                            avgWaveform[iframe][isample] *= norm;
-                        }
-                    }
+                norm = 1.0f/(norm);
+                for (int is = 0; is < kSamplesPerWaveform; ++is) {
+                    avgWaveform[is] *= norm;
+                }
+
+                if (ccsum*norm < 0.50f || (1.0f/norm < nWaveforms/3)) {
+                    failedToTrain.push_back(key);
                 }
 
                 printf("\n");
