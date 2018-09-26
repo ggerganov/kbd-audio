@@ -16,8 +16,8 @@ class AudioLogger {
             return (bufferSize_s*sampleRate)/kSamplesPerFrame;
         }
 
-        static constexpr uint64_t kSamplesPerFrame = 1024;
-        static constexpr uint64_t kMaxSampleRate = 44100;
+        static constexpr uint64_t kSamplesPerFrame = 512;
+        static constexpr uint64_t kMaxSampleRate = 96000;
         static constexpr float    kMaxBufferSize_s = 1.000f;
 
         using Sample = float;
@@ -31,6 +31,7 @@ class AudioLogger {
         bool install(uint64_t sampleRate, Callback callback);
         bool addFrame(const Sample * stream);
         bool record(float bufferSize_s);
+        bool recordSym(float bufferSize_s);
 
     private:
         struct Data;

@@ -17,9 +17,12 @@ int main(int argc, const char ** argv) {
         return -127;
     }
 
+    auto tStart = std::chrono::high_resolution_clock::now();
+    auto tEnd = std::chrono::high_resolution_clock::now();
+
     size_t totalSize_bytes = 0;
     constexpr float kBufferSize_s = 0.075f;
-    constexpr uint64_t kSampleRate = 96000;
+    constexpr uint64_t kSampleRate = 24000;
 
     int keyPressed = -1;
     int bufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
@@ -29,6 +32,9 @@ int main(int argc, const char ** argv) {
 
     AudioLogger audioLogger;
     AudioLogger::Callback cbAudio = [&](const auto & frames) {
+        tEnd = std::chrono::high_resolution_clock::now();
+        printf("t = %d us\n", (int) std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart).count());
+
         printf("Record callback with %d frames\n", (int) frames.size());
         fout.write((char *)(&keyPressed), sizeof(keyPressed));
         for (const auto & frame : frames) {
@@ -47,6 +53,7 @@ int main(int argc, const char ** argv) {
 
     KeyLogger keyLogger;
     KeyLogger::Callback cbKey = [&](int key) -> void {
+        tStart = std::chrono::high_resolution_clock::now();
         const char * ascii = KeyLogger::codeToText(key);
         if (strlen(ascii) > 1) return;
         char c = ascii[0];

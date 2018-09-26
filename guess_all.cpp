@@ -14,14 +14,17 @@
 #include <deque>
 #include <fstream>
 
+#define MY_DEBUG
+#define OUTPUT_WAVEFORMS
+
 // constants
 
 constexpr float kBufferSize_s = 0.075f;
-constexpr uint64_t kSampleRate = 96000;
+constexpr uint64_t kSampleRate = 24000;
 
 constexpr uint64_t kRingBufferSize = 16*1024;
 constexpr int bkgrStep_samples = 7;
-constexpr int keyDuration_samples = 0.050f*kSampleRate;
+constexpr int keyDuration_samples = 0.005f*kSampleRate;
 
 constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
 
@@ -31,7 +34,7 @@ constexpr auto kSamplesPerWaveform = kSamplesPerFrame*kBufferSize_frames;
 // types
 
 using TKey = int;
-using TKeyWaveform = std::array<AudioLogger::Sample, kSamplesPerFrame*kBufferSize_frames>;
+using TKeyWaveform = std::vector<AudioLogger::Sample>;
 using TKeyHistory = std::vector<TKeyWaveform>;
 
 // helpers
@@ -65,6 +68,14 @@ TValueCC calcCC(
     for (int is = 0; is < is1 - is0; ++is) {
         auto a0 = waveform0[is00 + is];
         auto a1 = waveform1[is0 + is];
+
+#ifdef MY_DEBUG
+        if (is00 + is < 0 || is00 + is >= waveform0.size()) printf("BUG 0\n");
+        if (is0 + is < 0 || is0 + is >= waveform1.size()) {
+            printf("BUG 1\n");
+            printf("%d %d %d\n", is0, is, (int) waveform1.size());
+        }
+#endif
 
         sum1 += a1;
         sum12 += a1*a1;
@@ -232,7 +243,7 @@ int main(int argc, char ** argv) {
                 const auto & positionsToPredict = workData.positionsToPredict;
 
                 int nFramesPerWaveform = kBufferSize_frames;
-                int alignWindow = 2*kSamplesPerFrame;
+                int alignWindow = ((nFramesPerWaveform/2)*kSamplesPerFrame)/2;
 
                 for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
                     int scmp0 = positionsToPredict[ipos] - kSamplesPerFrame/2;
@@ -265,7 +276,7 @@ int main(int argc, char ** argv) {
     });
 
     AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & frames) {
-        if (frames.size() != kBufferSize_frames) {
+        if (frames.size() != kBufferSize_frames && isReadyToPredict == false) {
             printf("Unexpected number of frames - %d, expected - %d. Should never happen\n",
                    (int) frames.size(), (int) kBufferSize_frames);
             return;
@@ -295,7 +306,8 @@ int main(int argc, char ** argv) {
                 int skip_samples = 0;
                 int nFrames = frames.size();
                 int nFrames2 = std::max(1, nFrames/2);
-                for (int f = nFrames2 - nFrames2/2; f <= nFrames2 + nFrames2/2; ++f) {
+                //for (int f = nFrames2 - nFrames2/2; f <= nFrames2 + nFrames2/2; ++f) {
+                for (int f = nFrames/4; f < frames.size() - 2; ++f) {
                     for (int s = 0; s < frames[f].size(); ++s) {
                         if (s + skip_samples >= frames[f].size()) {
                             skip_samples -= frames[f].size() - s;
@@ -306,7 +318,8 @@ int main(int argc, char ** argv) {
                             skip_samples = 0;
                         }
                         auto acur = frames[f][s];
-                        if (acur > 10.0f*rbAverage) {
+                        //if (acur > 10.0f*rbAverage) {
+                        if (acur > 0.5f*amax && ((s == frames[f].size() - 1) || (acur > frames[f][s-1] && acur > frames[f][s+1]))) {
                             skip_samples = keyDuration_samples;
                             positionsToPredict.push_back(f*kSamplesPerFrame + s);
                             //printf("Key press detected\n");
@@ -320,6 +333,7 @@ int main(int argc, char ** argv) {
             if (positionsToPredict.size() > 0) {
                 WorkData workData;
                 auto & ampl = workData.ampl;
+                ampl.resize(nFrames*kSamplesPerFrame);
                 for (int k = 0; k < nFrames; ++k) {
                     std::copy(frames[k].begin(), frames[k].end(), ampl.begin() + k*kSamplesPerFrame);
                 }
@@ -336,6 +350,7 @@ int main(int argc, char ** argv) {
             auto & history = keySoundHistoryAmpl[keyPressed];
             history.push_back(TKeyWaveform());
             auto & ampl = history.back();
+            ampl.resize(nFrames*kSamplesPerFrame);
             for (int k = 0; k < nFrames; ++k) {
                 std::copy(frames[k].begin(), frames[k].end(), ampl.begin() + k*kSamplesPerFrame);
             }
@@ -469,6 +484,7 @@ int main(int argc, char ** argv) {
                     //printf("        Offset for waveform %-4d = %-4d\n", iwaveform, offset);
 
                     auto newWaveform = TKeyWaveform();
+                    newWaveform.resize(kSamplesPerWaveform);
                     auto & waveform = history[iwaveform];
                     for (int icur = 0; icur < kSamplesPerWaveform; ++icur) {
                         int iorg = icur + offset;
@@ -522,9 +538,11 @@ int main(int argc, char ** argv) {
                 bestccsum2 /= nWaveforms;
 
                 printf("    - Aligning all waveforms to waveform %d, (cost = %g)\n", bestw, bestccsum2);
-                //std::ofstream fout(std::string("waveform_one_") + std::to_string(key) + ".plot");
-                //for (auto & v : history[bestw]) fout << v << std::endl;
-                //fout << std::endl;
+#ifdef OUTPUT_WAVEFORMS
+                std::ofstream fout(std::string("waveform_one_") + std::to_string(key) + ".plot");
+                for (auto & v : history[bestw]) fout << v << std::endl;
+                fout << std::endl;
+#endif
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     if (iwaveform == bestw) continue;
 
@@ -532,6 +550,7 @@ int main(int argc, char ** argv) {
                     auto [cc, offset] = ccs[iwaveform][bestw];
 
                     auto newWaveform = TKeyWaveform();
+                    newWaveform.resize(kSamplesPerWaveform);
                     for (int icur = 0; icur < kSamplesPerWaveform; ++icur) {
                         int iorg = icur + offset;
 
@@ -543,18 +562,21 @@ int main(int argc, char ** argv) {
                     }
 
                     waveform1 = std::move(newWaveform);
-                    //for (auto & v : waveform1) fout << v << std::endl;
-                    //fout << std::endl;
+#ifdef OUTPUT_WAVEFORMS
+                    for (auto & v : waveform1) fout << v << std::endl;
+                    fout << std::endl;
+#endif
                 }
 
                 printf("    - Calculating average waveform\n");
                 double ccsum = 0.0f;
                 double norm = 1.0f;
                 auto & avgWaveform = keySoundAverageAmpl[key];
-                avgWaveform.fill(0.0f);
+                avgWaveform.resize(kSamplesPerWaveform);
+                std::fill(avgWaveform.begin(), avgWaveform.end(), 0.0f);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     auto [cc, offset] = ccs[iwaveform][bestw];
-                    if (cc < 0.4f) continue;
+                    if (cc < 0.50f) continue;
                     printf("        Adding waveform %d - cc = %g, offset = %d\n", iwaveform, cc, offset);
                     ccsum += cc*cc;
                     norm += cc*cc;
@@ -568,6 +590,13 @@ int main(int argc, char ** argv) {
                 for (int is = 0; is < kSamplesPerWaveform; ++is) {
                     avgWaveform[is] *= norm;
                 }
+
+#ifdef OUTPUT_WAVEFORMS
+                {
+                    std::ofstream fout(std::string("waveform_avg_") + std::to_string(key) + ".plot");
+                    for (auto & v : avgWaveform) fout << v << std::endl;
+                }
+#endif
 
                 if (ccsum*norm < 0.50f || (1.0f/norm < nWaveforms/3)) {
                     failedToTrain.push_back(key);
@@ -596,7 +625,7 @@ int main(int argc, char ** argv) {
 
         if (doRecord) {
             doRecord = false;
-            audioLogger.record(kBufferSize_s);
+            audioLogger.recordSym(0.50f);
         }
     };
 

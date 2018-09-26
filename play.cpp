@@ -6,6 +6,8 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_audio.h>
 
+#include "audio_logger.h"
+
 #include <fstream>
 
 bool g_terminate = false;
@@ -50,10 +52,10 @@ int main(int argc, char ** argv) {
     SDL_AudioSpec playbackSpec;
     SDL_zero(playbackSpec);
 
-    playbackSpec.freq = 96000;
+    playbackSpec.freq = 24000;
     playbackSpec.format = AUDIO_F32SYS;
     playbackSpec.channels = 1;
-    playbackSpec.samples = bufferSize_frames*1024;
+    playbackSpec.samples = bufferSize_frames*AudioLogger::kSamplesPerFrame;
     playbackSpec.callback = cbPlayback;
     playbackSpec.userdata = (void *)(&fin);
 
