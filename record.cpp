@@ -61,9 +61,12 @@ int main(int argc, const char ** argv) {
         newt.c_lflag &= ~( ICANON | ECHO );
         tcsetattr ( STDIN_FILENO, TCSANOW, &newt );
         while (true) {
-            int keyPressed = getchar();
+            int key = getchar();
             tStart = std::chrono::high_resolution_clock::now();
-            audioLogger.record(kBufferSize_s);
+            if (keyPressed == -1) {
+                keyPressed = key;
+                audioLogger.record(kBufferSize_s);
+            }
         }
         tcsetattr ( STDIN_FILENO, TCSANOW, &oldt );
     });
