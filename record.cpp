@@ -3,8 +3,11 @@
  *  \author Georgi Gerganov
  */
 
-#include "key_logger.h"
 #include "audio_logger.h"
+
+#include <stdio.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include <cstdio>
 #include <chrono>
@@ -51,26 +54,19 @@ int main(int argc, const char ** argv) {
         return -1;
     }
 
-    KeyLogger keyLogger;
-    KeyLogger::Callback cbKey = [&](int key) -> void {
-        tStart = std::chrono::high_resolution_clock::now();
-        const char * ascii = KeyLogger::codeToText(key);
-        if (strlen(ascii) > 1) return;
-        char c = ascii[0];
-        if (keyPressed == -1 &&
-            ((c >= 'a' && c <= 'z') ||
-             (c >= '0' && c <= '9') ||
-             (c == ' ')
-             )) {
-            keyPressed = c;
+    std::thread keyReader = std::thread([&]() {
+        struct termios oldt, newt;
+        tcgetattr ( STDIN_FILENO, &oldt );
+        newt = oldt;
+        newt.c_lflag &= ~( ICANON | ECHO );
+        tcsetattr ( STDIN_FILENO, TCSANOW, &newt );
+        while (true) {
+            int keyPressed = getchar();
+            tStart = std::chrono::high_resolution_clock::now();
             audioLogger.record(kBufferSize_s);
         }
-    };
-
-    if (keyLogger.install(cbKey) == false) {
-        fprintf(stderr, "Failed to install key logger\n");
-        return -2;
-    }
+        tcsetattr ( STDIN_FILENO, TCSANOW, &oldt );
+    });
 
     while (true) {}
 

@@ -21,10 +21,8 @@ find_package(FFTW REQUIRED)
 string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
 
 if (APPLE)
-    find_library(COREFOUNDATION_LIBRARY CoreFoundation )
     find_library(COREGRAPHICS_LIBRARY CoreGraphics )
 else (APPLE)
-    unset(COREFOUNDATION_LIBRARY)
     unset(COREGRAPHICS_LIBRARY)
 endif (APPLE)
 
@@ -45,7 +43,6 @@ target_link_libraries(Core PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
     ${SDL2_LIBRARIES}
     ${FFTWF_LIBRARIES}
-    ${COREGRAPHICS_LIBRARY}
     ${COREFOUNDATION_LIBRARY}
     )
 
@@ -91,7 +88,5 @@ target_link_libraries(play PRIVATE Core)
 add_executable(scale scale.cpp)
 target_link_libraries(scale PRIVATE Core)
 
-if (APPLE)
-    add_executable(record record.cpp key_logger.cpp)
-    target_link_libraries(record PRIVATE Core)
-endif (APPLE)
+add_executable(record record.cpp)
+target_link_libraries(record PRIVATE Core)
