@@ -33,6 +33,10 @@ int main(int argc, char ** argv) {
     }
 
     std::ifstream fin(argv[1], std::ios::binary);
+    if (fin.good() == false) {
+        fprintf(stderr, "Failed to open file '%s'\n", argv[1]);
+        return -1;
+    }
 
     int bufferSize_frames = 1;
     fin.read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
