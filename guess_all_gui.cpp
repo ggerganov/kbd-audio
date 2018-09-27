@@ -790,7 +790,11 @@ int main(int argc, char ** argv) {
                     if (key == predictedKey) {
                         ImGui::TextColored({1.0f, 0.0f, 0.0f, 1.0f}, "%s", kKeyText.at(key));
                     } else {
-                        ImGui::Text("%s", kKeyText.at(key));
+                        if (keySoundAverageAmpl.find(key) == keySoundAverageAmpl.end()) {
+                            ImGui::TextDisabled("%s", kKeyText.at(key));
+                        } else {
+                            ImGui::Text("%s", kKeyText.at(key));
+                        }
                     }
                     conf *= 0.99f;
                 }
