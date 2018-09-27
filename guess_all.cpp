@@ -253,11 +253,13 @@ int main(int argc, char ** argv) {
                     double maxcc = -1.0f;
                     for (const auto & ka : keySoundAverageAmpl) {
                         auto [bestcc, bestoffset] = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
+                        //printf(" %8.4f ", bestcc);
                         if (bestcc > maxcc) {
                             res = ka.first;
                             maxcc = bestcc;
                         }
                     }
+                    //printf("\n");
 
                     if (maxcc > 0.50f) {
                         if (lastkey != res || lastcc != maxcc) {
@@ -514,7 +516,6 @@ int main(int argc, char ** argv) {
                     int is1 = centerSample + kSamplesPerFrame/2;
 
                     const auto & waveform0 = history[alignToWaveform];
-                    auto [sum0, sum02] = calcSum(waveform0, is0, is1);
 
                     for (int iwaveform = alignToWaveform + 1; iwaveform < nWaveforms; ++iwaveform) {
                         const auto & waveform1 = history[iwaveform];
@@ -527,6 +528,7 @@ int main(int argc, char ** argv) {
                     double curccsum2 = 0.0f;
                     for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                         auto [cc, offset] = ccs[iwaveform][alignToWaveform];
+                        if (std::abs(offset) > 5) continue;
                         curccsum2 += cc;
                     }
 
@@ -576,7 +578,7 @@ int main(int argc, char ** argv) {
                 std::fill(avgWaveform.begin(), avgWaveform.end(), 0.0f);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     auto [cc, offset] = ccs[iwaveform][bestw];
-                    if (cc < 0.50f) continue;
+                    if (cc < 0.50f || std::abs(offset) > 5) continue;
                     printf("        Adding waveform %d - cc = %g, offset = %d\n", iwaveform, cc, offset);
                     ccsum += cc*cc;
                     norm += cc*cc;
