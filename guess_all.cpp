@@ -6,6 +6,7 @@
 #include "audio_logger.h"
 
 #include <map>
+#include <mutex>
 #include <cmath>
 #include <string>
 #include <chrono>
