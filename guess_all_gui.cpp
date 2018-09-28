@@ -51,17 +51,25 @@ static const std::vector<std::vector<int>> kKeyboard = {
 
 // types
 
+using TSum = double;
+using TSum2 = double;
 using TConfidence = float;
+using TValueCC = double;
+using TOffset = int;
 
 using TKey = int;
 using TKeyWaveform = std::vector<AudioLogger::Sample>;
 using TKeyHistory = std::vector<TKeyWaveform>;
 using TKeyConfidenceMap = std::map<TKey, TConfidence>;
 
+struct TrainStats {
+    int nWaveformsUsed = 0;
+    int nWaveformsTotal = 0;
+    TValueCC averageCC = 0.0f;
+};
+
 // helpers
 
-using TSum = double;
-using TSum2 = double;
 std::tuple<TSum, TSum2> calcSum(const TKeyWaveform & waveform, int is0, int is1) {
     TSum sum = 0.0f;
     TSum2 sum2 = 0.0f;
@@ -74,8 +82,6 @@ std::tuple<TSum, TSum2> calcSum(const TKeyWaveform & waveform, int is0, int is1)
     return { sum, sum2 };
 }
 
-using TValueCC = double;
-using TOffset = int;
 TValueCC calcCC(
     const TKeyWaveform & waveform0,
     const TKeyWaveform & waveform1,
@@ -248,7 +254,7 @@ int main(int argc, char ** argv) {
     //ImGui::StyleColorsClassic();
 
     ImFontConfig fontConfig;
-    fontConfig.SizePixels = 24.0f;
+    fontConfig.SizePixels = 18.0f;
     ImGui::GetIO().Fonts->AddFontDefault(&fontConfig);
 
     std::map<int, std::ifstream> fins;
@@ -279,6 +285,14 @@ int main(int argc, char ** argv) {
     int curFile = 0;
 
     int predictedKey = -1;
+    TKeyWaveform predictedAmpl(kSamplesPerWaveform, 0);
+    int predictedHistoryBegin = 0;
+    std::array<int, 32> predictedHistory;
+    predictedHistory.fill(0.0f);
+    std::map<TKey, TrainStats> trainStats;
+
+    float amplMin = 0.0f;
+    float amplMax = 0.0f;
     float thresholdCC = 0.5f;
     float thresholdBackground = 10.0f;
     TValueCC predictedCC = -1.0f;
@@ -323,26 +337,26 @@ int main(int argc, char ** argv) {
                 const auto & ampl = workData.ampl;
                 const auto & positionsToPredict = workData.positionsToPredict;
 
-                int nFramesPerWaveform = kBufferSize_frames;
-                int alignWindow = ((nFramesPerWaveform/2)*kSamplesPerFrame)/2;
+                int alignWindow = kSamplesPerFrame/2;
 
                 for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
-                    int scmp0 = positionsToPredict[ipos] - kSamplesPerFrame/2;
-                    int scmp1 = positionsToPredict[ipos] + kSamplesPerFrame/2;
+                    auto curPos = positionsToPredict[ipos];
+                    int scmp0 = curPos - kSamplesPerFrame/2;
+                    int scmp1 = curPos + kSamplesPerFrame/2;
 
                     char res = -1;
-                    double maxcc = -1.0f;
+                    TValueCC maxcc = -1.0f;
+                    TOffset offs = 0;
                     TKeyConfidenceMap keyConfidenceTmp;
                     for (const auto & ka : keySoundAverageAmpl) {
                         auto [bestcc, bestoffset] = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
-                        //printf(" %8.4f ", bestcc);
                         if (bestcc > maxcc) {
                             res = ka.first;
                             maxcc = bestcc;
+                            offs = bestoffset;
                         }
                         keyConfidenceTmp[ka.first] = bestcc;
                     }
-                    //printf("\n");
 
                     if (maxcc > thresholdCC) {
                         if (lastkey != res || lastcc != maxcc) {
@@ -352,6 +366,13 @@ int main(int argc, char ** argv) {
                             for (auto & c : keyConfidenceTmp) {
                                 keyConfidence[c.first] = std::pow(c.second/maxcc, 4.0);
                             }
+                            for (int i = 0; i < kSamplesPerWaveform; ++i) {
+                                int idx = curPos + offs - kSamplesPerWaveform/2 + i;
+                                if (idx < 0 || idx >= (int) ampl.size()) continue;
+                                predictedAmpl[i] = ampl[idx];
+                            }
+                            predictedHistory[predictedHistoryBegin] = predictedKey;
+                            if (++predictedHistoryBegin >= predictedHistory.size()) predictedHistoryBegin = 0;
                         }
                         lastkey = res;
                         lastcc = maxcc;
@@ -590,7 +611,8 @@ int main(int argc, char ** argv) {
                 printf("      Align window = %d\n", alignWindow);
 
                 int bestw = -1;
-                double bestccsum2 = -1.0f;
+                int ntrain = 0;
+                double bestccsum = -1.0f;
                 std::map<int, std::map<int, std::tuple<TValueCC, TOffset>>> ccs;
 
                 for (int alignToWaveform = 0; alignToWaveform < nWaveforms; ++alignToWaveform) {
@@ -609,21 +631,28 @@ int main(int argc, char ** argv) {
                         ccs[alignToWaveform][iwaveform] = { bestcc, -bestoffset };
                     }
 
-                    double curccsum2 = 0.0f;
+                    int curntrain = 0;
+                    double curccsum = 0.0f;
                     for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                         auto [cc, offset] = ccs[iwaveform][alignToWaveform];
                         if (std::abs(offset) > 5) continue;
-                        curccsum2 += cc;
+                        ++curntrain;
+                        curccsum += cc;
                     }
 
-                    if (curccsum2 > bestccsum2) {
+                    if (curccsum > bestccsum) {
+                        ntrain = curntrain;
                         bestw = alignToWaveform;
-                        bestccsum2 = curccsum2;
+                        bestccsum = curccsum;
                     }
                 }
-                bestccsum2 /= nWaveforms;
+                bestccsum /= ntrain;
 
-                printf("    - Aligning all waveforms to waveform %d, (cost = %g)\n", bestw, bestccsum2);
+                trainStats[key].nWaveformsUsed = ntrain;
+                trainStats[key].nWaveformsTotal = nWaveforms;
+                trainStats[key].averageCC = bestccsum;
+
+                printf("    - Aligning all waveforms to waveform %d, (cost = %g)\n", bestw, bestccsum);
 #ifdef OUTPUT_WAVEFORMS
                 std::ofstream fout(std::string("waveform_one_") + std::to_string(key) + ".plot");
                 for (auto & v : history[bestw]) fout << v << std::endl;
@@ -662,8 +691,9 @@ int main(int argc, char ** argv) {
                 std::fill(avgWaveform.begin(), avgWaveform.end(), 0.0f);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     auto [cc, offset] = ccs[iwaveform][bestw];
-                    if (cc < 0.50f || std::abs(offset) > 5) continue;
+                    if (std::abs(offset) > 5) continue;
                     printf("        Adding waveform %d - cc = %g, offset = %d\n", iwaveform, cc, offset);
+                    cc = 1.0f;
                     ccsum += cc*cc;
                     norm += cc*cc;
                     auto & waveform = history[iwaveform];
@@ -675,6 +705,8 @@ int main(int argc, char ** argv) {
                 norm = 1.0f/(norm);
                 for (int is = 0; is < kSamplesPerWaveform; ++is) {
                     avgWaveform[is] *= norm;
+                    if (avgWaveform[is] > amplMax) amplMax = avgWaveform[is];
+                    if (avgWaveform[is] < amplMin) amplMin = avgWaveform[is];
                 }
 
 #ifdef OUTPUT_WAVEFORMS
@@ -704,6 +736,15 @@ int main(int argc, char ** argv) {
             isReadyToPredict = true;
             doRecord = true;
 
+            amplMax = std::max(amplMax, -amplMin);
+            amplMin = -std::max(amplMax, -amplMin);
+
+            for (auto & kh : keySoundAverageAmpl) {
+                float curAmplMax = 0.0f;
+                for (const auto & v : kh.second) if (std::abs(v) > curAmplMax) curAmplMax = std::abs(v);
+                for (auto & v : kh.second) v = (v/curAmplMax)*amplMax;
+            }
+
             printf("[+] Ready to predict. Keep pressing keys and the program will guess which key was pressed\n");
             printf("    based on the captured audio from the microphone.\n");
             printf("[+] Predicting\n");
@@ -725,14 +766,6 @@ int main(int argc, char ** argv) {
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
             switch (event.type) {
-                case SDL_KEYDOWN:
-                    if (keyPressed == -1) {
-                        //auto t1 = std::chrono::high_resolution_clock::now();
-                        //printf("Event: %d\n", (int) std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
-                        keyPressed = event.key.keysym.sym;
-                        audioLogger.record(kBufferSize_s);
-                    }
-                    break;
                 case SDL_QUIT:
                     done = true;
                     break;
@@ -742,13 +775,15 @@ int main(int argc, char ** argv) {
             };
         }
 
+        SDL_GetWindowSize(window, &windowSizeX, &windowSizeY);
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame(window);
         ImGui::NewFrame();
 
-        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
-        ImGui::SetNextWindowSize(ImVec2(windowSizeX, windowSizeY), ImGuiCond_Once);
-        ImGui::Begin("Main");
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(windowSizeX, windowSizeY));
+        ImGui::Begin("Main", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
         if (isReadyToPredict == false) {
             ImGui::Text("Training ... Please wait");
         } else {
@@ -799,6 +834,55 @@ int main(int argc, char ** argv) {
                     conf *= 0.99f;
                 }
                 oy += by;
+            }
+
+            ImGui::SetCursorScreenPos({p0.x, oy + ImGui::GetTextLineHeightWithSpacing()});
+
+            ImGui::TextDisabled("Last %d predicted keys:", (int) predictedHistory.size());
+            for (int i = 0; i < (int) predictedHistory.size(); ++i) {
+                int idx = (predictedHistoryBegin + i)%predictedHistory.size();
+                if (predictedHistory[idx] > 0) {
+                    ImGui::Text("%s", kKeyText.at(predictedHistory[idx])); ImGui::SameLine();
+                }
+            }
+            ImGui::Text("\n\n");
+
+            if (ImGui::CollapsingHeader("Last prediction", 0)) {
+                if (predictedKey != -1) {
+                    auto savePos = ImGui::GetCursorScreenPos();
+                    {
+                        const auto & ampl = keySoundAverageAmpl[predictedKey];
+                        ImGui::PlotLines((std::string("##") + kKeyText.at(predictedKey)).c_str(), ampl.data(), ampl.size(), 0, kKeyText.at(predictedKey), amplMin, amplMax, { ImGui::GetContentRegionAvailWidth(), 400.0f });
+                    }
+                    ImGui::SetCursorScreenPos(savePos);
+                    {
+                        ImGui::PushStyleColor(ImGuiCol_PlotLines, {1.0f, 0.0f, 0.0f, 0.5f});
+                        ImGui::PushStyleColor(ImGuiCol_FrameBg, {0.0f, 0.0f, 0.0f, 0.0f});
+                        ImGui::PlotLines((std::string("##") + kKeyText.at(predictedKey)).c_str(), predictedAmpl.data(), predictedAmpl.size(), 0, kKeyText.at(predictedKey), amplMin, amplMax, { ImGui::GetContentRegionAvailWidth(), 400.0f });
+                        ImGui::PopStyleColor(2);
+                    }
+                }
+            }
+
+            if (ImGui::CollapsingHeader("Average key sound", 0)) {
+                for (const auto & key : keySoundAverageAmpl) {
+                    ImGui::PlotLines((std::string("##") + kKeyText.at(key.first)).c_str(), key.second.data(), key.second.size(), 0, kKeyText.at(key.first), amplMin, amplMax, { ImGui::GetContentRegionAvailWidth(), 100.0f });
+                }
+            }
+
+            if (ImGui::CollapsingHeader("Training statistics", 0)) {
+                for (const auto & key : trainStats) {
+                    if (key.second.nWaveformsUsed < 0.75*key.second.nWaveformsTotal) {
+                        ImGui::TextColored({1.0f, 1.0f, 0.0f, 1.0f}, "Key: %8s   Average CC: %8.6f   Waveforms: %3d / %3d", kKeyText.at(key.first), key.second.averageCC, key.second.nWaveformsUsed, key.second.nWaveformsTotal);
+                        if (ImGui::IsItemHovered()) {
+                            ImGui::BeginTooltip();
+                            ImGui::Text("Predictions for this key might not be very accurate. Provide more training data");
+                            ImGui::EndTooltip();
+                        }
+                    } else {
+                        ImGui::Text("Key: %8s   Average CC: %8.6f   Waveforms: %3d / %3d", kKeyText.at(key.first), key.second.averageCC, key.second.nWaveformsUsed, key.second.nWaveformsTotal);
+                    }
+                }
             }
         }
 
