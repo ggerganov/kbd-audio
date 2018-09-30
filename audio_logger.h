@@ -29,6 +29,7 @@ class AudioLogger {
         ~AudioLogger();
 
         bool install(uint64_t sampleRate, Callback callback);
+        bool terminate();
         bool addFrame(const Sample * stream);
         bool record(float bufferSize_s);
         bool recordSym(float bufferSize_s);

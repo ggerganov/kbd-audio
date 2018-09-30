@@ -114,6 +114,15 @@ bool AudioLogger::install(uint64_t sampleRate, AudioLogger::Callback callback) {
     return true;
 }
 
+bool AudioLogger::terminate() {
+    auto & data = getData();
+
+    SDL_PauseAudioDevice(data.deviceIdIn, 1);
+    SDL_CloseAudioDevice(data.deviceIdIn);
+
+    return true;
+}
+
 bool AudioLogger::addFrame(const Sample * stream) {
     auto & data = getData();
 

@@ -204,8 +204,8 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
-    int windowSizeX = 1280;
-    int windowSizeY = 800;
+    int windowSizeX = 600;
+    int windowSizeY = 600;
 
 #if __APPLE__
     // GL 3.2 Core + GLSL 150
@@ -254,13 +254,17 @@ int main(int argc, char ** argv) {
     //ImGui::StyleColorsClassic();
 
     ImFontConfig fontConfig;
-    fontConfig.SizePixels = 18.0f;
+    //fontConfig.SizePixels = 14.0f;
     ImGui::GetIO().Fonts->AddFontDefault(&fontConfig);
 
     std::map<int, std::ifstream> fins;
     for (int i = 0; i < argc - 1; ++i) {
         printf("Opening file '%s'\n", argv[i + 1]);
         fins[i] = std::ifstream(argv[i + 1], std::ios::binary);
+        if (fins[i].good() == false) {
+            printf("Failed to open input file: '%s'\n", argv[i + 1]);
+            return -2;
+        }
 
         {
             int bufferSize_frames = 1;
@@ -281,6 +285,7 @@ int main(int argc, char ** argv) {
     bool printStatus = true;
     bool isReadyToPredict = false;
     bool processingInput = true;
+    bool finishApp = false;
 
     int curFile = 0;
 
@@ -317,7 +322,7 @@ int main(int argc, char ** argv) {
         int lastkey = -1;
         double lastcc = -1.0f;
 
-        while(true) {
+        while (finishApp == false) {
             bool process = false;
             WorkData workData;
             {
@@ -756,10 +761,8 @@ int main(int argc, char ** argv) {
         }
     };
 
-    bool done = false;
-
     init();
-    while (done == false) {
+    while (finishApp == false) {
         update();
 
         SDL_Event event;
@@ -767,10 +770,10 @@ int main(int argc, char ** argv) {
             ImGui_ImplSDL2_ProcessEvent(&event);
             switch (event.type) {
                 case SDL_QUIT:
-                    done = true;
+                    finishApp = true;
                     break;
                 case SDL_WINDOWEVENT:
-                    if (event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) done = true;
+                    if (event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) finishApp = true;
                     break;
             };
         }
@@ -803,8 +806,8 @@ int main(int argc, char ** argv) {
             auto p1 = p0;
             float ox = 0.0f;
             float oy = p0.y;
-            float bx = 64.0f;
-            float by = 64.0f;
+            float bx = 32.0f;
+            float by = 32.0f;
 
             for (int rid = 0; rid < kKeyboard.size(); ++rid) {
                 const auto & row = kKeyboard[rid];
@@ -874,7 +877,7 @@ int main(int argc, char ** argv) {
                 }
             }
 
-            if (ImGui::CollapsingHeader("Training statistics", 0)) {
+            if (ImGui::CollapsingHeader("Training statistics", ImGuiTreeNodeFlags_DefaultOpen)) {
                 for (const auto & key : trainStats) {
                     if (key.second.nWaveformsUsed < 0.75*key.second.nWaveformsTotal) {
                         ImGui::TextColored({1.0f, 1.0f, 0.0f, 1.0f}, "Key: %8s   Average CC: %8.6f   Waveforms: %3d / %3d", kKeyText.at(key.first), key.second.averageCC, key.second.nWaveformsUsed, key.second.nWaveformsTotal);
@@ -901,6 +904,8 @@ int main(int argc, char ** argv) {
         SDL_GL_SwapWindow(window);
     }
 
+    worker.join();
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
@@ -908,9 +913,6 @@ int main(int argc, char ** argv) {
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
     SDL_Quit();
-
-    printf("Kill with Ctrl + C\n");
-    while(true) { }
 
     return 0;
 }

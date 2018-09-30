@@ -22,8 +22,10 @@ string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
 
 if (APPLE)
     find_library(COREGRAPHICS_LIBRARY CoreGraphics )
+    find_library(COREFOUNDATION_LIBRARY CoreFoundation )
 else (APPLE)
     unset(COREGRAPHICS_LIBRARY)
+    unset(COREFOUNDATION_LIBRARY)
 endif (APPLE)
 
 include_directories(imgui)
