@@ -76,11 +76,11 @@ target_link_libraries(guess_qp PRIVATE Core)
 add_executable(guess_qp2 guess_qp2.cpp)
 target_link_libraries(guess_qp2 PRIVATE Core)
 
-add_executable(guess_all guess_all.cpp)
-target_link_libraries(guess_all PRIVATE Core)
+add_executable(keytap keytap.cpp)
+target_link_libraries(keytap PRIVATE Core)
 
-add_executable(guess_all_gui guess_all_gui.cpp)
-target_link_libraries(guess_all_gui PRIVATE Core ImGui)
+add_executable(keytap-gui keytap-gui.cpp)
+target_link_libraries(keytap-gui PRIVATE Core ImGui)
 
 add_executable(key_detector key_detector.cpp)
 target_link_libraries(key_detector PRIVATE Core)
