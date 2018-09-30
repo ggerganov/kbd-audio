@@ -90,8 +90,14 @@ target_link_libraries(key_detector PRIVATE Core)
 add_executable(play play.cpp)
 target_link_libraries(play PRIVATE Core)
 
+add_executable(play-full play-full.cpp)
+target_link_libraries(play-full PRIVATE Core)
+
 add_executable(scale scale.cpp)
 target_link_libraries(scale PRIVATE Core)
 
 add_executable(record record.cpp)
 target_link_libraries(record PRIVATE Core)
+
+add_executable(record-full record-full.cpp)
+target_link_libraries(record-full PRIVATE Core)
