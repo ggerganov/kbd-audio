@@ -839,6 +839,10 @@ int main(int argc, char ** argv) {
             ImGui::SetCursorScreenPos({p0.x, oy + ImGui::GetTextLineHeightWithSpacing()});
 
             ImGui::TextDisabled("Last %d predicted keys:", (int) predictedHistory.size());
+            ImGui::SameLine();
+            if (ImGui::Button("Clear")) {
+                std::fill(predictedHistory.begin(), predictedHistory.end(), 0);
+            }
             for (int i = 0; i < (int) predictedHistory.size(); ++i) {
                 int idx = (predictedHistoryBegin + i)%predictedHistory.size();
                 if (predictedHistory[idx] > 0) {
