@@ -34,6 +34,9 @@ class AudioLogger {
         bool record(float bufferSize_s);
         bool recordSym(float bufferSize_s);
 
+        bool pause();
+        bool resume();
+
     private:
         struct Data;
         std::unique_ptr<Data> data_;

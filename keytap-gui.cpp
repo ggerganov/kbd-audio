@@ -28,17 +28,20 @@
 
 // constants
 
-constexpr float kBufferSize_s = 0.075f;
+constexpr float kTrainBufferSize_s = 0.075f;
+constexpr float kPredictBufferSize_s = 0.200f;
 constexpr uint64_t kSampleRate = 24000;
 
 constexpr uint64_t kRingBufferSize = 128*1024;
-constexpr int bkgrStep_samples = 7;
-constexpr int keyDuration_samples = 0.005f*kSampleRate;
+constexpr int bkgrStep_samples = 1;
+//constexpr int keyDuration_samples = 0.005f*kSampleRate;
+constexpr int keyDuration_samples = 1;
 
-constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+constexpr uint64_t kTrainBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kTrainBufferSize_s) - 1;
+constexpr uint64_t kPredictBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kPredictBufferSize_s) - 1;
 
 constexpr auto kSamplesPerFrame = AudioLogger::kSamplesPerFrame;
-constexpr auto kSamplesPerWaveform = kSamplesPerFrame*kBufferSize_frames;
+constexpr auto kSamplesPerWaveform = kSamplesPerFrame*kTrainBufferSize_frames;
 
 static const std::vector<float> kRowOffset = { 0.0f, 1.5f, 1.8f, 2.1f, 5.5f };
 static const std::vector<std::vector<int>> kKeyboard = {
@@ -257,6 +260,7 @@ int main(int argc, char ** argv) {
     //fontConfig.SizePixels = 14.0f;
     ImGui::GetIO().Fonts->AddFontDefault(&fontConfig);
 
+    std::ifstream frecord;
     std::map<int, std::ifstream> fins;
     for (int i = 0; i < argc - 1; ++i) {
         printf("Opening file '%s'\n", argv[i + 1]);
@@ -269,8 +273,8 @@ int main(int argc, char ** argv) {
         {
             int bufferSize_frames = 1;
             fins[i].read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
-            if (bufferSize_frames != kBufferSize_frames) {
-                printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kBufferSize_frames);
+            if (bufferSize_frames != kTrainBufferSize_frames) {
+                printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kTrainBufferSize_frames);
                 return -1;
             }
         }
@@ -285,7 +289,9 @@ int main(int argc, char ** argv) {
     bool printStatus = true;
     bool isReadyToPredict = false;
     bool processingInput = true;
+    bool processingRecord = false;
     bool finishApp = false;
+    bool waitForQueueDuringPlayback = true;
 
     int curFile = 0;
 
@@ -327,7 +333,7 @@ int main(int argc, char ** argv) {
             WorkData workData;
             {
                 std::lock_guard<std::mutex> lock(mutex);
-                while (workQueue.size() > 30) {
+                while (workQueue.size() > 30 && processingRecord == false) {
                     workQueue.pop_front();
                     printf("pop\n");
                 }
@@ -390,9 +396,9 @@ int main(int argc, char ** argv) {
     });
 
     AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & frames) {
-        if (frames.size() != kBufferSize_frames && isReadyToPredict == false) {
+        if (frames.size() != kTrainBufferSize_frames && isReadyToPredict == false) {
             printf("Unexpected number of frames - %d, expected - %d. Should never happen\n",
-                   (int) frames.size(), (int) kBufferSize_frames);
+                   (int) frames.size(), (int) kTrainBufferSize_frames);
             return;
         }
 
@@ -417,26 +423,37 @@ int main(int argc, char ** argv) {
                     }
                 }
 
-                int skip_samples = 0;
                 int nFrames = frames.size();
                 int nFrames2 = std::max(1, nFrames/2);
-                //for (int f = nFrames2 - nFrames2/2; f <= nFrames2 + nFrames2/2; ++f) {
-                for (int f = 2; f < frames.size() - 2; ++f) {
-                    for (int s = 0; s < frames[f].size(); ++s) {
-                        if (s + skip_samples >= frames[f].size()) {
-                            skip_samples -= frames[f].size() - s;
-                            s += skip_samples;
-                            continue;
-                        } else {
-                            s += skip_samples;
-                            skip_samples = 0;
+
+                auto _acc = [](const AudioLogger::Record & r, int id) { return r[id/kSamplesPerFrame][id%kSamplesPerFrame]; };
+
+                int k = kSamplesPerFrame;
+                std::deque<int> que(k);
+                for (int i = 0; i < nFrames*kSamplesPerFrame; ++i) {
+                    if (i < k) {
+                        while((!que.empty()) && _acc(frames, i) >= _acc(frames, que.back())) {
+                            que.pop_back();
                         }
-                        auto acur = frames[f][s];
-                        if (acur > thresholdBackground*rbAverage && acur > 0.5f*amax &&
-                            ((s == frames[f].size() - 1) || (acur > frames[f][s-1] && acur > frames[f][s+1]))) {
-                            skip_samples = keyDuration_samples;
-                            positionsToPredict.push_back(f*kSamplesPerFrame + s);
-                            tLastDetectedKeyStroke = std::chrono::high_resolution_clock::now();
+                        que.push_back(i);
+                    } else {
+                        while((!que.empty()) && que.front() <= i - k) {
+                            que.pop_front();
+                        }
+
+                        while((!que.empty()) && _acc(frames, i) >= _acc(frames, que.back())) {
+                            que.pop_back();
+                        }
+
+                        que.push_back(i);
+
+                        int itest = i - k/2;
+                        if (itest >= 2*kSamplesPerFrame && itest < (nFrames - 2)*kSamplesPerFrame && que.front() == itest) {
+                            auto acur = _acc(frames, itest);
+                            if (acur > thresholdBackground*rbAverage){
+                                positionsToPredict.push_back(itest);
+                                tLastDetectedKeyStroke = std::chrono::high_resolution_clock::now();
+                            }
                         }
                     }
                 }
@@ -477,6 +494,8 @@ int main(int argc, char ** argv) {
             return -1;
         }
 
+        audioLogger.pause();
+
         printf("[+] Collecting training data\n");
         g_isInitialized = true;
         return 0;
@@ -486,7 +505,7 @@ int main(int argc, char ** argv) {
         if (keyPressed == -1 && isReadyToPredict == false) {
             predictedKey = -1;
             keyPressed = key;
-            audioLogger.record(kBufferSize_s);
+            audioLogger.record(kTrainBufferSize_s);
         }
     };
 
@@ -504,11 +523,49 @@ int main(int argc, char ** argv) {
                 } else {
                     printf("%c", keyPressed);
                     fflush(stdout);
-                    for (int i = 0; i < kBufferSize_frames; ++i) {
+                    for (int i = 0; i < kTrainBufferSize_frames; ++i) {
                         fins[curFile].read((char *)(frame.data()), sizeof(AudioLogger::Sample)*frame.size());
                         record.push_back(frame);
                     }
                     cbAudio(record);
+                }
+            }
+            return;
+        }
+
+        if (processingRecord) {
+            if (frecord.eof()) {
+                if (workQueue.size() == 0) {
+                    printf("[+] Done. Continuing capturing microphone audio \n");
+                    processingRecord = false;
+                    audioLogger.resume();
+                }
+
+                return;
+            }
+            if (keyPressed == -1 && ((waitForQueueDuringPlayback == false) || (waitForQueueDuringPlayback && workQueue.size() < 3))) {
+                AudioLogger::Frame frame;
+                static AudioLogger::Record record;
+                keyPressed = 32;
+                int nRead = kPredictBufferSize_frames;
+                if (record.size() > 5) {
+                    record.erase(record.begin(), record.end() - 5);
+                    nRead -= 5;
+                }
+                for (int i = 0; i < nRead; ++i) {
+                    frecord.read((char *)(frame.data()), sizeof(AudioLogger::Sample)*frame.size());
+                    if (frecord.eof()) {
+                        printf("[+] Waiting for work queue to get processed. Remaining jobs = %d \n", (int) workQueue.size());
+                        record.clear();
+                        break;
+                    } else {
+                        record.push_back(frame);
+                    }
+                }
+                if (record.size() == kPredictBufferSize_frames) {
+                    cbAudio(record);
+                } else {
+                    printf("    Skipping partial buffer of size %d frames\n", (int) record.size());
                 }
             }
             return;
@@ -523,7 +580,7 @@ int main(int argc, char ** argv) {
                 auto & history = keySoundHistoryAmpl[key];
 
                 int nWaveforms = history.size();
-                int nFramesPerWaveform = kBufferSize_frames;
+                int nFramesPerWaveform = kTrainBufferSize_frames;
 
                 printf("    - Training key '%c'\n", key);
                 printf("    - History size = %d key waveforms\n", nWaveforms);
@@ -750,6 +807,8 @@ int main(int argc, char ** argv) {
                 for (auto & v : kh.second) v = (v/curAmplMax)*amplMax;
             }
 
+            audioLogger.resume();
+
             printf("[+] Ready to predict. Keep pressing keys and the program will guess which key was pressed\n");
             printf("    based on the captured audio from the microphone.\n");
             printf("[+] Predicting\n");
@@ -757,7 +816,7 @@ int main(int argc, char ** argv) {
 
         if (doRecord) {
             doRecord = false;
-            audioLogger.recordSym(0.20f);
+            audioLogger.recordSym(kPredictBufferSize_s);
         }
     };
 
@@ -790,14 +849,34 @@ int main(int argc, char ** argv) {
         if (isReadyToPredict == false) {
             ImGui::Text("Training ... Please wait");
         } else {
-
+            {
+                static char inp[128] = { "record.kbd" };
+                ImGui::InputText("Audio file", inp, 128);
+                ImGui::SameLine();
+                if (ImGui::Button("Load")) {
+                    printf("[+] Replaying audio from file '%s' ...\n", inp);
+                    frecord = std::ifstream(inp, std::ios::binary);
+                    if (frecord.good()) {
+                        audioLogger.pause();
+                        processingRecord = true;
+                    }
+                }
+                ImGui::SameLine();
+                ImGui::Checkbox("##waitForQueue", &waitForQueueDuringPlayback);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("If selected - wait for old playback data to get processed before pushing new data");
+                    ImGui::EndTooltip();
+                }
+            }
             ImGui::Text("Last predicted key:       %s (%8.6f)\n", kKeyText.at(predictedKey), predictedCC);
             ImGui::SliderFloat("Threshold CC", &thresholdCC, 0.1f, 1.0f);
             auto tNow = std::chrono::high_resolution_clock::now();
             ImGui::Text("Last detected key stroke: %5.3f seconds ago\n",
                         (float)(std::chrono::duration_cast<std::chrono::milliseconds>(tNow - tLastDetectedKeyStroke).count()/1000.0f));
             ImGui::Text("Average background level: %16.13f\n", rbAverage);
-            ImGui::SliderFloat("Threshold background", &thresholdBackground, 0.1f, 30.0f);
+            ImGui::SliderFloat("Threshold background", &thresholdBackground, 0.1f, 300.0f);
+            ImGui::Text("Tasks in queue: %d\n", (int) workQueue.size());
             ImGui::Text("\n");
 
             auto drawList = ImGui::GetWindowDrawList();
@@ -905,6 +984,8 @@ int main(int argc, char ** argv) {
     }
 
     worker.join();
+
+    printf("[+] Terminated");
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();

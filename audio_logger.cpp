@@ -187,3 +187,15 @@ bool AudioLogger::recordSym(float bufferSize_s) {
 
     return true;
 }
+
+bool AudioLogger::pause() {
+    auto & data = getData();
+    SDL_PauseAudioDevice(data.deviceIdIn, 1);
+    return true;
+}
+
+bool AudioLogger::resume() {
+    auto & data = getData();
+    SDL_PauseAudioDevice(data.deviceIdIn, 0);
+    return true;
+}
