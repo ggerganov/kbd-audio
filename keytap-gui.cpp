@@ -298,7 +298,7 @@ int main(int argc, char ** argv) {
     int predictedKey = -1;
     TKeyWaveform predictedAmpl(kSamplesPerWaveform, 0);
     int predictedHistoryBegin = 0;
-    std::array<int, 32> predictedHistory;
+    std::array<int, 24> predictedHistory;
     predictedHistory.fill(0.0f);
     std::map<TKey, TrainStats> trainStats;
 
@@ -352,8 +352,8 @@ int main(int argc, char ** argv) {
 
                 for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
                     auto curPos = positionsToPredict[ipos];
-                    int scmp0 = curPos - kSamplesPerFrame/2;
-                    int scmp1 = curPos + kSamplesPerFrame/2;
+                    int scmp0 = curPos - kSamplesPerFrame;
+                    int scmp1 = curPos + kSamplesPerFrame;
 
                     char res = -1;
                     TValueCC maxcc = -1.0f;
@@ -680,8 +680,8 @@ int main(int argc, char ** argv) {
                 for (int alignToWaveform = 0; alignToWaveform < nWaveforms; ++alignToWaveform) {
                     ccs[alignToWaveform][alignToWaveform] = { 1.0f, 0 };
 
-                    int is0 = centerSample - kSamplesPerFrame/2;
-                    int is1 = centerSample + kSamplesPerFrame/2;
+                    int is0 = centerSample - kSamplesPerFrame;
+                    int is1 = centerSample + kSamplesPerFrame;
 
                     const auto & waveform0 = history[alignToWaveform];
 
@@ -697,7 +697,7 @@ int main(int argc, char ** argv) {
                     double curccsum = 0.0f;
                     for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                         auto [cc, offset] = ccs[iwaveform][alignToWaveform];
-                        if (std::abs(offset) > 5) continue;
+                        if (std::abs(offset) > 50) continue;
                         ++curntrain;
                         curccsum += cc;
                     }
@@ -753,7 +753,7 @@ int main(int argc, char ** argv) {
                 std::fill(avgWaveform.begin(), avgWaveform.end(), 0.0f);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     auto [cc, offset] = ccs[iwaveform][bestw];
-                    if (std::abs(offset) > 5) continue;
+                    if (std::abs(offset) > 50) continue;
                     printf("        Adding waveform %d - cc = %g, offset = %d\n", iwaveform, cc, offset);
                     cc = 1.0f;
                     ccsum += cc*cc;
@@ -959,14 +959,20 @@ int main(int argc, char ** argv) {
             if (ImGui::CollapsingHeader("Training statistics", ImGuiTreeNodeFlags_DefaultOpen)) {
                 for (const auto & key : trainStats) {
                     if (key.second.nWaveformsUsed < 0.75*key.second.nWaveformsTotal) {
-                        ImGui::TextColored({1.0f, 1.0f, 0.0f, 1.0f}, "Key: %8s   Average CC: %8.6f   Waveforms: %3d / %3d", kKeyText.at(key.first), key.second.averageCC, key.second.nWaveformsUsed, key.second.nWaveformsTotal);
+                        ImGui::TextColored({1.0f, 1.0f, 0.0f, (float) key.second.averageCC},
+                                           "Key: %8s   Average CC: %8.6f   Waveforms: %3d / %3d",
+                                           kKeyText.at(key.first), key.second.averageCC,
+                                           key.second.nWaveformsUsed, key.second.nWaveformsTotal);
                         if (ImGui::IsItemHovered()) {
                             ImGui::BeginTooltip();
                             ImGui::Text("Predictions for this key might not be very accurate. Provide more training data");
                             ImGui::EndTooltip();
                         }
                     } else {
-                        ImGui::Text("Key: %8s   Average CC: %8.6f   Waveforms: %3d / %3d", kKeyText.at(key.first), key.second.averageCC, key.second.nWaveformsUsed, key.second.nWaveformsTotal);
+                        ImGui::TextColored({1.0f, 1.0f, 1.0f, (float) key.second.averageCC},
+                                           "Key: %8s   Average CC: %8.6f   Waveforms: %3d / %3d",
+                                           kKeyText.at(key.first), key.second.averageCC,
+                                           key.second.nWaveformsUsed, key.second.nWaveformsTotal);
                     }
                 }
             }
