@@ -282,6 +282,7 @@ int main(int argc, char ** argv) {
 
     TKey keyPressed = -1;
     TKeyConfidenceMap keyConfidence;
+    TKeyConfidenceMap keyConfidenceDisplay;
     std::map<TKey, TKeyHistory> keySoundHistoryAmpl;
     std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
 
@@ -298,8 +299,8 @@ int main(int argc, char ** argv) {
     int predictedKey = -1;
     TKeyWaveform predictedAmpl(kSamplesPerWaveform, 0);
     int predictedHistoryBegin = 0;
-    std::array<int, 24> predictedHistory;
-    predictedHistory.fill(0.0f);
+    std::array<std::vector<int>, 24> predictedHistory;
+    predictedHistory.fill({});
     std::map<TKey, TrainStats> trainStats;
 
     float amplMin = 0.0f;
@@ -374,16 +375,21 @@ int main(int argc, char ** argv) {
                             printf("    Prediction: '%c'        (%8.5g)\n", res, maxcc);
                             predictedKey = res;
                             predictedCC = maxcc;
+                            predictedHistory[predictedHistoryBegin].clear();
+                            predictedHistory[predictedHistoryBegin].push_back(predictedKey);
                             for (auto & c : keyConfidenceTmp) {
-                                keyConfidence[c.first] = std::pow(c.second/maxcc, 4.0);
+                                keyConfidence[c.first] = c.second/maxcc;
+                                keyConfidenceDisplay[c.first] = std::pow(c.second/maxcc, 4.0f);
+                                if (c.first != predictedKey && c.second/maxcc > 0.9f) {
+                                    predictedHistory[predictedHistoryBegin].push_back(c.first);
+                                }
                             }
+                            if (++predictedHistoryBegin >= predictedHistory.size()) predictedHistoryBegin = 0;
                             for (int i = 0; i < kSamplesPerWaveform; ++i) {
                                 int idx = curPos + offs - kSamplesPerWaveform/2 + i;
                                 if (idx < 0 || idx >= (int) ampl.size()) continue;
                                 predictedAmpl[i] = ampl[idx];
                             }
-                            predictedHistory[predictedHistoryBegin] = predictedKey;
-                            if (++predictedHistoryBegin >= predictedHistory.size()) predictedHistoryBegin = 0;
                         }
                         lastkey = res;
                         lastcc = maxcc;
@@ -426,7 +432,7 @@ int main(int argc, char ** argv) {
                 int nFrames = frames.size();
                 int nFrames2 = std::max(1, nFrames/2);
 
-                auto _acc = [](const AudioLogger::Record & r, int id) { return r[id/kSamplesPerFrame][id%kSamplesPerFrame]; };
+                auto _acc = [](const AudioLogger::Record & r, int id) { return std::abs(r[id/kSamplesPerFrame][id%kSamplesPerFrame]); };
 
                 int k = kSamplesPerFrame;
                 std::deque<int> que(k);
@@ -879,6 +885,9 @@ int main(int argc, char ** argv) {
             ImGui::Text("Tasks in queue: %d\n", (int) workQueue.size());
             ImGui::Text("\n");
 
+            static bool displayConfidence = false;
+            ImGui::Checkbox("Display confidence", &displayConfidence);
+
             auto drawList = ImGui::GetWindowDrawList();
 
             auto p0 = ImGui::GetCursorScreenPos();
@@ -893,7 +902,7 @@ int main(int argc, char ** argv) {
                 ox = p0.x + kRowOffset[rid]*bx;
                 for (const auto & button : row) {
                     int key = button;
-                    auto & conf = keyConfidence[key];
+                    auto & confDisplay = keyConfidenceDisplay[key];
                     p1.x = ox;
                     p1.y = oy;
                     auto p2 = p1;
@@ -901,9 +910,13 @@ int main(int argc, char ** argv) {
                     p2.x += bx + tw.x;
                     p2.y += by;
                     ox += bx + tw.x;
-                    drawList->AddRectFilled(p1, p2, ImGui::ColorConvertFloat4ToU32({ 0.2f, 1.0f, 0.2f, conf }), 0.0f, 0);
-                    drawList->AddRect(p1, p2, ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 1.0f }), 0.0f, 0, 2.0f);
-                    ImGui::SetCursorScreenPos({0.5f*(p1.x + p2.x - tw.x), 0.5f*(p1.y + p2.y - tw.y)});
+                    drawList->AddRectFilled(p1, p2, ImGui::ColorConvertFloat4ToU32({ 0.2f, 1.0f, 0.2f, confDisplay }), 0.0f, 0);
+                    drawList->AddRect(p1, p2, ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 1.0f }), 0.0f, 0, 1.0f);
+                    if (displayConfidence) {
+                        ImGui::SetCursorScreenPos({0.5f*(p1.x + p2.x - tw.x), 0.5f*(p1.y + p2.y - tw.y) - 0.5f*tw.y});
+                    } else {
+                        ImGui::SetCursorScreenPos({0.5f*(p1.x + p2.x - tw.x), 0.5f*(p1.y + p2.y - tw.y)});
+                    }
                     if (key == predictedKey) {
                         ImGui::TextColored({1.0f, 0.0f, 0.0f, 1.0f}, "%s", kKeyText.at(key));
                     } else {
@@ -913,7 +926,14 @@ int main(int argc, char ** argv) {
                             ImGui::Text("%s", kKeyText.at(key));
                         }
                     }
-                    conf *= 0.99f;
+                    if (displayConfidence) {
+                        ImGui::SetWindowFontScale(0.90f);
+                        static auto tcw = ImGui::CalcTextSize("0.123");
+                        ImGui::SetCursorScreenPos({0.5f*(p1.x + p2.x - tcw.x), 0.5f*(p1.y + p2.y - tw.y) + 0.5f*tw.y});
+                        ImGui::Text("%4.3f", keyConfidence[key]);
+                        ImGui::SetWindowFontScale(1.0f);
+                    }
+                    confDisplay *= 0.99f;
                 }
                 oy += by;
             }
@@ -923,13 +943,22 @@ int main(int argc, char ** argv) {
             ImGui::TextDisabled("Last %d predicted keys:", (int) predictedHistory.size());
             ImGui::SameLine();
             if (ImGui::Button("Clear")) {
-                std::fill(predictedHistory.begin(), predictedHistory.end(), 0);
+                predictedHistory.fill({});
             }
-            for (int i = 0; i < (int) predictedHistory.size(); ++i) {
-                int idx = (predictedHistoryBegin + i)%predictedHistory.size();
-                if (predictedHistory[idx] > 0) {
-                    ImGui::Text("%s", kKeyText.at(predictedHistory[idx])); ImGui::SameLine();
+            int nBestPredictions = 3;
+            for (int ip = 0; ip < nBestPredictions; ++ip) {
+                for (int i = 0; i < (int) predictedHistory.size(); ++i) {
+                    int idx = (predictedHistoryBegin + i)%predictedHistory.size();
+                    int maxLen = 1;
+                    for (auto l : predictedHistory[idx]) if (strlen(kKeyText.at(l)) > maxLen) maxLen = strlen(kKeyText.at(l));
+                    if (predictedHistory[idx].size() > ip) {
+                        ImGui::Text("%s", kKeyText.at(predictedHistory[idx][ip])); ImGui::SameLine();
+                    } else {
+                        static std::map<int, const char *> kws = { {1, " "}, {2, "  "}, {3, "   "}, {4, "    "}, {5, "     "}, {6, "      "}, {7, "       "}, {8, "        "}, };
+                        ImGui::Text("%s", kws.at(maxLen)); ImGui::SameLine();
+                    }
                 }
+                ImGui::Text("\n");
             }
             ImGui::Text("\n\n");
 
