@@ -674,13 +674,14 @@ int main(int argc, char ** argv) {
                     waveform = std::move(newWaveform);
                 }
 
-                int alignWindow = centerSample/2;
+                int alignWindow = 64;
                 printf("    - Calculating CC pairs\n");
                 printf("      Align window = %d\n", alignWindow);
 
                 int bestw = -1;
                 int ntrain = 0;
                 double bestccsum = -1.0f;
+                double bestosum = 1e10;
                 std::map<int, std::map<int, std::tuple<TValueCC, TOffset>>> ccs;
 
                 for (int alignToWaveform = 0; alignToWaveform < nWaveforms; ++alignToWaveform) {
@@ -700,21 +701,25 @@ int main(int argc, char ** argv) {
                     }
 
                     int curntrain = 0;
-                    double curccsum = 0.0f;
+                    double curccsum = 0.0;
+                    double curosum = 0.0;
                     for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                         auto [cc, offset] = ccs[iwaveform][alignToWaveform];
                         if (std::abs(offset) > 50) continue;
                         ++curntrain;
-                        curccsum += cc;
+                        curccsum += cc*cc;
+                        curosum += offset*offset;
                     }
 
                     if (curccsum > bestccsum) {
+                    //if (curosum < bestosum) {
                         ntrain = curntrain;
                         bestw = alignToWaveform;
                         bestccsum = curccsum;
+                        bestosum = curosum;
                     }
                 }
-                bestccsum /= ntrain;
+                bestccsum = sqrt(bestccsum/ntrain);
 
                 trainStats[key].nWaveformsUsed = ntrain;
                 trainStats[key].nWaveformsTotal = nWaveforms;
@@ -753,15 +758,14 @@ int main(int argc, char ** argv) {
 
                 printf("    - Calculating average waveform\n");
                 double ccsum = 0.0f;
-                double norm = 1.0f;
+                double norm = 0.0f;
                 auto & avgWaveform = keySoundAverageAmpl[key];
                 avgWaveform.resize(kSamplesPerWaveform);
                 std::fill(avgWaveform.begin(), avgWaveform.end(), 0.0f);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     auto [cc, offset] = ccs[iwaveform][bestw];
-                    if (std::abs(offset) > 50) continue;
+                    //if (std::abs(offset) > 5) continue;
                     printf("        Adding waveform %d - cc = %g, offset = %d\n", iwaveform, cc, offset);
-                    cc = 1.0f;
                     ccsum += cc*cc;
                     norm += cc*cc;
                     auto & waveform = history[iwaveform];
@@ -951,10 +955,24 @@ int main(int argc, char ** argv) {
                     int idx = (predictedHistoryBegin + i)%predictedHistory.size();
                     int maxLen = 1;
                     for (auto l : predictedHistory[idx]) if (strlen(kKeyText.at(l)) > maxLen) maxLen = strlen(kKeyText.at(l));
+                    static std::map<int, const char *> kws = {
+                        {0,  ""},
+                        {1,  " "},
+                        {2,  "  "},
+                        {3,  "   "},
+                        {4,  "    "},
+                        {5,  "     "},
+                        {6,  "      "},
+                        {7,  "       "},
+                        {8,  "        "},
+                        {9,  "         "},
+                        {10, "          "},
+                    };
                     if (predictedHistory[idx].size() > ip) {
-                        ImGui::Text("%s", kKeyText.at(predictedHistory[idx][ip])); ImGui::SameLine();
+                        auto t = kKeyText.at(predictedHistory[idx][ip]);
+                        ImGui::Text("%s%s", t, kws[maxLen - strlen(t)]);
+                        ImGui::SameLine();
                     } else {
-                        static std::map<int, const char *> kws = { {1, " "}, {2, "  "}, {3, "   "}, {4, "    "}, {5, "     "}, {6, "      "}, {7, "       "}, {8, "        "}, };
                         ImGui::Text("%s", kws.at(maxLen)); ImGui::SameLine();
                     }
                 }
