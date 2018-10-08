@@ -104,3 +104,6 @@ target_link_libraries(record PRIVATE Core)
 
 add_executable(record-full record-full.cpp)
 target_link_libraries(record-full PRIVATE Core)
+
+add_executable(subbreak subbreak.cpp)
+target_link_libraries(subbreak PRIVATE Core)
