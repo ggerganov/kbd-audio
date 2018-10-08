@@ -30,15 +30,15 @@
 
 constexpr float kTrainBufferSize_s = 0.075f;
 constexpr float kPredictBufferSize_s = 0.200f;
-constexpr uint64_t kSampleRate = 24000;
+constexpr int64_t kSampleRate = 24000;
 
-constexpr uint64_t kRingBufferSize = 128*1024;
+constexpr int64_t kRingBufferSize = 1024;
 constexpr int bkgrStep_samples = 1;
 //constexpr int keyDuration_samples = 0.005f*kSampleRate;
 constexpr int keyDuration_samples = 1;
 
-constexpr uint64_t kTrainBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kTrainBufferSize_s) - 1;
-constexpr uint64_t kPredictBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kPredictBufferSize_s) - 1;
+constexpr int64_t kTrainBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kTrainBufferSize_s) - 1;
+constexpr int64_t kPredictBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kPredictBufferSize_s) - 1;
 
 constexpr auto kSamplesPerFrame = AudioLogger::kSamplesPerFrame;
 constexpr auto kSamplesPerWaveform = kSamplesPerFrame*kTrainBufferSize_frames;
@@ -349,7 +349,8 @@ int main(int argc, char ** argv) {
                 const auto & ampl = workData.ampl;
                 const auto & positionsToPredict = workData.positionsToPredict;
 
-                int alignWindow = kSamplesPerFrame/2;
+                //int alignWindow = kSamplesPerFrame/2;
+                int alignWindow = 64;
 
                 for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
                     auto curPos = positionsToPredict[ipos];

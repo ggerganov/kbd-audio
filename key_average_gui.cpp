@@ -33,8 +33,8 @@ int main(int, char**) {
     int windowSizeY = 800;
 
     constexpr float kBufferSize_s = 0.1f;
-    constexpr uint64_t kSampleRate = 12000;
-    constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+    constexpr int64_t kSampleRate = 12000;
+    constexpr int64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
 
 #if __APPLE__
     // GL 3.2 Core + GLSL 150

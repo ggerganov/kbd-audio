@@ -32,7 +32,7 @@ struct AudioLogger::Data {
 
     Callback callback = nullptr;
 
-    uint64_t sampleRate = kMaxSampleRate;
+    int64_t sampleRate = kMaxSampleRate;
 
     int32_t nFramesToRecord = 0;
     int32_t sampleSize_bytes = 4;
@@ -49,7 +49,7 @@ AudioLogger::AudioLogger() : data_(new AudioLogger::Data()) {}
 
 AudioLogger::~AudioLogger() {}
 
-bool AudioLogger::install(uint64_t sampleRate, AudioLogger::Callback callback) {
+bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback) {
     auto & data = getData();
 
     data.sampleRate = sampleRate;

@@ -81,6 +81,9 @@ target_link_libraries(guess_qp2 PRIVATE Core)
 add_executable(keytap keytap.cpp)
 target_link_libraries(keytap PRIVATE Core)
 
+add_executable(keytap2 keytap2.cpp)
+target_link_libraries(keytap2 PRIVATE Core)
+
 add_executable(keytap-gui keytap-gui.cpp)
 target_link_libraries(keytap-gui PRIVATE Core ImGui)
 
