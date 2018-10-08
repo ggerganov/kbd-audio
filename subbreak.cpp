@@ -140,9 +140,11 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
         }
     }
 
+    TCode mask = (1 << 5*(n-1)) - 1;
+
     res += fmap[curc];
     while (true) {
-        curc = curc & ((1 << 15) - 1);
+        curc &= mask;
 
         while (true) {
             if (i1 >= len) return res;
@@ -178,9 +180,11 @@ TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
         --k;
     }
 
+    TCode mask = (1 << 5*(n-1)) - 1;
+
     res += fmap[curc];
     while (true) {
-        curc = curc & ((1 << 15) - 1);
+        curc &= mask;
 
         if (i1 >= len) return res;
         auto c = ::kCharToInt[txt[i1++]];
