@@ -5,14 +5,15 @@
 
 #include "constants.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <map>
-#include <random>
 #include <string>
 #include <tuple>
+#include <vector>
+
+inline float frand() { return ((float)rand())/RAND_MAX; }
 
 using TCode = int32_t;
 using TProb = double;
@@ -20,10 +21,25 @@ using TGramLen = int;
 using TFreqMap = std::tuple<TGramLen, std::vector<TProb>>;
 using TAlphabet = std::vector<char>;
 
+int kN = 35;
+double pMin = -100;
+std::array<int32_t, 256> myCharToInt = ::kCharToInt;
+
 TCode calcCode(const char * data, int n) {
     TCode res = 0;
-    do { res <<= 5; res += kCharToInt[*data++]; } while (--n > 0);
+    do { res <<= 5; res += myCharToInt[*data++]; } while (--n > 0);
     return res;
+}
+
+template <typename T>
+void shuffle(T & t, int start = -1, int end = -1) {
+    if (start == -1) start = 0;
+    if (end == -1) end = t.size();
+
+    int n = t.size();
+    for (int i = end - 1; i > start; --i) {
+        std::swap(t[i], t[rand()%(i - start + 1)+start]);
+    }
 }
 
 bool loadFreqMap(const char * fname, TFreqMap & res) {
@@ -59,14 +75,14 @@ bool loadFreqMap(const char * fname, TFreqMap & res) {
 
         if (len == 0) {
             len = gram.size();
-            fmap.resize(1 << (5*len), 0.0);
+            fmap.resize(1 << (5*len), 1.0);
         } else if (len != gram.size()) {
             printf("Error: loaded n-grams with vaying lengths\n");
             return false;
         }
 
         TCode idx = ::calcCode(gram.data(), len);
-        if (fmap[idx] != 0.0) {
+        if (fmap[idx] < 0.5) {
             printf("Error: duplicate n-gram '%s'\n", gram.c_str());
             return false;
         }
@@ -74,10 +90,11 @@ bool loadFreqMap(const char * fname, TFreqMap & res) {
     }
     printf("    Total n-grams loaded = %g\n", (double) nTotal);
 
-    double pMin = std::log(0.5/nTotal);
+    //pMin = std::log(1000.0/nTotal);
+    pMin = std::log(0.01/nTotal);
     printf("    P-min = %g\n", pMin);
     for (auto & p : fmap) {
-        if (p >= 0.0) p = pMin;
+        if (p >= 0.5) p = pMin;
     }
 
     return true;
@@ -86,23 +103,33 @@ bool loadFreqMap(const char * fname, TFreqMap & res) {
 TAlphabet getAlphabetRandom(int seed = 0) {
     TAlphabet res;
 
-    for (int i = 0; i <= 26; ++i) res.push_back(i);
-
-    std::random_device rd;
-    std::mt19937 g(seed > 0 ? seed : rd());
-    std::shuffle(res.begin() + 1, res.end(), g);
+    for (int i = 0; i <= kN; ++i) res.push_back(i);
+    shuffle(res, 1);
 
     return res;
 }
 
-bool encipher(const std::string & plain, TAlphabet & alphabet, std::string & enc) {
-    alphabet = getAlphabetRandom(1234);
+bool encrypt(const std::string & plain, TAlphabet & alphabet, std::string & enc) {
+    myCharToInt = kCharToInt;
+    {
+        int k = 26;
+        for (auto & p : plain) {
+            if (k == kN) break;
+            if (myCharToInt[p] == 0) {
+                myCharToInt[p] = ++k;
+            }
+        }
+        kN = k;
+        printf("[+] Unique symbols = %d\n", k);
+    }
+
+    alphabet = getAlphabetRandom(0);
 
     enc = plain;
     int n = plain.length();
     for (int i = 0; i < n; ++i) {
-        auto c = ::kCharToInt[plain[i]];
-        enc[i] = enc[i] - c + alphabet[c];
+        auto c = ::myCharToInt[plain[i]];
+        enc[i] = alphabet[c];
     }
 
     return true;
@@ -112,9 +139,8 @@ bool translate(const TAlphabet & alphabet, const std::string & src, std::string 
     if (dst.size() != src.size()) return false;
 
     for (int i = 0; i < (int) src.size(); ++i) {
-        if (src[i] == 0) continue;
-        auto c = ::kCharToInt[src[i]];
-        dst[i] = c > 0 ? src[i] - c + alphabet[c] : '.';
+        auto c = src[i];
+        dst[i] = (c > 0 && c <= kN) ? alphabet[c] : '.';
     }
 
     return true;
@@ -127,39 +153,46 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
     const auto & [n, fmap] = freqMap;
 
     int i1 = 0;
+    int cnt = 0;
 
     int k = n;
     TCode curc = 0;
     while (k > 0) {
         if (i1 >= len) return 1e-100;
-        auto c = ::kCharToInt[txt[i1++]];
-        if (c > 0) {
+        auto c = txt[i1++];
+        if (c > 0 && c <= 26) {
             curc <<= 5;
             curc += c;
             --k;
+        } else {
+            //res += pMin;
         }
     }
 
     TCode mask = (1 << 5*(n-1)) - 1;
 
     res += fmap[curc];
+    ++cnt;
     while (true) {
         curc &= mask;
 
         while (true) {
-            if (i1 >= len) return res;
-            auto c = ::kCharToInt[txt[i1++]];
-            if (c > 0) {
+            if (i1 >= len) return cnt > 0.3*len ? res/cnt : 1e-100;
+            auto c = txt[i1++];
+            if (c > 0 && c <= 26) {
                 curc <<= 5;
                 curc += c;
                 break;
+            } else {
+                //res += pMin;
             }
         }
 
         res += fmap[curc];
+        ++cnt;
     }
 
-    return res;
+    return cnt > 0.3*len ? res/cnt : 1e-100;
 }
 
 TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
@@ -174,7 +207,7 @@ TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
     TCode curc = 0;
     while (k > 0) {
         if (i1 >= len) return 1e-100;
-        auto c = ::kCharToInt[txt[i1++]];
+        auto c = txt[i1++];
         curc <<= 5;
         curc += c;
         --k;
@@ -187,7 +220,7 @@ TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
         curc &= mask;
 
         if (i1 >= len) return res;
-        auto c = ::kCharToInt[txt[i1++]];
+        auto c = txt[i1++];
         curc <<= 5;
         curc += c;
 
@@ -199,18 +232,57 @@ TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
 
 auto calcScore = calcScore0;
 
+void printText(const std::string & t) {
+    for (auto & c : t) {
+        if (c >= 1 && c <= 26) printf("%c", 'a' + c - 1); else printf(".");
+    }
+    printf("\n");
+}
+
 bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & res) {
     TAlphabet besta = getAlphabetRandom();
 
+    auto lena = kN;
+
     auto cure = enc;
+    auto beste = enc;
     translate(besta, enc, cure);
     auto bestp = calcScore(freqMap, cure);
+    printf("XXX %g\n", bestp);
+
+    auto bestbestp = bestp;
+
+    TProb pmax = 10.0;
+    std::vector<TProb> pletter(kN + 1);
+    std::fill(pletter.begin(), pletter.end(), pmax);
+
+    int nIters = 0;
     while (true) {
-        auto itera = getAlphabetRandom();
+        if (++nIters > 10000) {
+            TAlphabet besta = getAlphabetRandom();
+            translate(besta, enc, cure);
+            bestp = calcScore(freqMap, cure);
+            printf("reset\n");
+            nIters = 0;
+        }
+
+        auto itera = besta;
+		int nswaps = 3;
+        for (int i = 0; i < nswaps; ++i) {
+            int a0 = rand()%lena + 1;
+            int a1 = rand()%lena + 1;
+            while (a0 == a1 || a0 > 26 || a1 <= 26) {
+                a0 = rand()%lena + 1;
+                a1 = rand()%lena + 1;
+            }
+
+            std::swap(itera[a0], itera[a1]);
+        }
+
         translate(itera, enc, cure);
         auto iterp = calcScore(freqMap, cure);
-        for (int i = 0; i < 1000; ++i) {
-            auto cura = itera;
+        auto cura = itera;
+        for (int i = 0; i < 100; ++i) {
             int a0 = rand()%26 + 1;
             int a1 = rand()%26 + 1;
             while (a0 == a1) {
@@ -226,21 +298,30 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
                 iterp = curp;
                 itera = cura;
                 i = 0;
+            } else {
+                std::swap(cura[a0], cura[a1]);
             }
         }
+
         if (iterp > bestp) {
             besta = itera;
             bestp = iterp;
-            translate(besta, enc, cure);
 
-            printf("[+] Best score = %g\n", bestp);
-            printf("    Alphabet:  '");
-            for (int i = 'a'; i <= 'z'; ++i) {
-                auto c = ::kCharToInt[i];
-                printf("%c", i - c + besta[c]);
+            if (bestp > bestbestp) {
+                bestbestp = bestp;
+                translate(besta, enc, beste);
+                printf("[+] Best score = %g\n", bestp);
+                printf("    Alphabet:  '");
+                for (int i = 'a'; i <= 'z'; ++i) {
+                    auto c = ::myCharToInt[i];
+                    printf("%c", i - c + besta[c]);
+                }
+                printf("'\n");
+                printText(beste);
+                printf("[+] pmax = %g\n", pmax);
+                printf("\n");
             }
-            printf("'\n");
-            printf("    Decrypted: '%s'\n", cure.c_str());
+            nIters = 0;
         }
     }
 
@@ -253,6 +334,8 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
+    srand(time(0));
+
     TFreqMap freqMap;
     if (loadFreqMap(argv[1], freqMap) == false) {
         return -1;
@@ -262,25 +345,35 @@ int main(int argc, char ** argv) {
     printf("[+] Score of 'HELLO WORLD' = %g\n", calcScore(freqMap, "HELLO WORLD"));
 
     TAlphabet alphabet;
-    //std::string plain = "Hello world! By spite about do of do allow blush. Additions in conveying or collected objection in. Suffer few desire wonder her object hardly nearer.";
     std::string plain = R"(
-    Is he staying arrival address earnest. To preference considered it themselves inquietude collecting estimating.
-    View park for why gay knew face. Next than near to four so hand. Times so do he downs me would.
-    Witty abode party her found quiet law. They door four bed fail now have.)";
+    Domestic confined any but son bachelor advanced remember. How proceed offered her offence shy forming.
+    )";
 
     std::string enc;
-    encipher(plain, alphabet, enc);
+    encrypt(plain, alphabet, enc);
 
     printf("[+] Alphabet: 'abcdefghijklmnopqrstuvwxyz'\n");
     printf("[+] Alphabet: '");
     for (int i = 'a'; i <= 'z'; ++i) {
-        auto c = ::kCharToInt[i];
+        auto c = ::myCharToInt[i];
         printf("%c", i - c + alphabet[c]);
     }
     printf("'\n");
 
     printf("[+] Plain:    '%s'\n", plain.c_str());
-    printf("[+] Enc:      '%s'\n", enc.c_str());
+    {
+        TAlphabet sola = alphabet;
+        for (int i = 0; i <= kN; ++i) {
+            sola[alphabet[i]] = i;
+        }
+        std::string solt = enc;
+        translate(sola, enc, solt);
+        printf("[+] Sol: ");
+        printText(solt);
+        printf("[+] Score = %g\n", calcScore(freqMap, solt));
+    }
+    printf("[+] Enc:      ");
+    printText(enc);
 
     std::string decrypted;
     decrypt(freqMap, enc, decrypted);
