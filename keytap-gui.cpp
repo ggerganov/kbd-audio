@@ -286,6 +286,8 @@ int main(int argc, char ** argv) {
     std::map<TKey, TKeyHistory> keySoundHistoryAmpl;
     std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
 
+    int ntest = 0;
+
     bool doRecord = false;
     bool printStatus = true;
     bool isReadyToPredict = false;
@@ -373,7 +375,7 @@ int main(int argc, char ** argv) {
 
                     if (maxcc > thresholdCC) {
                         if (lastkey != res || lastcc != maxcc) {
-                            printf("    Prediction: '%c'        (%8.5g)\n", res, maxcc);
+                            printf("    Prediction: '%c'        (%8.5g), ntest = %d\n", res, maxcc, ntest);
                             predictedKey = res;
                             predictedCC = maxcc;
                             predictedHistory[predictedHistoryBegin].clear();
@@ -395,7 +397,9 @@ int main(int argc, char ** argv) {
                         lastkey = res;
                         lastcc = maxcc;
                     }
+                    ++ntest;
                 }
+
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
@@ -870,6 +874,7 @@ int main(int argc, char ** argv) {
                     if (frecord.good()) {
                         audioLogger.pause();
                         processingRecord = true;
+                        ntest = 0;
                     }
                 }
                 ImGui::SameLine();
