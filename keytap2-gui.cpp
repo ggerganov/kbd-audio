@@ -309,13 +309,183 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
     return true;
 }
 
-void markKeyPresses(const TWaveform & waveform, const TKeyPressCollection & keyPresses, TWaveform & res) {
-}
-
 float plotWaveform(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return waveform->samples[i];
 };
+
+struct PlaybackData {
+    static const int kSamples = 1024;
+    int64_t idx = 0;
+    int64_t offset = 0;
+    TWaveformView waveform;
+};
+
+SDL_AudioDeviceID g_deviceIdOut = 0;
+PlaybackData g_playbackData;
+
+bool renderKeyPresses(const TWaveform & waveform, TKeyPressCollection & keyPresses) {
+    ImGui::Begin("Key Presses");
+
+    int viewMin = 512;
+    int viewMax = waveform.size();
+
+    static int nview = waveform.size()/16;
+    static int offset = (waveform.size() - nview)/2;
+    static float amin = -16000;
+    static float amax = 16000;
+    static float dragOffset = 0.0f;
+    static float scrollSize = 18.0f;
+
+    auto wview = getView(waveform, offset, nview);
+    auto wsize = ImVec2(ImGui::GetContentRegionAvailWidth(), 250.0);
+
+    auto savePos = ImGui::GetCursorScreenPos();
+    auto drawList = ImGui::GetWindowDrawList();
+    ImGui::PlotLines("##Waveform", plotWaveform, &wview, nview, 0, "Waveform", amin, amax, wsize);
+    ImGui::SetCursorScreenPos(savePos);
+    ImGui::InvisibleButton("##WaveformIB",wsize);
+    if (ImGui::IsItemHovered()) {
+        auto w = ImGui::GetIO().MouseWheel;
+        auto nview_old = nview;
+        nview *= (10.0 + w)/10.0;
+        nview = std::min(std::max(viewMin, nview), viewMax);
+        if (w != 0.0) {
+            auto mpos = ImGui::GetIO().MousePos;
+            offset = std::max(0.0f, offset + ((mpos.x - savePos.x)/wsize.x)*(nview_old - nview));
+        }
+
+        if (ImGui::IsMouseDown(0) && ImGui::IsMouseDragging(0) == false) {
+            dragOffset = offset;
+        }
+
+        if (ImGui::IsMouseDragging(0)) {
+            offset = dragOffset - ImGui::GetMouseDragDelta(0).x*nview/wsize.x;
+        }
+    }
+    if (ImGui::BeginPopupContextWindow()) {
+        ImGui::SliderInt("View  ", &nview, viewMin, viewMax);
+        ImGui::DragInt  ("Offset", &offset, 0.01*nview, 0, waveform.size() - nview);
+        ImGui::SliderFloat("Amplitude Min", &amin, -32000, 0);
+        ImGui::SliderFloat("Amplitude Max", &amax, 0, 32000);
+        ImGui::EndPopup();
+    }
+
+    ImGui::InvisibleButton("##WaveformScrollIB", {wsize.x, scrollSize});
+    drawList->AddRect({savePos.x, savePos.y + wsize.y}, {savePos.x + wsize.x, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, 1.0f}));
+    drawList->AddRectFilled({savePos.x + wsize.x*(1.f*offset)/viewMax, savePos.y + wsize.y}, {savePos.x + wsize.x*(1.f*offset + nview)/viewMax, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, 1.0f}));
+
+    static bool scrolling = false;
+    if (ImGui::IsItemHovered()) {
+        if (ImGui::IsMouseDown(0)) {
+            scrolling = true;
+        }
+    }
+
+    if (scrolling) {
+        auto mpos = ImGui::GetIO().MousePos;
+        offset = ((mpos.x - savePos.x)/wsize.x)*viewMax - nview/2;
+    }
+
+    if (ImGui::IsMouseDown(0) == false) {
+        scrolling = false;
+    }
+
+    offset = std::max(0, std::min((int) offset, (int) waveform.size() - nview));
+    for (int i = 0; i < (int) keyPresses.size(); ++i) {
+        if (keyPresses[i].pos + kKeyPressWidth_samples < offset) continue;
+        if (keyPresses[i].pos - kKeyPressWidth_samples >= offset + nview) break;
+        {
+            float x0 = ((float)(keyPresses[i].pos - kKeyPressWidth_samples - offset))/nview;
+            float x1 = ((float)(keyPresses[i].pos + kKeyPressWidth_samples - offset))/nview;
+            float x2 = ((float)(g_playbackData.offset + g_playbackData.idx - offset))/nview;
+            drawList->AddRectFilled({savePos.x + x0*wsize.x, savePos.y}, {savePos.x + x1*wsize.x, savePos.y + wsize.y}, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 0.3f}));
+            drawList->AddRect({savePos.x + x2*wsize.x, savePos.y}, {savePos.x + x2*wsize.x + 1.0f, savePos.y + wsize.y}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 0.0f, 0.3f}));
+        }
+    }
+    for (int i = 0; i < (int) keyPresses.size(); ++i) {
+        {
+            float x0 = ((float)(keyPresses[i].pos))/viewMax;
+            drawList->AddRect({savePos.x + x0*wsize.x, savePos.y + wsize.y}, {savePos.x + x0*wsize.x + 1.0f, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 0.3f}));
+        }
+    }
+
+    if (ImGui::Button("Play")) {
+        g_playbackData.idx = 0;
+        g_playbackData.offset = offset;
+        g_playbackData.waveform = getView(waveform, offset, std::min(48000, nview));
+        SDL_PauseAudioDevice(g_deviceIdOut, 0);
+    }
+    if (g_playbackData.idx > g_playbackData.waveform.n) {
+        SDL_PauseAudioDevice(g_deviceIdOut, 1);
+    }
+
+    ImGui::End();
+
+    return false;
+}
+
+void cbPlayback(void * userData, uint8_t * stream, int len) {
+    printf("XXXXXXXXXXX len = %d\n", len);
+    PlaybackData * data = (PlaybackData *)(userData);
+    auto end = std::min(data->idx + PlaybackData::kSamples, data->waveform.n);
+    auto idx = data->idx;
+    for (; idx < end; ++idx) {
+        int16_t a = data->waveform.samples[idx];
+        memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
+        len -= sizeof(a);
+    }
+    while (len > 0) {
+        int16_t a = 0;
+        memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
+        len -= sizeof(a);
+        ++idx;
+    }
+    data->idx = idx;
+}
+
+bool prepareAudioOut() {
+    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
+        return false;
+    }
+
+    int nDevices = SDL_GetNumAudioDevices(SDL_FALSE);
+    printf("Found %d playback devices:\n", nDevices);
+    for (int i = 0; i < nDevices; i++) {
+        printf("    - Playback device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_FALSE));
+    }
+
+    SDL_AudioSpec playbackSpec;
+    SDL_zero(playbackSpec);
+
+    playbackSpec.freq = 24000;
+    playbackSpec.format = AUDIO_S16;
+    playbackSpec.channels = 1;
+    playbackSpec.samples = PlaybackData::kSamples;
+    playbackSpec.callback = cbPlayback;
+    playbackSpec.userdata = &g_playbackData;
+
+    SDL_AudioSpec obtainedSpec;
+    SDL_zero(obtainedSpec);
+
+    g_deviceIdOut = SDL_OpenAudioDevice(NULL, SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
+    if (!g_deviceIdOut) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for playback: %s!\n", SDL_GetError());
+        SDL_Quit();
+        return false;
+    }
+
+    printf("Opened playback device %d\n", g_deviceIdOut);
+    printf("    Frequency:  %d\n", obtainedSpec.freq);
+    printf("    Format:     %d\n", obtainedSpec.format);
+    printf("    Channels:   %d\n", obtainedSpec.channels);
+    printf("    Samples:    %d\n", obtainedSpec.samples);
+
+    SDL_PauseAudioDevice(g_deviceIdOut, 1);
+
+    return true;
+}
 
 int main(int argc, char ** argv) {
     srand(time(0));
@@ -330,8 +500,13 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
-    int windowSizeX = 600;
-    int windowSizeY = 600;
+    if (prepareAudioOut() == false) {
+        printf("Error: failed to initialize audio playback\n");
+        return -2;
+    }
+
+    int windowSizeX = 1920;
+    int windowSizeY = 1024;
 
 #if __APPLE__
     // GL 3.2 Core + GLSL 150
@@ -355,7 +530,7 @@ int main(int argc, char ** argv) {
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
-    SDL_Window* window = SDL_CreateWindow("Keytap", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+    SDL_Window* window = SDL_CreateWindow("Keytap", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_SetSwapInterval(1); // Enable vsync
 
@@ -475,26 +650,7 @@ int main(int argc, char ** argv) {
         ImGui_ImplSDL2_NewFrame(window);
         ImGui::NewFrame();
 
-        ImGui::Begin("Key Presses");
-        static int nview = 1024;
-        static int offset = 0;
-        auto wview = getView(waveformInput, offset, nview);
-        auto wsize = ImVec2(ImGui::GetContentRegionAvailWidth(), 250.0);
-        auto savePos = ImGui::GetCursorScreenPos();
-        auto drawList = ImGui::GetWindowDrawList();
-        ImGui::PlotLines("##Waveform", plotWaveform, &wview, nview, 0, "Waveform", 16000, -16000, wsize);
-        ImGui::SliderInt("View  ", &nview, 512, 48000);
-        ImGui::DragInt("Offset", &offset, 0.01*nview, 0, waveformInput.size() - nview);
-        offset = std::min((int) offset, (int) waveformInput.size() - nview);
-        for (int i = 0; i < (int) keyPresses.size(); ++i) {
-            if (keyPresses[i].pos + kKeyPressWidth_samples < offset) continue;
-            if (keyPresses[i].pos - kKeyPressWidth_samples >= offset + nview) break;
-            float x0 = ((float)(keyPresses[i].pos - kKeyPressWidth_samples - offset))/nview;
-            float x1 = ((float)(keyPresses[i].pos + kKeyPressWidth_samples - offset))/nview;
-            drawList->AddRectFilled({savePos.x + x0*wsize.x, savePos.y}, {savePos.x + x1*wsize.x, savePos.y + wsize.y}, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 0.3f}));
-        }
-
-        ImGui::End();
+        renderKeyPresses(waveformInput, keyPresses);
 
         ImGui::Render();
         SDL_GL_MakeCurrent(window, gl_context);
