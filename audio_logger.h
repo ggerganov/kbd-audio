@@ -18,7 +18,7 @@ class AudioLogger {
 
         static constexpr int64_t kSamplesPerFrame = 512;
         static constexpr int64_t kMaxSampleRate = 96000;
-        static constexpr float    kMaxBufferSize_s = 1.000f;
+        static constexpr float   kMaxBufferSize_s = 1.000f;
 
         using Sample = float;
         using Frame = std::array<Sample, kSamplesPerFrame>;
