@@ -475,8 +475,9 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
             }
 
             if (ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyCtrl) {
+                int i = 0;
                 int pos = offset + nview*(mpos.x - savePos.x)/wsize.x;
-                for (int i = 0; i < keyPresses.size(); ++i) {
+                for (i = 0; i < keyPresses.size(); ++i) {
                     if (std::abs(keyPresses[i].pos - pos) < kKeyPressWidth_samples) break;
                     if (keyPresses[i].pos > pos) {
                         ignoreDelete = true;
@@ -486,6 +487,13 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
                         keyPresses.insert(keyPresses.begin() + i, entry);
                         break;
                     }
+                }
+                if (i == keyPresses.size() && ignoreDelete == false) {
+                    ignoreDelete = true;
+                    TKeyPressData entry;
+                    entry.pos = pos;
+                    entry.waveform = wview;
+                    keyPresses.push_back(entry);
                 }
             }
         }
