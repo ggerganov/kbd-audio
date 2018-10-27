@@ -20,6 +20,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <thread>
 
 #define MY_DEBUG
 
@@ -676,6 +677,7 @@ int main(int argc, char ** argv) {
         ImGui::NewFrame();
 
         renderKeyPresses(waveformInput, keyPresses);
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
         ImGui::Render();
         SDL_GL_MakeCurrent(window, gl_context);
@@ -684,6 +686,15 @@ int main(int argc, char ** argv) {
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
+
+        // stupid hack to limit frame-rate to ~60 fps on Mojave
+        auto tEnd = std::chrono::high_resolution_clock::now();
+        auto tus = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart).count();
+        while (tus < 1e6/60.0) {
+            std::this_thread::sleep_for(std::chrono::microseconds(std::max(100, (int) (0.5*(1e6/60.0 - tus)))));
+            tEnd = std::chrono::high_resolution_clock::now();
+            tus = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart).count();
+        }
     }
 
     return 0;
