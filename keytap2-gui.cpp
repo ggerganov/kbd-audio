@@ -48,19 +48,19 @@ using TKeyPressData         = stKeyPressData;
 using TKeyPressCollection   = std::vector<TKeyPressData>;
 
 struct stMatch {
-    TCC     cc;
-    TOffset offset;
+    TCC     cc = 0.0;
+    TOffset offset = 0;
 };
 
 struct stWaveformView {
-    const TSample * samples;
-    int64_t         n;
+    const TSample * samples = nullptr;
+    int64_t         n = 0;
 };
 
 struct stKeyPressData {
     TWaveformView       waveform;
-    TKeyPressPosition   pos;
-    TCC                 ccAvg;
+    TKeyPressPosition   pos = 0;
+    TCC                 ccAvg = 0.0;
 };
 
 template <typename T>
@@ -73,6 +73,34 @@ inline float frand() { return ((float)rand())/RAND_MAX; }
 TWaveformView getView(const TWaveform & waveform, int64_t idx) { return { waveform.data() + idx, (int64_t) waveform.size() - idx }; }
 
 TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return { waveform.data() + idx, len }; }
+
+bool saveKeyPresses(const char * fname, const TKeyPressCollection & keyPresses) {
+    std::ofstream fout(fname, std::ios::binary);
+    int n = keyPresses.size();
+    fout.write((char *)(&n), sizeof(n));
+    for (int i = 0; i < n; ++i) {
+        fout.write((char *)(&keyPresses[i].pos), sizeof(keyPresses[i].pos));
+    }
+    fout.close();
+
+    return true;
+}
+
+bool loadKeyPresses(const char * fname, const TWaveformView & waveform, TKeyPressCollection & keyPresses) {
+    keyPresses.clear();
+
+    std::ifstream fin(fname, std::ios::binary);
+    int n = 0;
+    fin.read((char *)(&n), sizeof(n));
+    keyPresses.resize(n);
+    for (int i = 0; i < n; ++i) {
+        keyPresses[i].waveform = waveform;
+        fin.read((char *)(&keyPresses[i].pos), sizeof(keyPresses[i].pos));
+    }
+    fin.close();
+
+    return true;
+}
 
 bool readFromFile(const std::string & fname, TWaveform & res) {
     std::ifstream fin(fname, std::ios::binary | std::ios::ate);
@@ -118,6 +146,48 @@ bool readFromFile(const std::string & fname, TWaveform & res) {
     fin.close();
 
     return true;
+}
+
+bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveformLowRes, int nWindow) {
+    waveformLowRes.resize(waveform.n);
+
+    int k = nWindow;
+
+    std::deque<int64_t> que(k);
+    auto [samples, n] = waveform;
+
+    TWaveform waveformAbs(n);
+    for (int64_t i = 0; i < n; ++i) {
+        waveformAbs[i] = std::abs(samples[i]);
+    }
+
+    for (int64_t i = 0; i < n; ++i) {
+        if (i < k) {
+            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
+                que.pop_back();
+            }
+            que.push_back(i);
+        } else {
+            while((!que.empty()) && que.front() <= i - k) {
+                que.pop_front();
+            }
+
+            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
+                que.pop_back();
+            }
+
+            que.push_back(i);
+
+            int64_t itest = i - k/2;
+            waveformLowRes[itest] = waveformAbs[que.front()];
+        }
+    }
+
+    return true;
+}
+
+bool generateLowResWaveform(const TWaveform & waveform, TWaveform & waveformLowRes, int nWindow) {
+    return generateLowResWaveform(getView(waveform, 0), waveformLowRes, nWindow);
 }
 
 bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res, TWaveform & waveformThreshold, double thresholdBackground, int historySize) {
@@ -340,134 +410,200 @@ struct PlaybackData {
 SDL_AudioDeviceID g_deviceIdOut = 0;
 PlaybackData g_playbackData;
 
-bool renderKeyPresses(const TWaveform & waveform, TKeyPressCollection & keyPresses) {
-    ImGui::Begin("Key Presses");
+bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyPressCollection & keyPresses) {
+    if (ImGui::Begin("Key Presses")) {
+        int viewMin = 512;
+        int viewMax = waveform.size();
 
-    int viewMin = 512;
-    int viewMax = waveform.size();
+        bool ignoreDelete = false;
 
-    static int nview = waveform.size()/16;
-    static int offset = (waveform.size() - nview)/2;
-    static float amin = -16000;
-    static float amax = 16000;
-    static float dragOffset = 0.0f;
-    static float scrollSize = 18.0f;
+        static int nview = waveform.size()/16;
+        static int offset = (waveform.size() - nview)/2;
+        static float amin = -16000;
+        static float amax = 16000;
+        static float dragOffset = 0.0f;
+        static float scrollSize = 18.0f;
 
-    static TWaveform waveformThreshold = waveform;
+        static auto nviewPrev = nview + 1;
 
-    auto wview = getView(waveform, offset, nview);
-    auto tview = getView(waveformThreshold, offset, nview);
-    auto wsize = ImVec2(ImGui::GetContentRegionAvailWidth(), 250.0);
+        static TWaveform waveformLowRes = waveform;
+        static TWaveform waveformThreshold = waveform;
 
-    auto savePos = ImGui::GetCursorScreenPos();
-    auto drawList = ImGui::GetWindowDrawList();
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.3f });
-    ImGui::PushStyleColor(ImGuiCol_PlotLines, { 1.0f, 1.0f, 1.0f, 1.0f });
-    ImGui::PlotLines("##Waveform", plotWaveform, &wview, nview, 0, "Waveform", amin, amax, wsize);
-    ImGui::PopStyleColor(2);
-    ImGui::SetCursorScreenPos(savePos);
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
-    ImGui::PushStyleColor(ImGuiCol_PlotLines, { 0.0f, 1.0f, 0.0f, 0.5f });
-    ImGui::PlotLines("##WaveformThreshold", plotWaveform, &tview, nview, 0, "", amin, amax, wsize);
-    ImGui::PopStyleColor(2);
-    ImGui::SetCursorScreenPos(savePos);
-    ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
-    ImGui::PushStyleColor(ImGuiCol_PlotLines, { 0.0f, 1.0f, 0.0f, 0.5f });
-    ImGui::PlotLines("##WaveformThreshold", plotWaveformInverse, &tview, nview, 0, "", amin, amax, wsize);
-    ImGui::PopStyleColor(2);
-    ImGui::SetCursorScreenPos(savePos);
-    ImGui::InvisibleButton("##WaveformIB",wsize);
-    if (ImGui::IsItemHovered()) {
-        auto w = ImGui::GetIO().MouseWheel;
-        auto nview_old = nview;
-        nview *= (10.0 + w)/10.0;
-        nview = std::min(std::max(viewMin, nview), viewMax);
-        if (w != 0.0) {
-            auto mpos = ImGui::GetIO().MousePos;
-            offset = std::max(0.0f, offset + ((mpos.x - savePos.x)/wsize.x)*(nview_old - nview));
-        }
+        auto wview = getView(waveformLowRes, offset, nview);
+        auto tview = getView(waveformThreshold, offset, nview);
+        auto wsize = ImVec2(ImGui::GetContentRegionAvailWidth(), 250.0);
 
-        if (ImGui::IsMouseDown(0) && ImGui::IsMouseDragging(0) == false) {
-            dragOffset = offset;
-        }
-
-        if (ImGui::IsMouseDragging(0)) {
-            offset = dragOffset - ImGui::GetMouseDragDelta(0).x*nview/wsize.x;
-        }
-    }
-    if (ImGui::BeginPopupContextWindow()) {
-        ImGui::SliderInt("View  ", &nview, viewMin, viewMax);
-        ImGui::DragInt  ("Offset", &offset, 0.01*nview, 0, waveform.size() - nview);
-        ImGui::SliderFloat("Amplitude Min", &amin, -32000, 0);
-        ImGui::SliderFloat("Amplitude Max", &amax, 0, 32000);
-        ImGui::EndPopup();
-    }
-
-    ImGui::InvisibleButton("##WaveformScrollIB", {wsize.x, scrollSize});
-    drawList->AddRect({savePos.x, savePos.y + wsize.y}, {savePos.x + wsize.x, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, 1.0f}));
-    drawList->AddRectFilled({savePos.x + wsize.x*(1.f*offset)/viewMax, savePos.y + wsize.y}, {savePos.x + wsize.x*(1.f*offset + nview)/viewMax, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, 1.0f}));
-
-    static bool scrolling = false;
-    if (ImGui::IsItemHovered()) {
-        if (ImGui::IsMouseDown(0)) {
-            scrolling = true;
-        }
-    }
-
-    if (scrolling) {
         auto mpos = ImGui::GetIO().MousePos;
-        offset = ((mpos.x - savePos.x)/wsize.x)*viewMax - nview/2;
-    }
+        auto savePos = ImGui::GetCursorScreenPos();
+        auto drawList = ImGui::GetWindowDrawList();
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.3f });
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 1.0f, 1.0f, 1.0f, 1.0f });
+        ImGui::PlotHistogram("##Waveform", plotWaveform, &wview, nview, 0, "Waveform", amin, amax, wsize);
+        ImGui::PopStyleColor(2);
+        ImGui::SetCursorScreenPos(savePos);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.0f });
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 1.0f, 1.0f, 1.0f, 1.0f });
+        ImGui::PlotHistogram("##Waveform", plotWaveformInverse, &wview, nview, 0, "Waveform", amin, amax, wsize);
+        ImGui::PopStyleColor(2);
+        ImGui::SetCursorScreenPos(savePos);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
+        ImGui::PushStyleColor(ImGuiCol_PlotLines, { 0.0f, 1.0f, 0.0f, 0.5f });
+        ImGui::PlotLines("##WaveformThreshold", plotWaveform, &tview, nview, 0, "", amin, amax, wsize);
+        ImGui::PopStyleColor(2);
+        ImGui::SetCursorScreenPos(savePos);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
+        ImGui::PushStyleColor(ImGuiCol_PlotLines, { 0.0f, 1.0f, 0.0f, 0.5f });
+        ImGui::PlotLines("##WaveformThreshold", plotWaveformInverse, &tview, nview, 0, "", amin, amax, wsize);
+        ImGui::PopStyleColor(2);
+        ImGui::SetCursorScreenPos(savePos);
+        ImGui::InvisibleButton("##WaveformIB",wsize);
+        if (ImGui::IsItemHovered()) {
+            auto w = ImGui::GetIO().MouseWheel;
+            auto nview_old = nview;
+            nview *= (10.0 + w)/10.0;
+            nview = std::min(std::max(viewMin, nview), viewMax);
+            if (w != 0.0) {
+                offset = std::max(0.0f, offset + ((mpos.x - savePos.x)/wsize.x)*(nview_old - nview));
+            }
 
-    if (ImGui::IsMouseDown(0) == false) {
-        scrolling = false;
-    }
+            if (ImGui::IsMouseDown(0) && ImGui::IsMouseDragging(0) == false) {
+                dragOffset = offset;
+            }
 
-    offset = std::max(0, std::min((int) offset, (int) waveform.size() - nview));
-    for (int i = 0; i < (int) keyPresses.size(); ++i) {
-        if (keyPresses[i].pos + kKeyPressWidth_samples < offset) continue;
-        if (keyPresses[i].pos - kKeyPressWidth_samples >= offset + nview) break;
-        {
-            float x0 = ((float)(keyPresses[i].pos - kKeyPressWidth_samples - offset))/nview;
-            float x1 = ((float)(keyPresses[i].pos + kKeyPressWidth_samples - offset))/nview;
-            float x2 = ((float)(g_playbackData.offset + g_playbackData.idx - offset))/nview;
-            drawList->AddRectFilled({savePos.x + x0*wsize.x, savePos.y}, {savePos.x + x1*wsize.x, savePos.y + wsize.y}, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 0.3f}));
-            drawList->AddRect({savePos.x + x2*wsize.x, savePos.y}, {savePos.x + x2*wsize.x + 1.0f, savePos.y + wsize.y}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 0.0f, 0.3f}));
+            if (ImGui::IsMouseDragging(0)) {
+                offset = dragOffset - ImGui::GetMouseDragDelta(0).x*nview/wsize.x;
+            }
+
+            if (ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyCtrl) {
+                int pos = offset + nview*(mpos.x - savePos.x)/wsize.x;
+                for (int i = 0; i < keyPresses.size(); ++i) {
+                    if (std::abs(keyPresses[i].pos - pos) < kKeyPressWidth_samples) break;
+                    if (keyPresses[i].pos > pos) {
+                        ignoreDelete = true;
+                        TKeyPressData entry;
+                        entry.pos = pos;
+                        entry.waveform = wview;
+                        keyPresses.insert(keyPresses.begin() + i, entry);
+                        break;
+                    }
+                }
+            }
         }
-    }
-    for (int i = 0; i < (int) keyPresses.size(); ++i) {
-        {
-            float x0 = ((float)(keyPresses[i].pos))/viewMax;
-            drawList->AddRect({savePos.x + x0*wsize.x, savePos.y + wsize.y}, {savePos.x + x0*wsize.x + 1.0f, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 0.3f}));
+        if (ImGui::BeginPopupContextWindow()) {
+            ImGui::SliderInt("View  ", &nview, viewMin, viewMax);
+            ImGui::DragInt  ("Offset", &offset, 0.01*nview, 0, waveform.size() - nview);
+            ImGui::SliderFloat("Amplitude Min", &amin, -32000, 0);
+            ImGui::SliderFloat("Amplitude Max", &amax, 0, 32000);
+            ImGui::EndPopup();
         }
-    }
 
-    if (ImGui::Button("Play")) {
-        g_playbackData.idx = 0;
-        g_playbackData.offset = offset;
-        g_playbackData.waveform = getView(waveform, offset, std::min((int) (10*kSampleRate), nview));
-        SDL_PauseAudioDevice(g_deviceIdOut, 0);
-    }
+        ImGui::InvisibleButton("##WaveformScrollIB", {wsize.x, scrollSize});
+        drawList->AddRect({savePos.x, savePos.y + wsize.y}, {savePos.x + wsize.x, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, 1.0f}));
+        drawList->AddRectFilled({savePos.x + wsize.x*(1.f*offset)/viewMax, savePos.y + wsize.y}, {savePos.x + wsize.x*(1.f*offset + nview)/viewMax, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, 1.0f}));
 
-    if (g_playbackData.idx > g_playbackData.waveform.n) {
-        SDL_PauseAudioDevice(g_deviceIdOut, 1);
-    }
+        auto savePos2 = ImGui::GetCursorScreenPos();
 
-    ImGui::SameLine();
-    static bool recalculate = true;
-    static int historySize = 6*1024;
-    static float thresholdBackground = 10.0;
-    ImGui::PushItemWidth(100.0);
-    ImGui::SliderFloat("Threshold background", &thresholdBackground, 0.1f, 50.0f) && (recalculate = true);
-    ImGui::SameLine();
-    ImGui::SliderInt("History Size", &historySize, 512, 1024*16) && (recalculate = true);
-    ImGui::SameLine();
-    if (ImGui::Button("Recalculate") || recalculate) {
-        findKeyPresses(waveform, keyPresses, waveformThreshold, thresholdBackground, historySize);
-        recalculate = false;
-    }
-    ImGui::PopItemWidth();
+        static bool scrolling = false;
+        if (ImGui::IsItemHovered()) {
+            if (ImGui::IsMouseDown(0)) {
+                scrolling = true;
+            }
+        }
 
+        if (scrolling) {
+            offset = ((mpos.x - savePos.x)/wsize.x)*viewMax - nview/2;
+        }
+
+        if (ImGui::IsMouseDown(0) == false) {
+            scrolling = false;
+        }
+
+        offset = std::max(0, std::min((int) offset, (int) waveform.size() - nview));
+        for (int i = 0; i < (int) keyPresses.size(); ++i) {
+            if (keyPresses[i].pos + kKeyPressWidth_samples < offset) continue;
+            if (keyPresses[i].pos - kKeyPressWidth_samples >= offset + nview) break;
+
+            {
+                float x0 = ((float)(keyPresses[i].pos - kKeyPressWidth_samples - offset))/nview;
+                float x1 = ((float)(keyPresses[i].pos + kKeyPressWidth_samples - offset))/nview;
+                float x2 = ((float)(g_playbackData.offset + g_playbackData.idx - offset))/nview;
+
+                ImVec2 p0 = {savePos.x + x0*wsize.x, savePos.y};
+                ImVec2 p1 = {savePos.x + x1*wsize.x, savePos.y + wsize.y};
+                bool isHovered = (mpos.x > p0.x && mpos.x < p1.x && mpos.y > p0.y && mpos.y < p1.y);
+
+                float col = isHovered ? 0.7f : 0.3f;
+                drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, col}));
+                drawList->AddRect({savePos.x + x2*wsize.x, savePos.y}, {savePos.x + x2*wsize.x + 1.0f, savePos.y + wsize.y}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 0.0f, 0.3f}));
+
+                if (isHovered) {
+                    if (ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyCtrl && ignoreDelete == false) {
+                        keyPresses.erase(keyPresses.begin() + i);
+                        --i;
+                    }
+                }
+
+                if (nview < 64.0*wsize.x) {
+                    ImGui::SetCursorScreenPos({savePos.x + 0.5f*((x0 + x1)*wsize.x - ImGui::CalcTextSize(std::to_string(i).c_str()).x), savePos.y + wsize.y - ImGui::GetTextLineHeightWithSpacing()});
+                    ImGui::Text("%d", i);
+                }
+            }
+        }
+        for (int i = 0; i < (int) keyPresses.size(); ++i) {
+            {
+                float x0 = ((float)(keyPresses[i].pos))/viewMax;
+                drawList->AddRect({savePos.x + x0*wsize.x, savePos.y + wsize.y}, {savePos.x + x0*wsize.x + 1.0f, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 0.3f}));
+            }
+        }
+
+        ImGui::SetCursorScreenPos(savePos2);
+
+        if (ImGui::Button("Play")) {
+            g_playbackData.idx = 0;
+            g_playbackData.offset = offset;
+            g_playbackData.waveform = getView(waveform, offset, std::min((int) (10*kSampleRate), nview));
+            SDL_PauseAudioDevice(g_deviceIdOut, 0);
+        }
+
+        if (g_playbackData.idx > g_playbackData.waveform.n) {
+            SDL_PauseAudioDevice(g_deviceIdOut, 1);
+        }
+
+        ImGui::SameLine();
+        static bool recalculate = true;
+        static int historySize = 6*1024;
+        static float thresholdBackground = 10.0;
+        ImGui::PushItemWidth(100.0);
+        ImGui::SliderFloat("Threshold background", &thresholdBackground, 0.1f, 50.0f) && (recalculate = true);
+        ImGui::SameLine();
+        ImGui::SliderInt("History Size", &historySize, 512, 1024*16) && (recalculate = true);
+        ImGui::SameLine();
+        if (ImGui::Button("Recalculate") || recalculate) {
+            findKeyPresses(waveform, keyPresses, waveformThreshold, thresholdBackground, historySize);
+            recalculate = false;
+        }
+        ImGui::PopItemWidth();
+
+        static std::string filename = std::string(fnameInput) + ".keys";
+        ImGui::SameLine();
+        ImGui::Text("%s", filename.c_str());
+
+        ImGui::SameLine();
+        if (ImGui::Button("Save")) {
+            saveKeyPresses(filename.c_str(), keyPresses);
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Load")) {
+            loadKeyPresses(filename.c_str(), wview, keyPresses);
+        }
+
+        if (nview != nviewPrev) {
+            generateLowResWaveform(waveform, waveformLowRes, std::max(1.0f, nview/wsize.x));
+            nviewPrev = nview;
+        }
+
+    }
     ImGui::End();
 
     return false;
@@ -594,6 +730,9 @@ int main(int argc, char ** argv) {
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
 
+    ImGui::GetStyle().AntiAliasedFill = false;
+    ImGui::GetStyle().AntiAliasedLines = false;
+
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
@@ -672,11 +811,14 @@ int main(int argc, char ** argv) {
 
         SDL_GetWindowSize(window, &windowSizeX, &windowSizeY);
 
+        auto tStart = std::chrono::high_resolution_clock::now();
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame(window);
         ImGui::NewFrame();
 
-        renderKeyPresses(waveformInput, keyPresses);
+        renderKeyPresses(argv[1], waveformInput, keyPresses);
+
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
         ImGui::Render();
