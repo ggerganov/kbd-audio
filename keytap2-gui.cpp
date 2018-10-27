@@ -483,7 +483,7 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
                         ignoreDelete = true;
                         TKeyPressData entry;
                         entry.pos = pos;
-                        entry.waveform = wview;
+                        entry.waveform = getView(waveform, 0);
                         keyPresses.insert(keyPresses.begin() + i, entry);
                         break;
                     }
@@ -492,7 +492,7 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
                     ignoreDelete = true;
                     TKeyPressData entry;
                     entry.pos = pos;
-                    entry.waveform = wview;
+                    entry.waveform = getView(waveform, 0);
                     keyPresses.push_back(entry);
                 }
             }
@@ -631,10 +631,11 @@ bool renderSimilarity(TKeyPressCollection & keyPresses, TSimilarityMap & similar
         ImGui::SliderFloat("Size", &bsize, 1.5f, 24.0f);
         ImGui::SameLine();
         if (ImGui::Button("Fit")) {
-            bsize = std::min(wsize.x, wsize.y)/n;
+            bsize = (std::min(wsize.x, wsize.y) - 24.0)/n;
         }
         ImGui::PopItemWidth();
 
+        ImGui::BeginChild("Canvas", { 0, 0 }, 1, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar);
         auto savePos = ImGui::GetCursorScreenPos();
         auto drawList = ImGui::GetWindowDrawList();
 
@@ -645,8 +646,14 @@ bool renderSimilarity(TKeyPressCollection & keyPresses, TSimilarityMap & similar
                 ImVec2 p0 = {savePos.x + j*bsize, savePos.y + i*bsize};
                 ImVec2 p1 = {savePos.x + (j + 1)*bsize - 1.0f, savePos.y + (i + 1)*bsize - 1.0f};
                 drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, col}));
+                if (ImGui::IsMouseHoveringRect(p0, {p1.x + 1.0f, p1.y + 1.0f})) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("[%d, %d] = %g\n", i, j, similarityMap[i][j].cc);
+                    ImGui::EndTooltip();
+                }
             }
         }
+        ImGui::EndChild();
     }
     ImGui::End();
     return false;
