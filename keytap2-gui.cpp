@@ -379,8 +379,8 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
             auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + (int)(0.5f*w),               2*w },
                                                    { samples1 + pos1 + (int)(0.5f*w) - alignWindow, 2*w + 2*alignWindow }, alignWindow);
 
-            res[i][i].cc = bestcc;
-            res[i][i].offset = bestoffset;
+            res[i][j].cc = bestcc;
+            res[i][j].offset = bestoffset;
 
             avgcc += bestcc;
         }
@@ -436,7 +436,7 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
         auto mpos = ImGui::GetIO().MousePos;
         auto savePos = ImGui::GetCursorScreenPos();
         auto drawList = ImGui::GetWindowDrawList();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.3f });
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.2f, 0.3f, 0.3f });
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 1.0f, 1.0f, 1.0f, 1.0f });
         ImGui::PlotHistogram("##Waveform", plotWaveform, &wview, nview, 0, "Waveform", amin, amax, wsize);
         ImGui::PopStyleColor(2);
@@ -603,7 +603,7 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
 
         ImGui::SameLine();
         if (ImGui::Button("Load")) {
-            loadKeyPresses(filename.c_str(), wview, keyPresses);
+            loadKeyPresses(filename.c_str(), getView(waveform, 0), keyPresses);
         }
 
         if (nview != nviewPrev) {
@@ -614,6 +614,41 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
     }
     ImGui::End();
 
+    return false;
+}
+
+bool renderSimilarity(TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
+    if (ImGui::Begin("Similarity")) {
+        int n = similarityMap.size();
+        auto wsize = ImGui::GetContentRegionAvail();
+
+        static float bsize = 4.0f;
+        ImGui::PushItemWidth(100.0);
+        if (ImGui::Button("Calculate")) {
+            calculateSimilartyMap(keyPresses, similarityMap);
+        }
+        ImGui::SameLine();
+        ImGui::SliderFloat("Size", &bsize, 1.5f, 24.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Fit")) {
+            bsize = std::min(wsize.x, wsize.y)/n;
+        }
+        ImGui::PopItemWidth();
+
+        auto savePos = ImGui::GetCursorScreenPos();
+        auto drawList = ImGui::GetWindowDrawList();
+
+        ImGui::InvisibleButton("SimilarityMapIB", { n*bsize, n*bsize });
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                float col = similarityMap[i][j].cc;
+                ImVec2 p0 = {savePos.x + j*bsize, savePos.y + i*bsize};
+                ImVec2 p1 = {savePos.x + (j + 1)*bsize - 1.0f, savePos.y + (i + 1)*bsize - 1.0f};
+                drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, col}));
+            }
+        }
+    }
+    ImGui::End();
     return false;
 }
 
@@ -697,7 +732,7 @@ int main(int argc, char ** argv) {
     }
 
     int windowSizeX = 1920;
-    int windowSizeY = 1024;
+    int windowSizeY = 1200;
 
 #if __APPLE__
     // GL 3.2 Core + GLSL 150
@@ -826,6 +861,7 @@ int main(int argc, char ** argv) {
         ImGui::NewFrame();
 
         renderKeyPresses(argv[1], waveformInput, keyPresses);
+        renderSimilarity(keyPresses, similarityMap);
 
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
