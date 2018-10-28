@@ -676,6 +676,7 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
         auto wsize = ImGui::GetContentRegionAvail();
 
         static float bsize = 4.0f;
+        static float threshold = 0.3f;
         ImGui::PushItemWidth(100.0);
         if (ImGui::Button("Calculate") || ImGui::IsKeyPressed(6)) { // c
             calculateSimilartyMap(params, keyPresses, similarityMap);
@@ -686,6 +687,8 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
         if (ImGui::Button("Fit")) {
             bsize = (std::min(wsize.x, wsize.y) - 24.0)/n;
         }
+        ImGui::SameLine();
+        ImGui::SliderFloat("Threshold", &threshold, 0.0f, 1.0f);
         ImGui::PopItemWidth();
 
         ImGui::BeginChild("Canvas", { 0, 0 }, 1, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar);
@@ -698,7 +701,9 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
                 float col = similarityMap[i][j].cc;
                 ImVec2 p0 = {savePos.x + j*bsize, savePos.y + i*bsize};
                 ImVec2 p1 = {savePos.x + (j + 1)*bsize - 1.0f, savePos.y + (i + 1)*bsize - 1.0f};
-                drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, col}));
+                if (similarityMap[i][j].cc > threshold) {
+                    drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, col}));
+                }
                 if (ImGui::IsMouseHoveringRect(p0, {p1.x + 1.0f, p1.y + 1.0f})) {
                     ImGui::BeginTooltip();
                     ImGui::Text("[%d, %d] = %g\n", i, j, similarityMap[i][j].cc);
