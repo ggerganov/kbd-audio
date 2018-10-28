@@ -24,9 +24,7 @@
 
 #define MY_DEBUG
 
-constexpr int64_t kKeyPressWidth_samples = 256;
-constexpr int64_t kSampleRate = 24000;
-
+struct stParameters;
 struct stMatch;
 struct stKeyPressData;
 struct stWaveformView;
@@ -36,6 +34,7 @@ using TSum2                 = int64_t;
 using TCC                   = double;
 using TOffset               = int64_t;
 using TMatch                = stMatch;
+using TParameters           = stParameters;
 using TSimilarityMap        = std::vector<std::vector<TMatch>>;
 
 using TClusterId            = int32_t;
@@ -47,20 +46,27 @@ using TKeyPressPosition     = int64_t;
 using TKeyPressData         = stKeyPressData;
 using TKeyPressCollection   = std::vector<TKeyPressData>;
 
+struct stParameters {
+    int keyPressWidth_samples   = 256;
+    int sampleRate              = 24000;
+    int offsetFromPeak          = keyPressWidth_samples/2;
+    int alignWindow             = 256;
+};
+
 struct stMatch {
-    TCC     cc = 0.0;
-    TOffset offset = 0;
+    TCC     cc      = 0.0;
+    TOffset offset  = 0;
 };
 
 struct stWaveformView {
-    const TSample * samples = nullptr;
-    int64_t         n = 0;
+    const TSample * samples     = nullptr;
+    int64_t                     n = 0;
 };
 
 struct stKeyPressData {
     TWaveformView       waveform;
-    TKeyPressPosition   pos = 0;
-    TCC                 ccAvg = 0.0;
+    TKeyPressPosition   pos         = 0;
+    TCC                 ccAvg       = 0.0;
 };
 
 template <typename T>
@@ -352,12 +358,12 @@ std::tuple<TCC, TOffset> findBestCC(
     return { bestcc, besto };
 }
 
-bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & res) {
+bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & res) {
     res.clear();
     int nPresses = keyPresses.size();
 
-    int w = kKeyPressWidth_samples;
-    int alignWindow = 256;
+    int w = params.keyPressWidth_samples;
+    int alignWindow = params.alignWindow;
 
     res.resize(nPresses);
     for (auto & x : res) x.resize(nPresses);
@@ -376,8 +382,8 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
             auto pos1 = keyPresses[j].pos;
 
             auto samples1 = waveform1.samples;
-            auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + (int)(0.5f*w),               2*w },
-                                                   { samples1 + pos1 + (int)(0.5f*w) - alignWindow, 2*w + 2*alignWindow }, alignWindow);
+            auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + params.offsetFromPeak,               2*w },
+                                                   { samples1 + pos1 + params.offsetFromPeak - alignWindow, 2*w + 2*alignWindow }, alignWindow);
 
             res[i][j].cc = bestcc;
             res[i][j].offset = bestoffset;
@@ -402,6 +408,7 @@ float plotWaveformInverse(void * data, int i) {
 
 struct PlaybackData {
     static const int kSamples = 1024;
+    int slowDown = 1;
     int64_t idx = 0;
     int64_t offset = 0;
     TWaveformView waveform;
@@ -410,14 +417,14 @@ struct PlaybackData {
 SDL_AudioDeviceID g_deviceIdOut = 0;
 PlaybackData g_playbackData;
 
-bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyPressCollection & keyPresses) {
+bool renderKeyPresses(TParameters & params, const char * fnameInput, const TWaveform & waveform, TKeyPressCollection & keyPresses) {
     if (ImGui::Begin("Key Presses")) {
         int viewMin = 512;
         int viewMax = waveform.size();
 
         bool ignoreDelete = false;
 
-        static int nview = waveform.size()/16;
+        static int nview = waveform.size();
         static int offset = (waveform.size() - nview)/2;
         static float amin = -16000;
         static float amax = 16000;
@@ -436,7 +443,7 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
         auto mpos = ImGui::GetIO().MousePos;
         auto savePos = ImGui::GetCursorScreenPos();
         auto drawList = ImGui::GetWindowDrawList();
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.2f, 0.3f, 0.3f });
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.3f, 0.3f, 0.3f, 0.3f });
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 1.0f, 1.0f, 1.0f, 1.0f });
         ImGui::PlotHistogram("##Waveform", plotWaveform, &wview, nview, 0, "Waveform", amin, amax, wsize);
         ImGui::PopStyleColor(2);
@@ -476,10 +483,13 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
 
             if (ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyCtrl) {
                 int i = 0;
-                int pos = offset + nview*(mpos.x - savePos.x)/wsize.x;
+                int64_t pos = offset + nview*(mpos.x - savePos.x)/wsize.x;
                 for (i = 0; i < keyPresses.size(); ++i) {
-                    if (std::abs(keyPresses[i].pos - pos) < kKeyPressWidth_samples) break;
-                    if (keyPresses[i].pos > pos) {
+                    int64_t p0 = keyPresses[i].pos + params.offsetFromPeak - params.keyPressWidth_samples;
+                    int64_t p1 = keyPresses[i].pos + params.offsetFromPeak + params.keyPressWidth_samples;
+                    int64_t pmin = std::min(std::min(keyPresses[i].pos, p0), p1);
+                    int64_t pmax = std::max(std::max(keyPresses[i].pos, p0), p1);
+                    if (pmin > pos) {
                         ignoreDelete = true;
                         TKeyPressData entry;
                         entry.pos = pos;
@@ -487,6 +497,7 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
                         keyPresses.insert(keyPresses.begin() + i, entry);
                         break;
                     }
+                    if (pos >= pmin && pos <= pmax) break;
                 }
                 if (i == keyPresses.size() && ignoreDelete == false) {
                     ignoreDelete = true;
@@ -528,21 +539,34 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
 
         offset = std::max(0, std::min((int) offset, (int) waveform.size() - nview));
         for (int i = 0; i < (int) keyPresses.size(); ++i) {
-            if (keyPresses[i].pos + kKeyPressWidth_samples < offset) continue;
-            if (keyPresses[i].pos - kKeyPressWidth_samples >= offset + nview) break;
+            if (keyPresses[i].pos + params.offsetFromPeak + params.keyPressWidth_samples < offset) continue;
+            if (keyPresses[i].pos + params.offsetFromPeak - params.keyPressWidth_samples >= offset + nview) break;
 
             {
-                float x0 = ((float)(keyPresses[i].pos - kKeyPressWidth_samples - offset))/nview;
-                float x1 = ((float)(keyPresses[i].pos + kKeyPressWidth_samples - offset))/nview;
-                float x2 = ((float)(g_playbackData.offset + g_playbackData.idx - offset))/nview;
+                float x0 = ((float)(keyPresses[i].pos - offset))/nview;
 
-                ImVec2 p0 = {savePos.x + x0*wsize.x, savePos.y};
-                ImVec2 p1 = {savePos.x + x1*wsize.x, savePos.y + wsize.y};
-                bool isHovered = (mpos.x > p0.x && mpos.x < p1.x && mpos.y > p0.y && mpos.y < p1.y);
+                ImVec2 p0 = { savePos.x + x0*wsize.x, savePos.y };
+                ImVec2 p1 = { savePos.x + x0*wsize.x, savePos.y + wsize.y };
+
+                drawList->AddLine(p0, p1, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.8f }), 1.0f);
+            }
+
+            {
+                float x0 = ((float)(keyPresses[i].pos - offset))/nview;
+                float x1 = ((float)(keyPresses[i].pos + params.offsetFromPeak - params.keyPressWidth_samples - offset))/nview;
+                float x2 = ((float)(keyPresses[i].pos + params.offsetFromPeak + params.keyPressWidth_samples - offset))/nview;
+
+                ImVec2 p0 = { savePos.x + x0*wsize.x, savePos.y };
+                ImVec2 p1 = { savePos.x + x1*wsize.x, savePos.y };
+                ImVec2 p2 = { savePos.x + x2*wsize.x, savePos.y + wsize.y };
+
+                float xmin = std::min(std::min(p0.x, p1.x), p2.x);
+                float xmax = std::max(std::max(p0.x, p1.x), p2.x);
+
+                bool isHovered = (mpos.x > xmin && mpos.x < xmax && mpos.y > p1.y && mpos.y < p2.y);
 
                 float col = isHovered ? 0.7f : 0.3f;
-                drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, col}));
-                drawList->AddRect({savePos.x + x2*wsize.x, savePos.y}, {savePos.x + x2*wsize.x + 1.0f, savePos.y + wsize.y}, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 0.0f, 0.3f}));
+                drawList->AddRectFilled(p1, p2, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, col }));
 
                 if (isHovered) {
                     if (ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyCtrl && ignoreDelete == false) {
@@ -552,24 +576,49 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
                 }
 
                 if (nview < 64.0*wsize.x) {
-                    ImGui::SetCursorScreenPos({savePos.x + 0.5f*((x0 + x1)*wsize.x - ImGui::CalcTextSize(std::to_string(i).c_str()).x), savePos.y + wsize.y - ImGui::GetTextLineHeightWithSpacing()});
+                    ImGui::SetCursorScreenPos({ savePos.x + 0.5f*((x1 + x2)*wsize.x - ImGui::CalcTextSize(std::to_string(i).c_str()).x), savePos.y + wsize.y - ImGui::GetTextLineHeightWithSpacing() });
                     ImGui::Text("%d", i);
                 }
+
+            }
+
+            {
+                float x0 = ((float)(g_playbackData.offset + g_playbackData.idx - offset))/nview;
+
+                ImVec2 p0 = {savePos.x + x0*wsize.x, savePos.y};
+                ImVec2 p1 = {savePos.x + x0*wsize.x, savePos.y + wsize.y};
+                drawList->AddLine(p0, p1, ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 0.0f, 0.3f }));
             }
         }
         for (int i = 0; i < (int) keyPresses.size(); ++i) {
             {
                 float x0 = ((float)(keyPresses[i].pos))/viewMax;
-                drawList->AddRect({savePos.x + x0*wsize.x, savePos.y + wsize.y}, {savePos.x + x0*wsize.x + 1.0f, savePos.y + wsize.y + scrollSize}, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 0.3f}));
+
+                ImVec2 p0 = { savePos.x + x0*wsize.x, savePos.y + wsize.y };
+                ImVec2 p1 = { savePos.x + x0*wsize.x, savePos.y + wsize.y + scrollSize };
+
+                drawList->AddLine(p0, p1, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.3f }));
             }
         }
 
         ImGui::SetCursorScreenPos(savePos2);
 
-        if (ImGui::Button("Play")) {
+        //auto io = ImGui::GetIO();
+        //ImGui::Text("Keys pressed:");   for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyPressed(i))             { ImGui::SameLine(); ImGui::Text("%d", i); }
+
+        static bool recalculate = true;
+        static bool playHalfSpeed = false;
+        static int historySize = 6*1024;
+        static float thresholdBackground = 10.0;
+        ImGui::PushItemWidth(100.0);
+
+        ImGui::Checkbox("x0.5", &playHalfSpeed);
+        ImGui::SameLine();
+        if (ImGui::Button("Play") || ImGui::IsKeyPressed(44)) { // space
+            g_playbackData.slowDown = playHalfSpeed ? 2 : 1;
             g_playbackData.idx = 0;
             g_playbackData.offset = offset;
-            g_playbackData.waveform = getView(waveform, offset, std::min((int) (10*kSampleRate), nview));
+            g_playbackData.waveform = getView(waveform, offset, std::min((int) (10*params.sampleRate), nview));
             SDL_PauseAudioDevice(g_deviceIdOut, 0);
         }
 
@@ -578,10 +627,6 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
         }
 
         ImGui::SameLine();
-        static bool recalculate = true;
-        static int historySize = 6*1024;
-        static float thresholdBackground = 10.0;
-        ImGui::PushItemWidth(100.0);
         ImGui::SliderFloat("Threshold background", &thresholdBackground, 0.1f, 50.0f) && (recalculate = true);
         ImGui::SameLine();
         ImGui::SliderInt("History Size", &historySize, 512, 1024*16) && (recalculate = true);
@@ -590,7 +635,6 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
             findKeyPresses(waveform, keyPresses, waveformThreshold, thresholdBackground, historySize);
             recalculate = false;
         }
-        ImGui::PopItemWidth();
 
         static std::string filename = std::string(fnameInput) + ".keys";
         ImGui::SameLine();
@@ -606,6 +650,15 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
             loadKeyPresses(filename.c_str(), getView(waveform, 0), keyPresses);
         }
 
+        ImGui::SameLine();
+        ImGui::DragInt("Key width", &params.keyPressWidth_samples, 8, 0, params.sampleRate/10);
+        ImGui::SameLine();
+        ImGui::DragInt("Peak offset", &params.offsetFromPeak, 8, -params.sampleRate/10, params.sampleRate/10);
+        ImGui::SameLine();
+        ImGui::DragInt("Align window", &params.alignWindow, 8, 0, params.sampleRate/10);
+
+        ImGui::PopItemWidth();
+
         if (nview != nviewPrev) {
             generateLowResWaveform(waveform, waveformLowRes, std::max(1.0f, nview/wsize.x));
             nviewPrev = nview;
@@ -617,15 +670,15 @@ bool renderKeyPresses(const char * fnameInput, const TWaveform & waveform, TKeyP
     return false;
 }
 
-bool renderSimilarity(TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
+bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
     if (ImGui::Begin("Similarity")) {
         int n = similarityMap.size();
         auto wsize = ImGui::GetContentRegionAvail();
 
         static float bsize = 4.0f;
         ImGui::PushItemWidth(100.0);
-        if (ImGui::Button("Calculate")) {
-            calculateSimilartyMap(keyPresses, similarityMap);
+        if (ImGui::Button("Calculate") || ImGui::IsKeyPressed(6)) { // c
+            calculateSimilartyMap(params, keyPresses, similarityMap);
         }
         ImGui::SameLine();
         ImGui::SliderFloat("Size", &bsize, 1.5f, 24.0f);
@@ -661,12 +714,22 @@ bool renderSimilarity(TKeyPressCollection & keyPresses, TSimilarityMap & similar
 
 void cbPlayback(void * userData, uint8_t * stream, int len) {
     PlaybackData * data = (PlaybackData *)(userData);
-    auto end = std::min(data->idx + PlaybackData::kSamples, data->waveform.n);
+    auto end = std::min(data->idx + PlaybackData::kSamples/data->slowDown, data->waveform.n);
     auto idx = data->idx;
+    auto sidx = 0;
     for (; idx < end; ++idx) {
         int16_t a = data->waveform.samples[idx];
-        memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
+        memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
         len -= sizeof(a);
+        ++sidx;
+
+        if (data->slowDown == 2) {
+            int16_t a2 = data->waveform.samples[idx + 1];
+            a = 0.5*(a + a2);
+            memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
+            len -= sizeof(a);
+            ++sidx;
+        }
     }
     while (len > 0) {
         int16_t a = 0;
@@ -677,7 +740,7 @@ void cbPlayback(void * userData, uint8_t * stream, int len) {
     data->idx = idx;
 }
 
-bool prepareAudioOut() {
+bool prepareAudioOut(const TParameters & params) {
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
         return false;
@@ -692,7 +755,7 @@ bool prepareAudioOut() {
     SDL_AudioSpec playbackSpec;
     SDL_zero(playbackSpec);
 
-    playbackSpec.freq = kSampleRate;
+    playbackSpec.freq = params.sampleRate;
     playbackSpec.format = AUDIO_S16;
     playbackSpec.channels = 1;
     playbackSpec.samples = PlaybackData::kSamples;
@@ -728,12 +791,17 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
+    TParameters params;
+    TWaveform waveformInput;
+    TKeyPressCollection keyPresses;
+    TSimilarityMap similarityMap;
+
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
 
-    if (prepareAudioOut() == false) {
+    if (prepareAudioOut(params) == false) {
         printf("Error: failed to initialize audio playback\n");
         return -2;
     }
@@ -786,9 +854,6 @@ int main(int argc, char ** argv) {
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    int64_t sampleRate = kSampleRate;
-
-    TWaveform waveformInput;
     printf("[+] Loading recording from '%s'\n", argv[1]);
     if (readFromFile(argv[1], waveformInput) == false) {
         printf("Specified file '%s' does not exist\n", argv[1]);
@@ -799,45 +864,7 @@ int main(int argc, char ** argv) {
     printf("    Size in memory:          %g MB\n", (float)(sizeof(TSample)*waveformInput.size())/1024/1024);
     printf("    Sample size:             %d\n", (int) sizeof(TSample));
     printf("    Total number of samples: %d\n", (int) waveformInput.size());
-    printf("    Recording length:        %g seconds\n", (float)(waveformInput.size())/sampleRate);
-
-    TKeyPressCollection keyPresses;
-    //{
-    //    auto tStart = std::chrono::high_resolution_clock::now();
-    //    printf("[+] Searching for key presses\n");
-    //    if (findKeyPresses(waveformInput, keyPresses) == false) {
-    //        printf("Failed to detect keypresses\n");
-    //        return -2;
-    //    }
-    //    auto tEnd = std::chrono::high_resolution_clock::now();
-    //    printf("[+] Detected a total of %d potential key presses\n", (int) keyPresses.size());
-    //    for (auto & k : keyPresses) {
-    //        printf("    position - %d\n", (int) k.pos);
-    //    }
-    //    printf("[+] Search took %4.3f seconds\n", toSeconds(tStart, tEnd));
-
-    //    dumpKeyPresses("key_presses.plot", keyPresses);
-    //}
-
-    TSimilarityMap similarityMap;
-    //{
-    //    auto tStart = std::chrono::high_resolution_clock::now();
-    //    printf("[+] Calculating CC similarity map\n");
-    //    if (calculateSimilartyMap(keyPresses, similarityMap) == false) {
-    //        printf("Failed to calculate similariy map\n");
-    //        return -3;
-    //    }
-    //    auto tEnd = std::chrono::high_resolution_clock::now();
-    //    printf("[+] Calculation took %4.3f seconds\n", toSeconds(tStart, tEnd));
-    //}
-
-    int n = keyPresses.size();
-    for (int i = 0; i < n; ++i) {
-        auto avgcc = keyPresses[i].ccAvg;
-        printf("    Average CC for keypress %4d - %6.3f\n", i, avgcc);
-    }
-
-    printf("\n");
+    printf("    Recording length:        %g seconds\n", (float)(waveformInput.size())/params.sampleRate);
 
     bool finishApp = false;
     while (finishApp == false) {
@@ -867,8 +894,8 @@ int main(int argc, char ** argv) {
         ImGui_ImplSDL2_NewFrame(window);
         ImGui::NewFrame();
 
-        renderKeyPresses(argv[1], waveformInput, keyPresses);
-        renderSimilarity(keyPresses, similarityMap);
+        renderKeyPresses(params, argv[1], waveformInput, keyPresses);
+        renderSimilarity(params, keyPresses, similarityMap);
 
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
