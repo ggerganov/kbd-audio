@@ -396,6 +396,51 @@ bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & key
     return true;
 }
 
+bool adjustKeyPresses(const TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & sim) {
+    struct Pair {
+        int i = -1;
+        int j = -1;
+        TCC cc = -1.0;
+
+        bool operator < (const Pair & a) const { return cc > a.cc; }
+    };
+
+    int n = keyPresses.size();
+
+    std::vector<Pair> ccpairs;
+    for (int i = 0; i < n - 1; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            ccpairs.emplace_back(Pair{i, j, sim[i][j].cc});
+        }
+    }
+
+    int nused = 0;
+    std::vector<bool> used(n, false);
+
+    std::sort(ccpairs.begin(), ccpairs.end());
+
+    int npairs = ccpairs.size();
+    for (int ip = 0; ip < npairs; ++ip) {
+        auto & curpair = ccpairs[ip];
+        int k0 = curpair.i;
+        int k1 = curpair.j;
+        if (used[k0] && used[k1]) continue;
+
+        if (used[k1] == false) {
+            keyPresses[k1].pos += sim[k0][k1].offset;
+        } else {
+            keyPresses[k0].pos -= sim[k0][k1].offset;
+        }
+
+        if (used[k0] == false) { used[k0] = true; ++nused; }
+        if (used[k1] == false) { used[k1] = true; ++nused; }
+
+        if (nused == n) break;
+    }
+
+    return true;
+}
+
 float plotWaveform(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return waveform->samples[i];
@@ -689,6 +734,10 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
         }
         ImGui::SameLine();
         ImGui::SliderFloat("Threshold", &threshold, 0.0f, 1.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Adjust")) {
+            adjustKeyPresses(params, keyPresses, similarityMap);
+        }
         ImGui::PopItemWidth();
 
         ImGui::BeginChild("Canvas", { 0, 0 }, 1, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar);
@@ -707,6 +756,13 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
                 if (ImGui::IsMouseHoveringRect(p0, {p1.x + 1.0f, p1.y + 1.0f})) {
                     ImGui::BeginTooltip();
                     ImGui::Text("[%d, %d] = %g\n", i, j, similarityMap[i][j].cc);
+                    for (int k = 0; k < n; ++k) {
+                        if (similarityMap[i][k].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", i, k, (int) similarityMap[i][k].offset);
+                    }
+                    ImGui::Separator();
+                    for (int k = 0; k < n; ++k) {
+                        if (similarityMap[k][i].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", k, i, (int) similarityMap[k][i].offset);
+                    }
                     ImGui::EndTooltip();
                 }
             }
