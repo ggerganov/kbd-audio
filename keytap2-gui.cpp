@@ -51,6 +51,7 @@ struct stParameters {
     int sampleRate              = 24000;
     int offsetFromPeak          = keyPressWidth_samples/2;
     int alignWindow             = 256;
+    float thresholdClustering   = 0.5f;
 };
 
 struct stMatch {
@@ -67,6 +68,7 @@ struct stKeyPressData {
     TWaveformView       waveform;
     TKeyPressPosition   pos         = 0;
     TCC                 ccAvg       = 0.0;
+    TClusterId          cid         = -1;
 };
 
 template <typename T>
@@ -254,6 +256,7 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res, T
                     entry.waveform = waveform;
                     entry.pos = itest;
                     entry.ccAvg = 0.0;
+                    entry.cid = -1;
                     res.emplace_back(std::move(entry));
                 }
             }
@@ -372,7 +375,7 @@ bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & key
         res[i][i].cc = 1.0f;
         res[i][i].offset = 0;
 
-        auto & [waveform0, pos0, avgcc] = keyPresses[i];
+        auto & [waveform0, pos0, avgcc, _x] = keyPresses[i];
         auto [samples0, n0] = waveform0;
 
         for (int j = 0; j < nPresses; ++j) {
@@ -391,6 +394,95 @@ bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & key
             avgcc += bestcc;
         }
         avgcc /= (nPresses - 1);
+    }
+
+    return true;
+}
+
+bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses, TCC threshold) {
+    struct Pair {
+        int i = -1;
+        int j = -1;
+        TCC cc = -1.0;
+
+        bool operator < (const Pair & a) const { return cc > a.cc; }
+    };
+
+    int n = keyPresses.size();
+
+    int nclusters = 0;
+    for (int i = 0; i < n; ++i) {
+        keyPresses[i].cid = i + 1;
+        ++nclusters;
+    }
+
+    std::vector<Pair> ccpairs;
+    for (int i = 0; i < n - 1; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            ccpairs.emplace_back(Pair{i, j, sim[i][j].cc});
+        }
+    }
+
+    std::sort(ccpairs.begin(), ccpairs.end());
+
+    printf("[+] Top 10 pairs\n");
+    for (int i = 0; i < 10; ++i) {
+        printf("    Pair %d: %d %d %g\n", i, ccpairs[i].i, ccpairs[i].j, ccpairs[i].cc);
+    }
+
+    int npairs = ccpairs.size();
+    for (int ip = 0; ip < npairs; ++ip) {
+        auto & curpair = ccpairs[ip];
+        //if (frand() > curpair.cc) continue;
+        if (curpair.cc < threshold) break;
+
+        auto ci = keyPresses[curpair.i].cid;
+        auto cj = keyPresses[curpair.j].cid;
+
+        if (ci == cj) continue;
+        auto cnew = std::min(ci, cj);
+        int nsum = 0;
+        int nsumi = 0;
+        int nsumj = 0;
+        double sumcc = 0.0;
+        double sumcci = 0.0;
+        double sumccj = 0.0;
+        for (int k = 0; k < n; ++k) {
+            auto & ck = keyPresses[k].cid;
+            for (int q = 0; q < n; ++q) {
+                if (q == k) continue;
+                auto & cq = keyPresses[q].cid;
+                if ((ck == ci || ck == cj) && (cq == ci || cq == cj)) {
+                    sumcc += sim[k][q].cc;
+                    ++nsum;
+                }
+                if (ck == ci && cq == ci) {
+                    sumcci += sim[k][q].cc;
+                    ++nsumi;
+                }
+                if (ck == cj && cq == cj) {
+                    sumccj += sim[k][q].cc;
+                    ++nsumj;
+                }
+            }
+        }
+        sumcc /= nsum;
+        if (nsumi > 0) sumcci /= nsumi;
+        if (nsumj > 0) sumccj /= nsumj;
+        printf("Merge avg n = %4d, cc = %8.5f, ni = %4d, cci = %8.5f, nj = %4d, ccj = %8.5f\n", nsum, sumcc, nsumi, sumcci, nsumj, sumccj);
+
+        //if (sumcc < 1.000*curpair.cc) continue;
+        //if (sumcc > 0.75*sumccj && sumcc > 0.75*sumcci) {
+        if (sumcc > 0.4*(sumcci + sumccj)) {
+        } else {
+            continue;
+        }
+
+        for (int k = 0; k < n; ++k) {
+            auto & ck = keyPresses[k].cid;
+            if (ck == ci || ck == cj) ck = cnew;
+        }
+        --nclusters;
     }
 
     return true;
@@ -755,7 +847,8 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
                 }
                 if (ImGui::IsMouseHoveringRect(p0, {p1.x + 1.0f, p1.y + 1.0f})) {
                     ImGui::BeginTooltip();
-                    ImGui::Text("[%d, %d] = %g\n", i, j, similarityMap[i][j].cc);
+                    ImGui::Text("[%3d, %3d]\n", keyPresses[i].cid, keyPresses[j].cid);
+                    ImGui::Text("[%3d, %3d] = %5.4g\n", i, j, similarityMap[i][j].cc);
                     for (int k = 0; k < n; ++k) {
                         if (similarityMap[i][k].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", i, k, (int) similarityMap[i][k].offset);
                     }
@@ -768,6 +861,17 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
             }
         }
         ImGui::EndChild();
+    }
+    ImGui::End();
+    return false;
+}
+
+bool renderClusters(TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
+    if (ImGui::Begin("Clusters")) {
+        ImGui::SliderFloat("Threshold", &params.thresholdClustering, 0.0f, 1.0f);
+        if (ImGui::Button("Calculate")) {
+            clusterG(similarityMap, keyPresses, params.thresholdClustering);
+        }
     }
     ImGui::End();
     return false;
@@ -957,6 +1061,7 @@ int main(int argc, char ** argv) {
 
         renderKeyPresses(params, argv[1], waveformInput, keyPresses);
         renderSimilarity(params, keyPresses, similarityMap);
+        renderClusters(params, keyPresses, similarityMap);
 
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
