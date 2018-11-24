@@ -3,6 +3,12 @@
  *  \author Georgi Gerganov
  */
 
+
+#ifdef __EMSCRIPTEN__
+#include "emscripten.h"
+#define IMGUI_IMPL_OPENGL_LOADER_GLEW
+#endif
+
 #include "constants.h"
 #include "audio_logger.h"
 
@@ -11,7 +17,16 @@
 #include "imgui_impl_opengl3.h"
 
 #include <SDL.h>
-#include <GL/gl3w.h>
+
+#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
+#include <GL/gl3w.h>    // Initialize with gl3wInit()
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
+#include <GL/glew.h>    // Initialize with glewInit()
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
+#include <glad/glad.h>  // Initialize with gladLoadGL()
+#else
+#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
+#endif
 
 #include <map>
 #include <mutex>
@@ -23,8 +38,14 @@
 #include <deque>
 #include <fstream>
 
-#define MY_DEBUG
-#define OUTPUT_WAVEFORMS
+static std::function<bool()> g_mainUpdate;
+
+void mainUpdate() {
+    g_mainUpdate();
+}
+
+//#define MY_DEBUG
+//#define OUTPUT_WAVEFORMS
 
 // constants
 
@@ -32,7 +53,7 @@ constexpr float kTrainBufferSize_s = 0.075f;
 constexpr float kPredictBufferSize_s = 0.200f;
 constexpr int64_t kSampleRate = 24000;
 
-constexpr int64_t kRingBufferSize = 1024;
+constexpr int64_t kRingBufferSize = 4*1024;
 constexpr int bkgrStep_samples = 1;
 //constexpr int keyDuration_samples = 0.005f*kSampleRate;
 constexpr int keyDuration_samples = 1;
@@ -134,7 +155,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
     int is00 = waveform0.size()/2 - (is1 - is0)/2;
     auto [sum0, sum02] = calcSum(waveform0, is00, is00 + is1 - is0);
 
-    int nWorkers = std::thread::hardware_concurrency();
+    int nWorkers = std::min(4u, std::thread::hardware_concurrency());
     std::mutex mutex;
     std::vector<std::thread> workers(nWorkers);
     for (int i = 0; i < workers.size(); ++i) {
@@ -197,6 +218,8 @@ extern "C" {
 }
 
 int main(int argc, char ** argv) {
+	printf("hardware_concurrency = %d\n", (int) std::thread::hardware_concurrency());
+
     if (argc < 2) {
         fprintf(stderr, "Usage: %s input.kbd [input2.kbd ...]\n", argv[0]);
         return -127;
@@ -217,7 +240,6 @@ int main(int argc, char ** argv) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
 #else
     // GL 3.0 + GLSL 130
     const char* glsl_version = "#version 130";
@@ -233,13 +255,28 @@ int main(int argc, char ** argv) {
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
+#ifdef __EMSCRIPTEN__
+	SDL_Window* window;
+	SDL_Renderer *renderer;
+    SDL_CreateWindowAndRenderer(windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_ALLOW_HIGHDPI, &window, &renderer);
+#else
     SDL_Window* window = SDL_CreateWindow("Keytap", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
+#endif
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_SetSwapInterval(1); // Enable vsync
 
     // Initialize OpenGL loader
+#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
     bool err = gl3wInit() != 0;
-    if (err) {
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
+    bool err = glewInit() != GLEW_OK;
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
+    bool err = gladLoadGL() == 0;
+#else
+    bool err = false; // If you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to requires some form of initialization.
+#endif
+    if (err)
+    {
         fprintf(stderr, "Failed to initialize OpenGL loader!\n");
         return 1;
     }
@@ -251,7 +288,11 @@ int main(int argc, char ** argv) {
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
 
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+#ifdef __EMSCRIPTEN__
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
     ImGui_ImplOpenGL3_Init(glsl_version);
+#endif
 
     // Setup style
     ImGui::StyleColorsDark();
@@ -837,7 +878,9 @@ int main(int argc, char ** argv) {
     };
 
     init();
-    while (finishApp == false) {
+    g_mainUpdate = [&]() {
+        if (finishApp) return false;
+
         update();
 
         SDL_Event event;
@@ -1041,7 +1084,17 @@ int main(int argc, char ** argv) {
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
+
+        return true;
+    };
+
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop(mainUpdate, 60, 1);
+#else
+    while (true) {
+        if (g_mainUpdate() == false) break;
     }
+#endif
 
     worker.join();
 

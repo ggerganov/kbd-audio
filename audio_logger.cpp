@@ -126,6 +126,11 @@ bool AudioLogger::terminate() {
 bool AudioLogger::addFrame(const Sample * stream) {
     auto & data = getData();
 
+	if ((int) SDL_GetQueuedAudioSize(data.deviceIdIn) > 32*sizeof(float)*kSamplesPerFrame) {
+		printf("Queue size: %d\n", SDL_GetQueuedAudioSize(data.deviceIdIn));
+		SDL_ClearQueuedAudio(data.deviceIdIn);
+	}
+
     std::lock_guard<std::mutex> lock(data.mutex);
 
     auto & curFrame = data.buffer[data.bufferId];
