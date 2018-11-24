@@ -3,6 +3,8 @@
  *  \author Georgi Gerganov
  */
 
+#include "subbreak.h"
+
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
@@ -28,6 +30,7 @@ struct stParameters;
 struct stMatch;
 struct stKeyPressData;
 struct stWaveformView;
+struct stKeyPressCollection;
 
 using TSum                  = int64_t;
 using TSum2                 = int64_t;
@@ -44,7 +47,7 @@ using TWaveform             = std::vector<TSample>;
 using TWaveformView         = stWaveformView;
 using TKeyPressPosition     = int64_t;
 using TKeyPressData         = stKeyPressData;
-using TKeyPressCollection   = std::vector<TKeyPressData>;
+using TKeyPressCollection   = stKeyPressCollection;
 
 struct stParameters {
     int keyPressWidth_samples   = 256;
@@ -71,12 +74,14 @@ struct stKeyPressData {
     TClusterId          cid         = -1;
 };
 
+struct stKeyPressCollection : public std::vector<TKeyPressData> {
+    int nClusters = 0;
+};
+
 template <typename T>
 float toSeconds(T t0, T t1) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1024.0f;
 }
-
-inline float frand() { return ((float)rand())/RAND_MAX; }
 
 TWaveformView getView(const TWaveform & waveform, int64_t idx) { return { waveform.data() + idx, (int64_t) waveform.size() - idx }; }
 
@@ -485,6 +490,8 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses, TCC 
         --nclusters;
     }
 
+    keyPresses.nClusters = nclusters;
+
     return true;
 }
 
@@ -836,6 +843,7 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
         auto savePos = ImGui::GetCursorScreenPos();
         auto drawList = ImGui::GetWindowDrawList();
 
+        int hoveredId = -1;
         ImGui::InvisibleButton("SimilarityMapIB", { n*bsize, n*bsize });
         for (int i = 0; i < n; ++i) {
             for (int j = 0; j < n; ++j) {
@@ -846,20 +854,34 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
                     drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, col}));
                 }
                 if (ImGui::IsMouseHoveringRect(p0, {p1.x + 1.0f, p1.y + 1.0f})) {
-                    ImGui::BeginTooltip();
-                    ImGui::Text("[%3d, %3d]\n", keyPresses[i].cid, keyPresses[j].cid);
-                    ImGui::Text("[%3d, %3d] = %5.4g\n", i, j, similarityMap[i][j].cc);
-                    for (int k = 0; k < n; ++k) {
-                        if (similarityMap[i][k].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", i, k, (int) similarityMap[i][k].offset);
+                    if (i == j) hoveredId = i;
+                    if (ImGui::IsMouseDown(0) == false) {
+                        ImGui::BeginTooltip();
+                        ImGui::Text("[%3d, %3d]\n", keyPresses[i].cid, keyPresses[j].cid);
+                        ImGui::Text("[%3d, %3d] = %5.4g\n", i, j, similarityMap[i][j].cc);
+                        for (int k = 0; k < n; ++k) {
+                            if (similarityMap[i][k].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", i, k, (int) similarityMap[i][k].offset);
+                        }
+                        ImGui::Separator();
+                        for (int k = 0; k < n; ++k) {
+                            if (similarityMap[k][i].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", k, i, (int) similarityMap[k][i].offset);
+                        }
+                        ImGui::EndTooltip();
                     }
-                    ImGui::Separator();
-                    for (int k = 0; k < n; ++k) {
-                        if (similarityMap[k][i].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", k, i, (int) similarityMap[k][i].offset);
-                    }
-                    ImGui::EndTooltip();
                 }
             }
         }
+
+        if (hoveredId >= 0) {
+            for (int i = 0; i < n; ++i) {
+                if (keyPresses[i].cid == keyPresses[hoveredId].cid) {
+                    ImVec2 p0 = {savePos.x + i*bsize, savePos.y + i*bsize};
+                    ImVec2 p1 = {savePos.x + (i + 1)*bsize - 1.0f, savePos.y + (i + 1)*bsize - 1.0f};
+                    drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 1.0f}));
+                }
+            }
+        }
+
         ImGui::EndChild();
     }
     ImGui::End();
@@ -868,12 +890,36 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
 
 bool renderClusters(TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
     if (ImGui::Begin("Clusters")) {
+        ImGui::Text("Clusters: %d\n", keyPresses.nClusters);
         ImGui::SliderFloat("Threshold", &params.thresholdClustering, 0.0f, 1.0f);
         if (ImGui::Button("Calculate")) {
             clusterG(similarityMap, keyPresses, params.thresholdClustering);
         }
     }
     ImGui::End();
+    return false;
+}
+
+bool renderSolution(TParameters & params, TFreqMap freqMap, TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
+    static int nIters = 10000;
+    static std::string enc = "";
+
+    if (ImGui::Begin("Solution")) {
+        ImGui::SliderInt("Iterations", &nIters, 0, 1e6);
+        if (ImGui::Button("Calculate")) {
+            int n = keyPresses.size();
+            enc.resize(n);
+            for (int i = 0; i < n; ++i) {
+                enc[i] = keyPresses[i].cid;
+            }
+            printText(enc);
+            std::string decrypted;
+            kN = std::max(27, keyPresses.nClusters);
+            decrypt(freqMap, enc, decrypted, nIters);
+        }
+    }
+    ImGui::End();
+
     return false;
 }
 
@@ -951,8 +997,8 @@ bool prepareAudioOut(const TParameters & params) {
 int main(int argc, char ** argv) {
     srand(time(0));
 
-    printf("Usage: %s record.kbd\n", argv[0]);
-    if (argc < 2) {
+    printf("Usage: %s recrod.kbd n-gram.txt\n", argv[0]);
+    if (argc < 3) {
         return -1;
     }
 
@@ -969,6 +1015,17 @@ int main(int argc, char ** argv) {
     if (prepareAudioOut(params) == false) {
         printf("Error: failed to initialize audio playback\n");
         return -2;
+    }
+
+    printf("[+] Loading recording from '%s'\n", argv[1]);
+    if (readFromFile(argv[1], waveformInput) == false) {
+        printf("Specified file '%s' does not exist\n", argv[1]);
+        return -1;
+    }
+
+    TFreqMap freqMap;
+    if (loadFreqMap(argv[2], freqMap) == false) {
+        return -1;
     }
 
     int windowSizeX = 1920;
@@ -1019,12 +1076,6 @@ int main(int argc, char ** argv) {
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    printf("[+] Loading recording from '%s'\n", argv[1]);
-    if (readFromFile(argv[1], waveformInput) == false) {
-        printf("Specified file '%s' does not exist\n", argv[1]);
-        return -1;
-    }
-
     printf("[+] Loaded recording: of %d samples (sample size = %d bytes)\n", (int) waveformInput.size(), (int) sizeof(TSample));
     printf("    Size in memory:          %g MB\n", (float)(sizeof(TSample)*waveformInput.size())/1024/1024);
     printf("    Sample size:             %d\n", (int) sizeof(TSample));
@@ -1062,6 +1113,7 @@ int main(int argc, char ** argv) {
         renderKeyPresses(params, argv[1], waveformInput, keyPresses);
         renderSimilarity(params, keyPresses, similarityMap);
         renderClusters(params, keyPresses, similarityMap);
+        renderSolution(params, freqMap, keyPresses, similarityMap);
 
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
