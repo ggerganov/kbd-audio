@@ -155,6 +155,23 @@ std::tuple<TValueCC, TOffset> findBestCC(
     int is00 = waveform0.size()/2 - (is1 - is0)/2;
     auto [sum0, sum02] = calcSum(waveform0, is00, is00 + is1 - is0);
 
+#ifdef __EMSCRIPTEN__
+    TOffset cbesto = -1;
+    TValueCC cbestcc = -1.0f;
+
+    for (int o = -alignWindow; o < alignWindow; ++o) {
+        auto cc = calcCC(waveform0, waveform1, sum0, sum02, is00, is0 + o, is1 + o);
+        if (cc > cbestcc) {
+            cbesto = o;
+            cbestcc = cc;
+        }
+    }
+
+    if (cbestcc > bestcc) {
+        bestcc = cbestcc;
+        besto = cbesto;
+    }
+#else
     int nWorkers = std::min(4u, std::thread::hardware_concurrency());
     std::mutex mutex;
     std::vector<std::thread> workers(nWorkers);
@@ -182,6 +199,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
         });
     }
     for (auto & worker : workers) worker.join();
+#endif
 
     return { bestcc, besto };
 }
@@ -938,11 +956,14 @@ int main(int argc, char ** argv) {
         ImGui::SetNextWindowSize(ImVec2(windowSizeX, windowSizeY));
         ImGui::Begin("Main", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
         if (isAcquiringTrainData == true) {
-            ImGui::Text("Collecting training data. Please press keys that you want to be predicted later");
+            ImGui::Text("Collecting training data. Type some text in the box below.");
+            ImGui::Text("The more text you type, the higher the chance for correct prediction later.");
             ImGui::Text("Click the 'Predict' button when ready");
             static char buf[1024];
             ImGui::InputTextMultiline("##TrainingData", buf, 1024, { ImGui::GetContentRegionAvailWidth(), 400 });
             if (ImGui::Button("Predict", ImGui::GetContentRegionAvail())) {
+                audioLogger.pause();
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 foutTrain.close();
                 fins[0] = std::ifstream("train_default.kbd", std::ios::binary);
                 if (fins[0].good()) {
@@ -954,6 +975,7 @@ int main(int argc, char ** argv) {
                 }
                 processingInput = true;
                 isAcquiringTrainData = false;
+                audioLogger.resume();
             }
         } else if (isReadyToPredict == false) {
             ImGui::Text("Training ... Please wait");
