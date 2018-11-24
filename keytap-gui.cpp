@@ -221,8 +221,10 @@ int main(int argc, char ** argv) {
 	printf("hardware_concurrency = %d\n", (int) std::thread::hardware_concurrency());
 
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s input.kbd [input2.kbd ...]\n", argv[0]);
+        printf("Usage: %s input.kbd [input2.kbd ...]\n", argv[0]);
+#ifndef __EMSCRIPTEN__
         return -127;
+#endif
     }
 
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER) != 0) {
@@ -258,7 +260,7 @@ int main(int argc, char ** argv) {
 #ifdef __EMSCRIPTEN__
 	SDL_Window* window;
 	SDL_Renderer *renderer;
-    SDL_CreateWindowAndRenderer(windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_ALLOW_HIGHDPI, &window, &renderer);
+    SDL_CreateWindowAndRenderer(windowSizeX, windowSizeY, SDL_WINDOW_OPENGL, &window, &renderer);
 #else
     SDL_Window* window = SDL_CreateWindow("Keytap", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
 #endif
@@ -360,6 +362,16 @@ int main(int argc, char ** argv) {
     std::array<double, kRingBufferSize> rbSamples;
     rbSamples.fill(0.0f);
 
+    // Train data
+    bool isAcquiringTrainData = (argc == 1) ? true : false;
+    std::map<int, int> nTimes;
+    size_t totalSize_bytes = 0;
+    std::ofstream foutTrain("train_default.kbd", std::ios::binary);
+    {
+        int x = kTrainBufferSize_frames;
+        foutTrain.write((char *)(&x), sizeof(x));
+    }
+
     AudioLogger audioLogger;
 
     struct WorkData {
@@ -449,6 +461,22 @@ int main(int argc, char ** argv) {
     });
 
     AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & frames) {
+        if (isAcquiringTrainData) {
+            foutTrain.write((char *)(&keyPressed), sizeof(keyPressed));
+            for (const auto & frame : frames) {
+                totalSize_bytes += sizeof(frame[0])*frame.size();
+                foutTrain.write((char *)(frame.data()), sizeof(frame[0])*frame.size());
+                foutTrain.flush();
+            }
+            ++nTimes[keyPressed];
+
+            printf("Last recorded key - %3d '%s'. Total times recorded so far - %3d. Total data saved: %g MB\n",
+                   keyPressed, kKeyText.at(keyPressed), nTimes[keyPressed], ((float)(totalSize_bytes)/1024.0f/1024.0f));
+
+            keyPressed = -1;
+            return;
+        }
+
         if (frames.size() != kTrainBufferSize_frames && isReadyToPredict == false) {
             printf("Unexpected number of frames - %d, expected - %d. Should never happen\n",
                    (int) frames.size(), (int) kTrainBufferSize_frames);
@@ -547,7 +575,7 @@ int main(int argc, char ** argv) {
             return -1;
         }
 
-        audioLogger.pause();
+        //audioLogger.pause();
 
         printf("[+] Collecting training data\n");
         g_isInitialized = true;
@@ -563,6 +591,10 @@ int main(int argc, char ** argv) {
     };
 
     g_update = [&]() {
+        if (isAcquiringTrainData) {
+            return;
+        }
+
         if (processingInput) {
             if (keyPressed == -1) {
                 AudioLogger::Frame frame;
@@ -905,7 +937,25 @@ int main(int argc, char ** argv) {
         ImGui::SetNextWindowPos(ImVec2(0, 0));
         ImGui::SetNextWindowSize(ImVec2(windowSizeX, windowSizeY));
         ImGui::Begin("Main", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
-        if (isReadyToPredict == false) {
+        if (isAcquiringTrainData == true) {
+            ImGui::Text("Collecting training data. Please press keys that you want to be predicted later");
+            ImGui::Text("Click the 'Predict' button when ready");
+            static char buf[1024];
+            ImGui::InputTextMultiline("##TrainingData", buf, 1024, { ImGui::GetContentRegionAvailWidth(), 400 });
+            if (ImGui::Button("Predict", ImGui::GetContentRegionAvail())) {
+                foutTrain.close();
+                fins[0] = std::ifstream("train_default.kbd", std::ios::binary);
+                if (fins[0].good()) {
+                    int bufferSize_frames = 1;
+                    fins[0].read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
+                    if (bufferSize_frames != kTrainBufferSize_frames) {
+                        printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kTrainBufferSize_frames);
+                    }
+                }
+                processingInput = true;
+                isAcquiringTrainData = false;
+            }
+        } else if (isReadyToPredict == false) {
             ImGui::Text("Training ... Please wait");
         } else {
             {
