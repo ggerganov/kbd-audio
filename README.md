@@ -43,4 +43,4 @@ Detect pressed keys via microphone audio capture. Uses statistical information (
 
 **Usage:** ./keytap2-gui recording.kbd n-gram.txt
 
-<a-href="https://i.imgur.com/yR3m5Bm.jpg" target="_blank">![Keytap](https://i.imgur.com/yR3m5Bm.jpg)</a>
+<a href="https://i.imgur.com/yR3m5Bm.jpg" target="_blank">![Keytap](https://i.imgur.com/yR3m5Bm.jpg)</a>
