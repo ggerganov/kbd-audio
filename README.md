@@ -1,13 +1,13 @@
 ## record-full
 
-Record audio capture to raw binary file on disk
+Record audio to a raw binary file on disk
 
 **Usage:** ./record-full output.kbd
 
 
 ## play-full
 
-Playback recording created via the **record-full** tool
+Playback a recording captured via the **record-full** tool
 
 **Usage:** ./play-full input.kbd
 
@@ -21,7 +21,7 @@ Record audio only while typing. Useful for collecting training data for **keytap
 
 ## play
 
-Playback recording created via the **record** tool
+Playback a recording created via the **record** tool
 
 **Usage:** ./play input.kbd
 
