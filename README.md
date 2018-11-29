@@ -1,3 +1,22 @@
+### Build instructions
+
+Dependencies: SDL2 and FFTW3
+
+**Linux and Mac OS**
+
+    git clone https://github.com/ggerganov/kbd-audio
+    cd kbd-audio
+    git submodule update --init
+    mkdir build && cd build
+    cmake ..
+    make
+    
+**Windows**
+
+    todo
+
+---
+
 ## record-full
 
 Record audio to a raw binary file on disk
