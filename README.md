@@ -1,7 +1,18 @@
-### Build instructions
+# kbd-audio
 
-Dependencies: SDL2 and FFTW3
+## Description
 
+This is a collection of command-line and GUI tools for capturing and analyzing audio data. The most interesting tool is called **keytap** - it can guess pressed keyboard keys only by analyzing the audio captured from the computer's microphone.
+
+*(Algorithm description coming soon)*
+
+## Build instructions
+
+Dependencies:
+
+ - **SDL2** - used to capture audio and to open GUI windows [libsdl](https://www.libsdl.org)
+ - **FFTW3** - some of the helper tools perform Fourier transformations [fftw](http://www.fftw.org)
+ 
 **Linux and Mac OS**
 
     git clone https://github.com/ggerganov/kbd-audio
@@ -13,39 +24,39 @@ Dependencies: SDL2 and FFTW3
     
 **Windows**
 
-    todo
+    (todo, PRs welcome)
 
----
+## Tools
 
-## record-full
+### record-full
 
 Record audio to a raw binary file on disk
 
 **Usage:** ./record-full output.kbd
 
 
-## play-full
+### play-full
 
 Playback a recording captured via the **record-full** tool
 
 **Usage:** ./play-full input.kbd
 
 
-## record
+### record
 
 Record audio only while typing. Useful for collecting training data for **keytap**
 
 **Usage:** ./record output.kbd
 
 
-## play
+### play
 
 Playback a recording created via the **record** tool
 
 **Usage:** ./play input.kbd
 
 
-## keytap
+### keytap
 
 Detect pressed keys via microphone audio capture in real-time. Uses training data captured via the **record** tool.
 
@@ -56,10 +67,14 @@ Detect pressed keys via microphone audio capture in real-time. Uses training dat
 <a href="https://i.imgur.com/mnRvT1X.gif" target="_blank">![Keytap](https://i.imgur.com/FXa60Pr.gif)</a>
 
 
-## keytap2 *(work in progress)*
+### keytap2 *(work in progress)*
 
-Detect pressed keys via microphone audio capture. Uses statistical information (n-gram frequencies) about the English language. No training data required. The *'recording.kbd'* input file has to be generated via the **record-full** tool and contains the audio data that will be analyzed.
+Detect pressed keys via microphone audio capture. Uses statistical information (n-gram frequencies) about the language. **No training data is required**. The *'recording.kbd'* input file has to be generated via the **record-full** tool and contains the audio data that will be analyzed. The *'n-gram.txt'* file has to contain n-gram probabilities for the corresponding language. 
 
 **Usage:** ./keytap2-gui recording.kbd n-gram.txt
 
 <a href="https://i.imgur.com/yR3m5Bm.jpg" target="_blank">![Keytap](https://i.imgur.com/yR3m5Bm.jpg)</a>
+
+## Feedback
+
+Any feedback about the performance of the tools is highly appreciated. Please drop a comment [here](https://github.com/ggerganov/kbd-audio/issues/3).
