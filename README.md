@@ -32,7 +32,7 @@ Detect pressed keys via microphone audio capture in real-time. Uses training dat
 
 **Usage:** ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ...
 
-[**Live demo *(WebAssembly threads required)***](https://ggerganov.github.io/jekyll/update/2018/11/17/wave-gui.html)
+[**Live demo *(WebAssembly threads required)***](https://ggerganov.github.io/jekyll/update/2018/11/24/keytap.html)
 
 <a href="https://i.imgur.com/mnRvT1X.gif" target="_blank">![Keytap](https://i.imgur.com/FXa60Pr.gif)</a>
 
