@@ -23,6 +23,7 @@
 #include <tuple>
 #include <vector>
 #include <thread>
+#include <algorithm>
 
 #define MY_DEBUG
 
