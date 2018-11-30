@@ -4,7 +4,9 @@
 
 This is a collection of command-line and GUI tools for capturing and analyzing audio data. The most interesting tool is called **keytap** - it can guess pressed keyboard keys only by analyzing the audio captured from the computer's microphone.
 
-*(Algorithm description coming soon)*
+Check this blog post for more details:
+
+[Keytap: description and some random thoughts](https://ggerganov.github.io/jekyll/update/2018/11/30/keytap-description-and-thoughts.html)
 
 ## Build instructions
 
