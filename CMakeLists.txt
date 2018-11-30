@@ -16,6 +16,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Threads REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(FFTW REQUIRED)
+find_package(OpenGL REQUIRED)
 
 string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
 
