@@ -18,8 +18,8 @@ before_install:
       sudo apt-get update;
       sudo apt-get install -qq build-essential xorg-dev libglu1-mesa-dev libglew-dev libglm-dev;
       sudo apt-get install -qq cmake;
-      sudo apt-get install -qq libsdl2-dev
-      sudo apt-get install -qq libfftw3-dev
+      sudo apt-get install -qq libsdl2-dev;
+      sudo apt-get install -qq libfftw3-dev;
     fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install fftw; fi
