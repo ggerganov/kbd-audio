@@ -1,4 +1,4 @@
-# kbd-audio
+# kbd-audio [![Build Status](https://travis-ci.org/ggerganov/kbd-audio.svg?branch=master)](https://travis-ci.org/ggerganov/kbd-audio?branch=master)
 
 ## Description
 
