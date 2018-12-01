@@ -1,0 +1,34 @@
+language: c++
+
+cache: apt
+
+dist: xenial
+
+sudo: required
+
+os:
+  - linux
+  - osx
+
+compiler:
+  - gcc
+
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+      sudo apt-get update;
+      sudo apt-get install -qq build-essential xorg-dev libglu1-mesa-dev libglew-dev libglm-dev;
+      sudo apt-get install -qq cmake;
+      sudo apt-get install -qq libsdl2-dev
+      sudo apt-get install -qq libfftw3-dev
+    fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install fftw; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install sdl2; fi
+
+install:
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+      echo "Install ...";
+    fi
+
+script:
+  - mkdir build && cd build && cmake .. && make
