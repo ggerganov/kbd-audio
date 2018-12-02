@@ -8,6 +8,8 @@ Check this blog post for more details:
 
 [Keytap: description and some random thoughts](https://ggerganov.github.io/jekyll/update/2018/11/30/keytap-description-and-thoughts.html)
 
+[Video: Short demo of Keytap in action](https://www.youtube.com/watch?v=2OjzI9m7W10)
+
 ## Build instructions
 
 Dependencies:
