@@ -1,5 +1,5 @@
 /*! \file view-full-gui.cpp
- *  \brief View data recorded with record-full
+ *  \brief Visualize data recorded with record-full
  *  \author Georgi Gerganov
  */
 
@@ -30,27 +30,14 @@ int g_windowSizeX = 1600;
 int g_windowSizeY = 400;
 
 struct stParameters;
-struct stMatch;
-struct stKeyPressData;
 struct stWaveformView;
-struct stKeyPressCollection;
 
-using TSum                  = int64_t;
-using TSum2                 = int64_t;
-using TCC                   = double;
-using TOffset               = int64_t;
-using TMatch                = stMatch;
 using TParameters           = stParameters;
-using TSimilarityMap        = std::vector<std::vector<TMatch>>;
 
-using TClusterId            = int32_t;
 using TSampleInput          = float;
 using TSample               = int32_t;
 using TWaveform             = std::vector<TSample>;
 using TWaveformView         = stWaveformView;
-using TKeyPressPosition     = int64_t;
-using TKeyPressData         = stKeyPressData;
-using TKeyPressCollection   = stKeyPressCollection;
 
 struct stParameters {
     int keyPressWidth_samples   = 256;
@@ -60,25 +47,9 @@ struct stParameters {
     float thresholdClustering   = 0.5f;
 };
 
-struct stMatch {
-    TCC     cc      = 0.0;
-    TOffset offset  = 0;
-};
-
 struct stWaveformView {
     const TSample * samples     = nullptr;
     int64_t                     n = 0;
-};
-
-struct stKeyPressData {
-    TWaveformView       waveform;
-    TKeyPressPosition   pos         = 0;
-    TCC                 ccAvg       = 0.0;
-    TClusterId          cid         = -1;
-};
-
-struct stKeyPressCollection : public std::vector<TKeyPressData> {
-    int nClusters = 0;
 };
 
 template <typename T>
@@ -89,34 +60,6 @@ float toSeconds(T t0, T t1) {
 TWaveformView getView(const TWaveform & waveform, int64_t idx) { return { waveform.data() + idx, (int64_t) waveform.size() - idx }; }
 
 TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return { waveform.data() + idx, len }; }
-
-bool saveKeyPresses(const char * fname, const TKeyPressCollection & keyPresses) {
-    std::ofstream fout(fname, std::ios::binary);
-    int n = keyPresses.size();
-    fout.write((char *)(&n), sizeof(n));
-    for (int i = 0; i < n; ++i) {
-        fout.write((char *)(&keyPresses[i].pos), sizeof(keyPresses[i].pos));
-    }
-    fout.close();
-
-    return true;
-}
-
-bool loadKeyPresses(const char * fname, const TWaveformView & waveform, TKeyPressCollection & keyPresses) {
-    keyPresses.clear();
-
-    std::ifstream fin(fname, std::ios::binary);
-    int n = 0;
-    fin.read((char *)(&n), sizeof(n));
-    keyPresses.resize(n);
-    for (int i = 0; i < n; ++i) {
-        keyPresses[i].waveform = waveform;
-        fin.read((char *)(&keyPresses[i].pos), sizeof(keyPresses[i].pos));
-    }
-    fin.close();
-
-    return true;
-}
 
 bool readFromFile(const std::string & fname, TWaveform & res) {
     std::ifstream fin(fname, std::ios::binary | std::ios::ate);
@@ -204,343 +147,6 @@ bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveform
 
 bool generateLowResWaveform(const TWaveform & waveform, TWaveform & waveformLowRes, int nWindow) {
     return generateLowResWaveform(getView(waveform, 0), waveformLowRes, nWindow);
-}
-
-bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res, TWaveform & waveformThreshold, double thresholdBackground, int historySize) {
-    res.clear();
-    waveformThreshold.resize(waveform.n);
-
-    int rbBegin = 0;
-    double rbAverage = 0.0;
-    std::vector<double> rbSamples(8*historySize, 0.0);
-
-    int k = historySize;
-
-    std::deque<int64_t> que(k);
-    auto [samples, n] = waveform;
-
-    TWaveform waveformAbs(n);
-    for (int64_t i = 0; i < n; ++i) {
-        waveformAbs[i] = std::abs(samples[i]);
-    }
-
-    for (int64_t i = 0; i < n; ++i) {
-        {
-            int64_t ii = i - k/2;
-            if (ii >= 0) {
-                rbAverage *= rbSamples.size();
-                rbAverage -= rbSamples[rbBegin];
-                double acur = waveformAbs[i];
-                rbSamples[rbBegin] = acur;
-                rbAverage += acur;
-                rbAverage /= rbSamples.size();
-                if (++rbBegin >= rbSamples.size()) {
-                    rbBegin = 0;
-                }
-            }
-        }
-
-        if (i < k) {
-            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
-                que.pop_back();
-            }
-            que.push_back(i);
-        } else {
-            while((!que.empty()) && que.front() <= i - k) {
-                que.pop_front();
-            }
-
-            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
-                que.pop_back();
-            }
-
-            que.push_back(i);
-
-            int64_t itest = i - k/2;
-            if (itest >= 2*k && itest < n - 2*k && que.front() == itest) {
-                double acur = waveformAbs[itest];
-                if (acur > thresholdBackground*rbAverage){
-                    TKeyPressData entry;
-                    entry.waveform = waveform;
-                    entry.pos = itest;
-                    entry.ccAvg = 0.0;
-                    entry.cid = -1;
-                    res.emplace_back(std::move(entry));
-                }
-            }
-            waveformThreshold[itest] = waveformAbs[que.front()];
-        }
-    }
-
-    return true;
-}
-
-bool findKeyPresses(const TWaveform & waveform, TKeyPressCollection & res, TWaveform & waveformThreshold, double thresholdBackground = 10.0, int historySize = 4*1024) {
-    return findKeyPresses(getView(waveform, 0), res, waveformThreshold, thresholdBackground, historySize);
-}
-
-bool dumpKeyPresses(const std::string & fname, const TKeyPressCollection & data) {
-    std::ofstream fout(fname);
-    for (auto & k : data) {
-        fout << k.pos << " 1" << std::endl;
-    }
-    fout.close();
-    return true;
-}
-
-std::tuple<TSum, TSum2> calcSum(const TWaveformView & waveform) {
-    TSum sum = 0.0f;
-    TSum2 sum2 = 0.0f;
-    auto [samples, n] = waveform;
-    for (int64_t is = 0; is < n; ++is) {
-        auto a0 = samples[is];
-        sum += a0;
-        sum2 += a0*a0;
-    }
-
-    return { sum, sum2 };
-}
-
-TCC calcCC(
-    const TWaveformView & waveform0,
-    const TWaveformView & waveform1,
-    TSum sum0, TSum2 sum02) {
-    TCC cc = -1.0f;
-
-    TSum sum1 = 0.0f;
-    TSum2 sum12 = 0.0f;
-    TSum2 sum01 = 0.0f;
-
-    auto [samples0, n0] = waveform0;
-    auto [samples1, n1] = waveform1;
-
-#ifdef MY_DEBUG
-    if (n0 != n1) {
-        printf("BUG 234f8273\n");
-    }
-#endif
-    auto n = std::min(n0, n1);
-
-    for (int64_t is = 0; is < n; ++is) {
-        auto a0 = samples0[is];
-        auto a1 = samples1[is];
-
-        sum1 += a1;
-        sum12 += a1*a1;
-        sum01 += a0*a1;
-    }
-
-    {
-        double nom = sum01*n - sum0*sum1;
-        double den2a = sum02*n - sum0*sum0;
-        double den2b = sum12*n - sum1*sum1;
-        cc = (nom)/(sqrt(den2a*den2b));
-    }
-
-    return cc;
-}
-
-std::tuple<TCC, TOffset> findBestCC(
-    const TWaveformView & waveform0,
-    const TWaveformView & waveform1,
-    int64_t alignWindow) {
-    TCC bestcc = -1.0;
-    TOffset besto = -1;
-
-    auto [samples0, n0] = waveform0;
-    auto [samples1, n1] = waveform1;
-
-#ifdef MY_DEBUG
-    if (n0 + 2*alignWindow != n1) {
-        printf("BUG 924830jm92, n0 = %d, n1 = %d, a = %d\n", (int) n0, (int) n1, (int) alignWindow);
-    }
-#endif
-
-    auto [sum0, sum02] = calcSum(waveform0);
-
-    for (int o = 0; o < 2*alignWindow; ++o) {
-        auto cc = calcCC(waveform0, { samples1 + o, n0 }, sum0, sum02);
-        if (cc > bestcc) {
-            besto = o - alignWindow;
-            bestcc = cc;
-        }
-    }
-
-    return { bestcc, besto };
-}
-
-bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & res) {
-    res.clear();
-    int nPresses = keyPresses.size();
-
-    int w = params.keyPressWidth_samples;
-    int alignWindow = params.alignWindow;
-
-    res.resize(nPresses);
-    for (auto & x : res) x.resize(nPresses);
-
-    for (int i = 0; i < nPresses; ++i) {
-        res[i][i].cc = 1.0f;
-        res[i][i].offset = 0;
-
-        auto & [waveform0, pos0, avgcc, _x] = keyPresses[i];
-        auto [samples0, n0] = waveform0;
-
-        for (int j = 0; j < nPresses; ++j) {
-            if (i == j) continue;
-
-            auto waveform1 = keyPresses[j].waveform;
-            auto pos1 = keyPresses[j].pos;
-
-            auto samples1 = waveform1.samples;
-            auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + params.offsetFromPeak,               2*w },
-                                                   { samples1 + pos1 + params.offsetFromPeak - alignWindow, 2*w + 2*alignWindow }, alignWindow);
-
-            res[i][j].cc = bestcc;
-            res[i][j].offset = bestoffset;
-
-            avgcc += bestcc;
-        }
-        avgcc /= (nPresses - 1);
-    }
-
-    return true;
-}
-
-bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses, TCC threshold) {
-    struct Pair {
-        int i = -1;
-        int j = -1;
-        TCC cc = -1.0;
-
-        bool operator < (const Pair & a) const { return cc > a.cc; }
-    };
-
-    int n = keyPresses.size();
-
-    int nclusters = 0;
-    for (int i = 0; i < n; ++i) {
-        keyPresses[i].cid = i + 1;
-        ++nclusters;
-    }
-
-    std::vector<Pair> ccpairs;
-    for (int i = 0; i < n - 1; ++i) {
-        for (int j = i + 1; j < n; ++j) {
-            ccpairs.emplace_back(Pair{i, j, sim[i][j].cc});
-        }
-    }
-
-    std::sort(ccpairs.begin(), ccpairs.end());
-
-    printf("[+] Top 10 pairs\n");
-    for (int i = 0; i < 10; ++i) {
-        printf("    Pair %d: %d %d %g\n", i, ccpairs[i].i, ccpairs[i].j, ccpairs[i].cc);
-    }
-
-    int npairs = ccpairs.size();
-    for (int ip = 0; ip < npairs; ++ip) {
-        auto & curpair = ccpairs[ip];
-        //if (frand() > curpair.cc) continue;
-        if (curpair.cc < threshold) break;
-
-        auto ci = keyPresses[curpair.i].cid;
-        auto cj = keyPresses[curpair.j].cid;
-
-        if (ci == cj) continue;
-        auto cnew = std::min(ci, cj);
-        int nsum = 0;
-        int nsumi = 0;
-        int nsumj = 0;
-        double sumcc = 0.0;
-        double sumcci = 0.0;
-        double sumccj = 0.0;
-        for (int k = 0; k < n; ++k) {
-            auto & ck = keyPresses[k].cid;
-            for (int q = 0; q < n; ++q) {
-                if (q == k) continue;
-                auto & cq = keyPresses[q].cid;
-                if ((ck == ci || ck == cj) && (cq == ci || cq == cj)) {
-                    sumcc += sim[k][q].cc;
-                    ++nsum;
-                }
-                if (ck == ci && cq == ci) {
-                    sumcci += sim[k][q].cc;
-                    ++nsumi;
-                }
-                if (ck == cj && cq == cj) {
-                    sumccj += sim[k][q].cc;
-                    ++nsumj;
-                }
-            }
-        }
-        sumcc /= nsum;
-        if (nsumi > 0) sumcci /= nsumi;
-        if (nsumj > 0) sumccj /= nsumj;
-        printf("Merge avg n = %4d, cc = %8.5f, ni = %4d, cci = %8.5f, nj = %4d, ccj = %8.5f\n", nsum, sumcc, nsumi, sumcci, nsumj, sumccj);
-
-        //if (sumcc < 1.000*curpair.cc) continue;
-        //if (sumcc > 0.75*sumccj && sumcc > 0.75*sumcci) {
-        if (sumcc > 0.4*(sumcci + sumccj)) {
-        } else {
-            continue;
-        }
-
-        for (int k = 0; k < n; ++k) {
-            auto & ck = keyPresses[k].cid;
-            if (ck == ci || ck == cj) ck = cnew;
-        }
-        --nclusters;
-    }
-
-    keyPresses.nClusters = nclusters;
-
-    return true;
-}
-
-bool adjustKeyPresses(const TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & sim) {
-    struct Pair {
-        int i = -1;
-        int j = -1;
-        TCC cc = -1.0;
-
-        bool operator < (const Pair & a) const { return cc > a.cc; }
-    };
-
-    int n = keyPresses.size();
-
-    std::vector<Pair> ccpairs;
-    for (int i = 0; i < n - 1; ++i) {
-        for (int j = i + 1; j < n; ++j) {
-            ccpairs.emplace_back(Pair{i, j, sim[i][j].cc});
-        }
-    }
-
-    int nused = 0;
-    std::vector<bool> used(n, false);
-
-    std::sort(ccpairs.begin(), ccpairs.end());
-
-    int npairs = ccpairs.size();
-    for (int ip = 0; ip < npairs; ++ip) {
-        auto & curpair = ccpairs[ip];
-        int k0 = curpair.i;
-        int k1 = curpair.j;
-        if (used[k0] && used[k1]) continue;
-
-        if (used[k1] == false) {
-            keyPresses[k1].pos += sim[k0][k1].offset;
-        } else {
-            keyPresses[k0].pos -= sim[k0][k1].offset;
-        }
-
-        if (used[k0] == false) { used[k0] = true; ++nused; }
-        if (used[k1] == false) { used[k1] = true; ++nused; }
-
-        if (nused == n) break;
-    }
-
-    return true;
 }
 
 float plotWaveform(void * data, int i) {
@@ -780,7 +386,7 @@ bool prepareAudioOut(const TParameters & params) {
 int main(int argc, char ** argv) {
     srand(time(0));
 
-    printf("Usage: %s recrod.kbd\n", argv[0]);
+    printf("Usage: %s record.kbd\n", argv[0]);
     if (argc < 2) {
         return -1;
     }
