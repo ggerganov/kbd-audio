@@ -68,7 +68,7 @@ Detect pressed keys via microphone audio capture in real-time. Uses training dat
 
 [**Live demo *(WebAssembly threads required)***](https://ggerganov.github.io/jekyll/update/2018/11/24/keytap.html)
 
-<a href="https://i.imgur.com/mnRvT1X.gif" target="_blank">![Keytap](https://i.imgur.com/FXa60Pr.gif)</a>
+<a href="https://i.imgur.com/mnRvT1X.gif" target="_blank">![keytap-gui](https://i.imgur.com/FXa60Pr.gif)</a>
 
 
 ### keytap2 *(work in progress)*
@@ -77,7 +77,17 @@ Detect pressed keys via microphone audio capture. Uses statistical information (
 
 **Usage:** ./keytap2-gui recording.kbd n-gram.txt
 
-<a href="https://i.imgur.com/yR3m5Bm.jpg" target="_blank">![Keytap](https://i.imgur.com/yR3m5Bm.jpg)</a>
+<a href="https://i.imgur.com/yR3m5Bm.jpg" target="_blank">![keytap2-gui](https://i.imgur.com/yR3m5Bm.jpg)</a>
+
+
+### view-full
+
+Visualize waveforms recorded with the 'recrod-full' tool. Can also playback the audio data.
+
+**Usage:** ./view-full-gui recording.kbd
+
+<a href="https://i.imgur.com/scjTaXw.png" target="_blank">![view-full-gui](https://i.imgur.com/scjTaXw.png)</a>
+
 
 ## Feedback
 
