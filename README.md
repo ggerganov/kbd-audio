@@ -82,7 +82,7 @@ Detect pressed keys via microphone audio capture. Uses statistical information (
 
 ### view-full
 
-Visualize waveforms recorded with the 'recrod-full' tool. Can also playback the audio data.
+Visualize waveforms recorded with the **record-full** tool. Can also playback the audio data.
 
 **Usage:** ./view-full-gui recording.kbd
 
