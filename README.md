@@ -84,9 +84,18 @@ Detect pressed keys via microphone audio capture. Uses statistical information (
 
 Visualize waveforms recorded with the **record-full** tool. Can also playback the audio data.
 
-**Usage:** ./view-full-gui recording.kbd
+**Usage:** ./view-full-gui input.kbd
 
 <a href="https://i.imgur.com/scjTaXw.png" target="_blank">![view-full-gui](https://i.imgur.com/scjTaXw.png)</a>
+
+
+### view
+
+Visualize training data recorded with the **record** tool. Can also playback the audio data.
+
+**Usage:** ./view-gui input.kbd
+
+<a href="https://i.imgur.com/2binGaZ.png" target="_blank">![view-full-gui](https://i.imgur.com/2binGaZ.png)</a>
 
 
 ## Feedback
