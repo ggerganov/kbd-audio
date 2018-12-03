@@ -110,3 +110,6 @@ target_link_libraries(record-full PRIVATE Core)
 
 add_executable(subbreak subbreak.cpp)
 target_link_libraries(subbreak PRIVATE Core)
+
+add_executable(view-full-gui view-full-gui.cpp)
+target_link_libraries(view-full-gui PRIVATE Core ImGui)
