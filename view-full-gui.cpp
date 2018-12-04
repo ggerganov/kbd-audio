@@ -36,6 +36,7 @@
 #include <vector>
 #include <thread>
 #include <algorithm>
+#include <functional>
 
 static std::function<bool()> g_mainUpdate;
 
