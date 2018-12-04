@@ -3,12 +3,26 @@
  *  \author Georgi Gerganov
  */
 
+#ifdef __EMSCRIPTEN__
+#include "emscripten.h"
+#define IMGUI_IMPL_OPENGL_LOADER_GLEW
+#endif
+
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
 
 #include <SDL.h>
-#include <GL/gl3w.h>
+
+#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
+#include <GL/gl3w.h>    // Initialize with gl3wInit()
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
+#include <GL/glew.h>    // Initialize with glewInit()
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
+#include <glad/glad.h>  // Initialize with gladLoadGL()
+#else
+#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
+#endif
 
 #include <array>
 #include <chrono>
@@ -23,11 +37,22 @@
 #include <thread>
 #include <algorithm>
 
+static std::function<bool()> g_mainUpdate;
+
+void mainUpdate() {
+    g_mainUpdate();
+}
+
 #define MY_DEBUG
 
 // globals
+#ifdef __EMSCRIPTEN__
+int g_windowSizeX = 1200;
+int g_windowSizeY = 400;
+#else
 int g_windowSizeX = 1600;
 int g_windowSizeY = 400;
+#endif
 
 struct stParameters;
 struct stWaveformView;
@@ -282,7 +307,8 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
         ImGui::SameLine();
         if (g_playbackData.playing) {
             if (ImGui::Button("Stop") || ImGui::IsKeyPressed(44)) { // space
-                g_playbackData.idx = g_playbackData.waveform.n - 1;
+                g_playbackData.playing = false;
+                g_playbackData.idx = g_playbackData.waveform.n - PlaybackData::kSamples;
             }
         } else {
             if (ImGui::Button("Play") || ImGui::IsKeyPressed(44)) { // space
@@ -295,8 +321,9 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
             }
         }
 
-        if (g_playbackData.idx > g_playbackData.waveform.n) {
+        if (g_playbackData.idx >= g_playbackData.waveform.n) {
             g_playbackData.playing = false;
+            SDL_ClearQueuedAudio(g_deviceIdOut);
             SDL_PauseAudioDevice(g_deviceIdOut, 1);
         }
 
@@ -314,6 +341,16 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
 
 void cbPlayback(void * userData, uint8_t * stream, int len) {
     PlaybackData * data = (PlaybackData *)(userData);
+    if (data->playing == false) {
+        int offset = 0;
+        int16_t a = 0;
+        while (len > 0) {
+            memcpy(stream + offset*sizeof(a), &a, sizeof(a));
+            len -= sizeof(a);
+            ++offset;
+        }
+        return;
+    }
     auto end = std::min(data->idx + PlaybackData::kSamples/data->slowDown, data->waveform.n);
     auto idx = data->idx;
     auto sidx = 0;
@@ -432,13 +469,28 @@ int main(int argc, char ** argv) {
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
+#ifdef __EMSCRIPTEN__
+	SDL_Window* window;
+	SDL_Renderer *renderer;
+    SDL_CreateWindowAndRenderer(g_windowSizeX, g_windowSizeY, SDL_WINDOW_OPENGL, &window, &renderer);
+#else
     SDL_Window* window = SDL_CreateWindow("View-full", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, g_windowSizeX, g_windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
+#endif
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_SetSwapInterval(1); // Enable vsync
 
     // Initialize OpenGL loader
+#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
     bool err = gl3wInit() != 0;
-    if (err) {
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
+    bool err = glewInit() != GLEW_OK;
+#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
+    bool err = gladLoadGL() == 0;
+#else
+    bool err = false; // If you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to requires some form of initialization.
+#endif
+    if (err)
+    {
         fprintf(stderr, "Failed to initialize OpenGL loader!\n");
         return 1;
     }
@@ -449,11 +501,23 @@ int main(int argc, char ** argv) {
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
 
+    ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+#ifdef __EMSCRIPTEN__
+    ImGui_ImplOpenGL3_Init("#version 300 es");
+#else
+    ImGui_ImplOpenGL3_Init(glsl_version);
+#endif
+
+    // Setup style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsClassic();
+
+    ImFontConfig fontConfig;
+    //fontConfig.SizePixels = 14.0f;
+    ImGui::GetIO().Fonts->AddFontDefault(&fontConfig);
+
     ImGui::GetStyle().AntiAliasedFill = false;
     ImGui::GetStyle().AntiAliasedLines = false;
-
-    ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-    ImGui_ImplOpenGL3_Init(glsl_version);
 
     printf("[+] Loaded recording: of %d samples (sample size = %d bytes)\n", (int) waveformInput.size(), (int) sizeof(TSample));
     printf("    Size in memory:          %g MB\n", (float)(sizeof(TSample)*waveformInput.size())/1024/1024);
@@ -462,7 +526,8 @@ int main(int argc, char ** argv) {
     printf("    Recording length:        %g seconds\n", (float)(waveformInput.size())/params.sampleRate);
 
     bool finishApp = false;
-    while (finishApp == false) {
+    g_mainUpdate = [&]() {
+        if (finishApp) return false;
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
@@ -509,7 +574,27 @@ int main(int argc, char ** argv) {
             tEnd = std::chrono::high_resolution_clock::now();
             tus = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart).count();
         }
+
+        return true;
+    };
+
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop(mainUpdate, 60, 1);
+#else
+    while (true) {
+        if (g_mainUpdate() == false) break;
     }
+#endif
+
+    printf("[+] Terminated");
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+
+    SDL_GL_DeleteContext(gl_context);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
 
     return 0;
 }
