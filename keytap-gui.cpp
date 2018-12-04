@@ -896,6 +896,7 @@ int main(int argc, char ** argv) {
                 if (kh.second.size() > 2) {
                     trainKey(kh.first);
                 } else {
+                    printf("[!] Key '%s' does not have enough training data. Need at least 3 presses\n", kKeyText.at(kh.first));
                     failedToTrain.push_back(kh.first);
                 }
             }
