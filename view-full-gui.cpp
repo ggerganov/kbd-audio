@@ -38,10 +38,17 @@
 #include <algorithm>
 #include <functional>
 
+static std::function<bool()> g_doInit;
 static std::function<bool()> g_mainUpdate;
 
 void mainUpdate() {
     g_mainUpdate();
+}
+
+// JS interface
+
+extern "C" {
+    int doInit() { return g_doInit(); }
 }
 
 #define MY_DEBUG
@@ -437,10 +444,9 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
-    if (prepareAudioOut(params) == false) {
-        printf("Error: failed to initialize audio playback\n");
-        return -2;
-    }
+    g_doInit = [&]() {
+        return prepareAudioOut(params);
+    };
 
     printf("[+] Loading recording from '%s'\n", argv[1]);
     if (readFromFile(argv[1], waveformInput) == false) {
@@ -582,6 +588,11 @@ int main(int argc, char ** argv) {
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(mainUpdate, 60, 1);
 #else
+    if (g_doInit() == false) {
+        printf("Error: failed to initialize audio playback\n");
+        return -2;
+    }
+
     while (true) {
         if (g_mainUpdate() == false) break;
     }
