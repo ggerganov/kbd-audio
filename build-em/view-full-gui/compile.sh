@@ -14,7 +14,6 @@ em++ -O3 -std=c++17 \
     -I ../../imgui/examples \
     -I ../../imgui/examples/libs/gl3w \
     ../../view-full-gui.cpp \
-    ../../audio_logger.cpp \
     ../../imgui/imgui.cpp \
     ../../imgui/imgui_draw.cpp \
     ../../imgui/imgui_demo.cpp \
