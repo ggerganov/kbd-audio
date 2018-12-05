@@ -18,7 +18,7 @@ find_package(SDL2 REQUIRED)
 find_package(FFTW REQUIRED)
 find_package(OpenGL REQUIRED)
 
-string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
+string(STRIP "${SDL2_LIBRARIES}" SDL2_LIBRARIES)
 
 if (APPLE)
     find_library(COREGRAPHICS_LIBRARY CoreGraphics )
