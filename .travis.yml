@@ -15,11 +15,7 @@ compiler:
 
 before_install:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test;
       sudo apt-get update;
-
-      sudo apt-get install -qq g++-7;
-      sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90;
 
       sudo apt-get install -qq build-essential xorg-dev libglu1-mesa-dev libglew-dev libglm-dev;
       sudo apt-get install -qq cmake;
