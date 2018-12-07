@@ -10,7 +10,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "DEBUG" "RELEASE" "RELWITHDEBINFO")
 endif()
 
-set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD 14)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Threads REQUIRED)
@@ -18,7 +18,7 @@ find_package(SDL2 REQUIRED)
 find_package(FFTW REQUIRED)
 find_package(OpenGL REQUIRED)
 
-string(STRIP ${SDL2_LIBRARIES} SDL2_LIBRARIES)
+string(STRIP "${SDL2_LIBRARIES}" SDL2_LIBRARIES)
 
 if (APPLE)
     find_library(COREGRAPHICS_LIBRARY CoreGraphics )
@@ -110,3 +110,9 @@ target_link_libraries(record-full PRIVATE Core)
 
 add_executable(subbreak subbreak.cpp)
 target_link_libraries(subbreak PRIVATE Core)
+
+add_executable(view-gui view-gui.cpp)
+target_link_libraries(view-gui PRIVATE Core ImGui)
+
+add_executable(view-full-gui view-full-gui.cpp)
+target_link_libraries(view-full-gui PRIVATE Core ImGui)

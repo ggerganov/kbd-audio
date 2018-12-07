@@ -166,9 +166,11 @@ bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveform
     waveformLowRes.resize(waveform.n);
 
     int k = nWindow;
-
     std::deque<int64_t> que(k);
-    auto [samples, n] = waveform;
+
+    //auto [samples, n] = waveform;
+    auto samples = waveform.samples;
+    auto n       = waveform.n;
 
     TWaveform waveformAbs(n);
     for (int64_t i = 0; i < n; ++i) {
@@ -213,9 +215,11 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res, T
     std::vector<double> rbSamples(8*historySize, 0.0);
 
     int k = historySize;
-
     std::deque<int64_t> que(k);
-    auto [samples, n] = waveform;
+
+    //auto [samples, n] = waveform;
+    auto samples = waveform.samples;
+    auto n       = waveform.n;
 
     TWaveform waveformAbs(n);
     for (int64_t i = 0; i < n; ++i) {
@@ -289,7 +293,11 @@ bool dumpKeyPresses(const std::string & fname, const TKeyPressCollection & data)
 std::tuple<TSum, TSum2> calcSum(const TWaveformView & waveform) {
     TSum sum = 0.0f;
     TSum2 sum2 = 0.0f;
-    auto [samples, n] = waveform;
+
+    //auto [samples, n] = waveform;
+    auto samples = waveform.samples;
+    auto n       = waveform.n;
+
     for (int64_t is = 0; is < n; ++is) {
         auto a0 = samples[is];
         sum += a0;
@@ -309,8 +317,13 @@ TCC calcCC(
     TSum2 sum12 = 0.0f;
     TSum2 sum01 = 0.0f;
 
-    auto [samples0, n0] = waveform0;
-    auto [samples1, n1] = waveform1;
+    //auto [samples0, n0] = waveform0;
+    auto samples0 = waveform0.samples;
+    auto n0       = waveform0.n;
+
+    //auto [samples1, n1] = waveform1;
+    auto samples1 = waveform1.samples;
+    auto n1       = waveform1.n;
 
 #ifdef MY_DEBUG
     if (n0 != n1) {
@@ -345,8 +358,13 @@ std::tuple<TCC, TOffset> findBestCC(
     TCC bestcc = -1.0;
     TOffset besto = -1;
 
-    auto [samples0, n0] = waveform0;
-    auto [samples1, n1] = waveform1;
+    //auto [samples0, n0] = waveform0;
+    auto samples0 = waveform0.samples;
+    auto n0       = waveform0.n;
+
+    //auto [samples1, n1] = waveform1;
+    auto samples1 = waveform1.samples;
+    auto n1       = waveform1.n;
 
 #ifdef MY_DEBUG
     if (n0 + 2*alignWindow != n1) {
@@ -354,7 +372,10 @@ std::tuple<TCC, TOffset> findBestCC(
     }
 #endif
 
-    auto [sum0, sum02] = calcSum(waveform0);
+    //auto [sum0, sum02] = calcSum(waveform0);
+    auto ret = calcSum(waveform0);
+    auto sum0  = std::get<0>(ret);
+    auto sum02 = std::get<1>(ret);
 
     for (int o = 0; o < 2*alignWindow; ++o) {
         auto cc = calcCC(waveform0, { samples1 + o, n0 }, sum0, sum02);
@@ -381,18 +402,28 @@ bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & key
         res[i][i].cc = 1.0f;
         res[i][i].offset = 0;
 
-        auto & [waveform0, pos0, avgcc, _x] = keyPresses[i];
-        auto [samples0, n0] = waveform0;
+        //auto & [waveform0, pos0, avgcc, _x] = keyPresses[i];
+        auto & waveform0 = keyPresses[i].waveform;
+        auto & pos0      = keyPresses[i].pos;
+        auto & avgcc     = keyPresses[i].ccAvg;
+
+        //auto [samples0, n0] = waveform0;
+        auto samples0 = waveform0.samples;
+        auto n0       = waveform0.n;
 
         for (int j = 0; j < nPresses; ++j) {
             if (i == j) continue;
 
             auto waveform1 = keyPresses[j].waveform;
-            auto pos1 = keyPresses[j].pos;
+            auto pos1      = keyPresses[j].pos;
 
             auto samples1 = waveform1.samples;
-            auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + params.offsetFromPeak,               2*w },
-                                                   { samples1 + pos1 + params.offsetFromPeak - alignWindow, 2*w + 2*alignWindow }, alignWindow);
+            //auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + params.offsetFromPeak,               2*w },
+            //                                       { samples1 + pos1 + params.offsetFromPeak - alignWindow, 2*w + 2*alignWindow }, alignWindow);
+            auto ret = findBestCC({ samples0 + pos0 + params.offsetFromPeak,               2*w },
+                                  { samples1 + pos1 + params.offsetFromPeak - alignWindow, 2*w + 2*alignWindow }, alignWindow);
+            auto bestcc     = std::get<0>(ret);
+            auto bestoffset = std::get<1>(ret);
 
             res[i][j].cc = bestcc;
             res[i][j].offset = bestoffset;
