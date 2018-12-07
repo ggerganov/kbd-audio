@@ -45,7 +45,10 @@ void shuffle(T & t, int start = -1, int end = -1) {
 }
 
 bool loadFreqMap(const char * fname, TFreqMap & res) {
-    auto & [len, fmap] = res;
+    // auto & [len, fmap] = res;
+    auto & len  = std::get<0>(res);
+    auto & fmap = std::get<1>(res);
+
     len = 0;
     fmap.clear();
 
@@ -152,7 +155,9 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
     TProb res = 0.0;
 
     auto len = txt.size();
-    const auto & [n, fmap] = freqMap;
+    //const auto & [n, fmap] = freqMap;
+    const auto & n    = std::get<0>(freqMap);
+    const auto & fmap = std::get<1>(freqMap);
 
     int i1 = 0;
     int cnt = 0;
@@ -201,7 +206,9 @@ TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
     TProb res = 0.0;
 
     auto len = txt.size();
-    const auto & [n, fmap] = freqMap;
+    //const auto & [n, fmap] = freqMap;
+    const auto & n    = std::get<0>(freqMap);
+    const auto & fmap = std::get<1>(freqMap);
 
     int i1 = 0;
 

@@ -102,7 +102,10 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res) {
     double thresholdBackground = 10.0;
 
     std::deque<int64_t> que(k);
-    auto [samples, nSamples] = waveform;
+    //auto [samples, nSamples] = waveform;
+    auto samples  = std::get<0>(waveform);
+    auto nSamples = std::get<1>(waveform);
+
     for (int64_t i = 0; i < nSamples; ++i) {
         {
             rbAverage *= rbSamples.size();
@@ -152,7 +155,8 @@ bool findKeyPresses(const TWaveform & waveform, TKeyPressCollection & res) {
 bool dumpKeyPresses(const std::string & fname, const TKeyPressCollection & data) {
     std::ofstream fout(fname);
     for (auto & k : data) {
-        auto [_k0, idx, cid, _k3] = k;
+        //auto [_k0, idx, cid, _k3] = k;
+        auto idx = std::get<1>(k);
         fout << idx << " 1" << std::endl;
     }
     fout.close();
@@ -162,7 +166,10 @@ bool dumpKeyPresses(const std::string & fname, const TKeyPressCollection & data)
 std::tuple<TSum, TSum2> calcSum(const TWaveformView & waveform) {
     TSum sum = 0.0f;
     TSum2 sum2 = 0.0f;
-    auto [samples, n] = waveform;
+    //auto [samples, n] = waveform;
+    auto samples = std::get<0>(waveform);
+    auto n       = std::get<1>(waveform);
+
     for (int64_t is = 0; is < n; ++is) {
         auto a0 = samples[is];
         sum += a0;
@@ -182,8 +189,13 @@ TCC calcCC(
     TSum2 sum12 = 0.0f;
     TSum2 sum01 = 0.0f;
 
-    auto [samples0, n0] = waveform0;
-    auto [samples1, n1] = waveform1;
+    //auto [samples0, n0] = waveform0;
+    auto samples0 = std::get<0>(waveform0);
+    auto n0       = std::get<1>(waveform0);
+
+    //auto [samples1, n1] = waveform1;
+    auto samples1 = std::get<0>(waveform1);
+    auto n1       = std::get<1>(waveform1);
 
 #ifdef MY_DEBUG
     if (n0 != n1) {
@@ -218,8 +230,13 @@ std::tuple<TCC, TOffset> findBestCC(
     TCC bestcc = -1.0;
     TOffset besto = -1;
 
-    auto [samples0, n0] = waveform0;
-    auto [samples1, n1] = waveform1;
+    //auto [samples0, n0] = waveform0;
+    auto samples0 = std::get<0>(waveform0);
+    auto n0       = std::get<1>(waveform0);
+
+    //auto [samples1, n1] = waveform1;
+    auto samples1 = std::get<0>(waveform1);
+    auto n1       = std::get<1>(waveform1);
 
 #ifdef MY_DEBUG
     if (n0 + 2*alignWindow != n1) {
@@ -227,7 +244,10 @@ std::tuple<TCC, TOffset> findBestCC(
     }
 #endif
 
-    auto [sum0, sum02] = calcSum(waveform0);
+    //auto [sum0, sum02] = calcSum(waveform0);
+    auto ret = calcSum(waveform0);
+    auto sum0  = std::get<0>(ret);
+    auto sum02 = std::get<1>(ret);
 
     for (int o = 0; o < 2*alignWindow; ++o) {
         auto cc = calcCC(waveform0, { samples1 + o, n0 }, sum0, sum02);
@@ -252,16 +272,33 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
 
     for (int i = 0; i < nPresses; ++i) {
         res[i][i] = { 1.0f, 0 };
-        auto & [waveform0, pos0, _i2, avgcc] = keyPresses[i];
-        auto [samples0, n0] = waveform0;
+        //auto & [waveform0, pos0, _i2, avgcc] = keyPresses[i];
+        auto & waveform0 = std::get<0>(keyPresses[i]);
+        auto & pos0      = std::get<1>(keyPresses[i]);
+        //   &           = std::get<2>(keyPresses[i]);
+        auto & avgcc     = std::get<3>(keyPresses[i]);
+
+        //auto [samples0, n0] = waveform0;
+        auto samples0 = std::get<0>(waveform0);
+        auto n0       = std::get<1>(waveform0);
 
         for (int j = 0; j < nPresses; ++j) {
             if (i == j) continue;
 
-            auto [waveform1, pos1, _j2, _j3] = keyPresses[j];
-            auto [samples1, n1] = waveform1;
-            auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + (int)(0.5f*w),               2*w },
-                                                   { samples1 + pos1 + (int)(0.5f*w) - alignWindow, 2*w + 2*alignWindow }, alignWindow);
+            //auto [waveform1, pos1, _j2, _j3] = keyPresses[j];
+            auto waveform1 = std::get<0>(keyPresses[j]);
+            auto pos1      = std::get<1>(keyPresses[j]);
+
+            //auto [samples1, n1] = waveform1;
+            auto samples1 = std::get<0>(waveform1);
+            auto n1       = std::get<1>(waveform1);
+
+            //auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + (int)(0.5f*w),               2*w },
+            //                                       { samples1 + pos1 + (int)(0.5f*w) - alignWindow, 2*w + 2*alignWindow }, alignWindow);
+            auto ret = findBestCC({ samples0 + pos0 + (int)(0.5f*w),               2*w },
+                                  { samples1 + pos1 + (int)(0.5f*w) - alignWindow, 2*w + 2*alignWindow }, alignWindow);
+            auto bestcc     = std::get<0>(ret);
+            auto bestoffset = std::get<1>(ret);
 
             res[j][i] = { bestcc, bestoffset };
             //res[i][j] = { bestcc, -bestoffset };
@@ -277,18 +314,24 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
 bool clusterDBSCAN(const TSimilarityMap & sim, TCC epsCC, int minPts, TKeyPressCollection & keyPresses) {
     int n = keyPresses.size();
     for (int i = 0; i < n; ++i) {
-        auto & [_i0, _i1, cid, _i3] = keyPresses[i];
+        //auto & [_i0, _i1, cid, _i3] = keyPresses[i];
+        auto & cid = std::get<2>(keyPresses[i]);
+
         cid = -1;
     }
 
     int curId = 0;
 
     for (int i = 0; i < n; ++i) {
-        auto & [_i0, i1, cid, _i2] = keyPresses[i];
+        //auto & [_i0, i1, cid, _i2] = keyPresses[i];
+        auto & cid = std::get<2>(keyPresses[i]);
+
         if (cid != -1) continue;
         std::vector<int> nbi;
         for (int j = 0; j < n; ++j) {
-            auto & [cc, x0] = sim[i][j];
+            //auto & [cc, x0] = sim[i][j];
+            auto & cc = std::get<0>(sim[i][j]);
+
             if (cc > epsCC) nbi.push_back(j);
         }
 
@@ -299,14 +342,18 @@ bool clusterDBSCAN(const TSimilarityMap & sim, TCC epsCC, int minPts, TKeyPressC
 
         cid = ++curId;
         for (int q = 0; q < (int) nbi.size(); ++q) {
-            auto & [_q0, _q1, qcid, _q3] = keyPresses[nbi[q]];
+            //auto & [_q0, _q1, qcid, _q3] = keyPresses[nbi[q]];
+            auto & qcid = std::get<2>(keyPresses[nbi[q]]);
+
             if (qcid == 0) qcid = curId;
             if (qcid != -1) continue;
             qcid = curId;
 
             std::vector<int> nbq;
             for (int j = 0; j < n; ++j) {
-                auto & [cc, x0] = sim[nbi[q]][j];
+                //auto & [cc, x0] = sim[nbi[q]][j];
+                auto & cc = std::get<0>(sim[nbi[q]][j]);
+
                 if (cc > epsCC) nbq.push_back(j);
             }
 
@@ -322,7 +369,9 @@ bool clusterDBSCAN(const TSimilarityMap & sim, TCC epsCC, int minPts, TKeyPressC
 bool clusterSimple(const TSimilarityMap & sim, TCC tholdCC, TKeyPressCollection & keyPresses) {
     int n = keyPresses.size();
     for (int i = 0; i < n; ++i) {
-        auto & [_i0, _i1, cid, _i2] = keyPresses[i];
+        //auto & [_i0, _i1, cid, _i2] = keyPresses[i];
+        auto & cid = std::get<2>(keyPresses[i]);
+
         cid = 0;
     }
 
@@ -336,11 +385,18 @@ bool clusterSimple(const TSimilarityMap & sim, TCC tholdCC, TKeyPressCollection 
             i = rand()%n;
             j = rand()%n;
         }
-        auto & [_i0, i1, icid, _i3] = keyPresses[i];
-        auto & [_j0, j1, jcid, _j3] = keyPresses[j];
+
+        //auto & [_i0, i1, icid, _i3] = keyPresses[i];
+        auto & icid = std::get<2>(keyPresses[i]);
+
+        //auto & [_j0, j1, jcid, _j3] = keyPresses[j];
+        auto & jcid = std::get<2>(keyPresses[j]);
+
         //if (icid != 0 && jcid != 0) continue;
 
-        auto & [cc, x] = sim[i][j];
+        //auto & [cc, x] = sim[i][j];
+        auto & cc = std::get<0>(sim[i][j]);
+
         if (cc < tholdCC) continue;
         auto r = frand();
         if (std::pow(r, 1.0) < cc) {
@@ -366,17 +422,23 @@ bool clusterSimple(const TSimilarityMap & sim, TCC tholdCC, TKeyPressCollection 
     }
 
     for (int i = 0; i < n; ++i) {
-        auto & [_i0, _i1, icid, _i3] = keyPresses[i];
+        //auto & [_i0, _i1, icid, _i3] = keyPresses[i];
+        auto & icid = std::get<2>(keyPresses[i]);
+
         if (icid == 0) icid = ++curId;
         icid = -icid;
     }
 
     curId = 0;
     for (int i = 0; i < n; ++i) {
-        auto [_i0, i1, icid, _i3] = keyPresses[i];
+        //auto [_i0, i1, icid, _i3] = keyPresses[i];
+        auto & icid = std::get<2>(keyPresses[i]);
+
         if (icid > 0) continue;
         for (int j = i; j < n; ++j) {
-            auto & [_j0, _j1, jcid, _j3] = keyPresses[j];
+            //auto & [_j0, _j1, jcid, _j3] = keyPresses[j];
+            auto & jcid = std::get<2>(keyPresses[j]);
+
             if (jcid == icid) {
                 jcid = curId;
             }
@@ -400,7 +462,9 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
 
     int nclusters = 0;
     for (int i = 0; i < n; ++i) {
-        auto & [_i0, _i1, ci, _i3] = keyPresses[i];
+        //auto & [_i0, _i1, ci, _i3] = keyPresses[i];
+        auto & ci = std::get<2>(keyPresses[i]);
+
         ci = i + 1;
         ++nclusters;
     }
@@ -408,7 +472,9 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
     std::vector<Pair> ccpairs;
     for (int i = 0; i < n - 1; ++i) {
         for (int j = i + 1; j < n; ++j) {
-            auto & [cc, _] = sim[i][j];
+            //auto & [cc, _] = sim[i][j];
+            auto & cc = std::get<0>(sim[i][j]);
+
             ccpairs.emplace_back(Pair{i, j, cc});
         }
     }
@@ -426,8 +492,11 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
         //if (frand() > curpair.cc) continue;
         if (curpair.cc < 0.50) break;
 
-        auto [_i0, __i0, ci, _i3] = keyPresses[curpair.i];
-        auto [_j1, __j1, cj, _j3] = keyPresses[curpair.j];
+        //auto [_i0, __i0, ci, _i3] = keyPresses[curpair.i];
+        auto ci = std::get<2>(keyPresses[curpair.i]);
+
+        //auto [_j1, __j1, cj, _j3] = keyPresses[curpair.j];
+        auto cj = std::get<2>(keyPresses[curpair.j]);
 
         if (ci == cj) continue;
         auto cnew = std::min(ci, cj);
@@ -438,22 +507,35 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
         double sumcci = 0.0;
         double sumccj = 0.0;
         for (int k = 0; k < n; ++k) {
-            auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            //auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            auto ck = std::get<2>(keyPresses[k]);
+
             for (int q = 0; q < n; ++q) {
                 if (q == k) continue;
-                auto & [_q0, _q1, cq, _q3] = keyPresses[q];
+                //auto & [_q0, _q1, cq, _q3] = keyPresses[q];
+                auto cq = std::get<2>(keyPresses[q]);
+
                 if ((ck == ci || ck == cj) && (cq == ci || cq == cj)) {
-                    auto & [cc, offset] = sim[k][q];
+                    //auto & [cc, offset] = sim[k][q];
+                    auto & cc     = std::get<0>(sim[k][q]);
+                    auto & offset = std::get<1>(sim[k][q]);
+
                     sumcc += cc;
                     ++nsum;
                 }
                 if (ck == ci && cq == ci) {
-                    auto & [cc, offset] = sim[k][q];
+                    //auto & [cc, offset] = sim[k][q];
+                    auto & cc     = std::get<0>(sim[k][q]);
+                    auto & offset = std::get<1>(sim[k][q]);
+
                     sumcci += cc;
                     ++nsumi;
                 }
                 if (ck == cj && cq == cj) {
-                    auto & [cc, offset] = sim[k][q];
+                    //auto & [cc, offset] = sim[k][q];
+                    auto & cc     = std::get<0>(sim[k][q]);
+                    auto & offset = std::get<1>(sim[k][q]);
+
                     sumccj += cc;
                     ++nsumj;
                 }
@@ -472,14 +554,18 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
         }
 
         for (int k = 0; k < n; ++k) {
-            auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            //auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            auto & ck = std::get<2>(keyPresses[k]);
+
             if (ck == ci || ck == cj) ck = cnew;
         }
         --nclusters;
 
         printf("Clusters %3d %5.4f:", nclusters, curpair.cc);
         for (int k = 0; k < n; ++k) {
-            auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            //auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            auto & ck = std::get<2>(keyPresses[k]);
+
             printf(" %3d", ck);
         }
         printf("\n");
@@ -501,7 +587,9 @@ bool clusterG2(TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
 
     int nclusters = 0;
     for (int i = 0; i < n; ++i) {
-        auto & [_i0, _i1, ci, _i3] = keyPresses[i];
+        //auto & [_i0, _i1, ci, _i3] = keyPresses[i];
+        auto & ci = std::get<2>(keyPresses[i]);
+
         ci = i + 1;
         ++nclusters;
     }
@@ -510,7 +598,9 @@ bool clusterG2(TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
     std::vector<Pair> ccpairs;
     for (int i = 0; i < n - 1; ++i) {
         for (int j = i + 1; j < n; ++j) {
-            auto & [cc, _] = sim[i][j];
+            //auto & [cc, _] = sim[i][j];
+            auto & cc = std::get<0>(sim[i][j]);
+
             ccpairs.emplace_back(Pair{i, j, cc});
         }
     }
@@ -528,20 +618,27 @@ bool clusterG2(TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
         if (frand() > curpair.cc) continue;
         if (curpair.cc < 0.50) break;
 
-        auto [_i0, __i0, ci, _i3] = keyPresses[curpair.i];
-        auto [_j1, __j1, cj, _j3] = keyPresses[curpair.j];
+        //auto [_i0, __i0, ci, _i3] = keyPresses[curpair.i];
+        auto & ci = std::get<2>(keyPresses[curpair.i]);
+
+        //auto [_j1, __j1, cj, _j3] = keyPresses[curpair.j];
+        auto & cj = std::get<2>(keyPresses[curpair.j]);
 
         if (ci == cj) continue;
         auto cnew = std::min(ci, cj);
         for (int k = 0; k < n; ++k) {
-            auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            //auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            auto & ck = std::get<2>(keyPresses[k]);
+
             if (ck == ci || ck == cj) ck = cnew;
         }
         --nclusters;
 
         printf("Clusters %3d %5.4f:", nclusters, curpair.cc);
         for (int k = 0; k < n; ++k) {
-            auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            //auto & [_k0, _k1, ck, _k3] = keyPresses[k];
+            auto & ck = std::get<2>(keyPresses[k]);
+
             printf(" %3d", ck);
         }
         printf("\n");
@@ -594,7 +691,9 @@ int main(int argc, char ** argv) {
         auto tEnd = std::chrono::high_resolution_clock::now();
         printf("[+] Detected a total of %d potential key presses\n", (int) keyPresses.size());
         for (auto & k : keyPresses) {
-            auto & [_k0, pos, _k2, _k3] = k;
+            //auto & [_k0, pos, _k2, _k3] = k;
+            auto & pos = std::get<1>(k);
+
             printf("    position - %d\n", (int) pos);
         }
         printf("[+] Search took %4.3f seconds\n", toSeconds(tStart, tEnd));
@@ -618,7 +717,9 @@ int main(int argc, char ** argv) {
 
     int n = keyPresses.size();
     for (int i = 0; i < n; ++i) {
-        auto [_i0, _i1, _i2, avgcc] = keyPresses[i];
+        //auto [_i0, _i1, _i2, avgcc] = keyPresses[i];
+        auto & avgcc = std::get<3>(keyPresses[i]);
+
         printf("    Average CC for keypress %4d - %6.3f\n", i, avgcc);
     }
 
@@ -632,7 +733,10 @@ int main(int argc, char ** argv) {
     for (int i = 0; i < n; ++i) {
         printf("%2d  | ", i);
         for (int j = 0; j < n; ++j) {
-            auto [cc, offset] = similarityMap[i][j];
+            //auto [cc, offset] = similarityMap[i][j];
+            auto cc     = std::get<0>(similarityMap[i][j]);
+            auto offset = std::get<1>(similarityMap[i][j]);
+
             if (cc > -0.45) {
                 printf("%4.0f ", cc*100);
             } else {
@@ -650,14 +754,18 @@ int main(int argc, char ** argv) {
     clusterG(similarityMap, keyPresses);
 
     for (const auto & k : keyPresses) {
-        auto & [_k0, _k1, cid, _k2] = k;
+        //auto & [_k0, _k1, cid, _k2] = k;
+        auto & cid = std::get<2>(k);
+
         //printf("%c", 'a' + cid - 1);
         printf("%d ", cid);
     }
     printf("\n");
 
     for (const auto & k : keyPresses) {
-        auto & [_k0, _k1, cid, _k3] = k;
+        //auto & [_k0, _k1, cid, _k3] = k;
+        auto & cid = std::get<2>(k);
+
         printf("%c", 'a' + cid - 1);
     }
     printf("\n");

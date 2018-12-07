@@ -103,7 +103,10 @@ std::tuple<TValueCC, TOffset> findBestCC(
     TValueCC bestcc = -1.0f;
 
     int is00 = waveform0.size()/2 - (is1 - is0)/2;
-    auto [sum0, sum02] = calcSum(waveform0, is00, is00 + is1 - is0);
+    //auto [sum0, sum02] = calcSum(waveform0, is00, is00 + is1 - is0);
+    auto ret = calcSum(waveform0, is00, is00 + is1 - is0);
+    auto sum0  = std::get<0>(ret);
+    auto sum02 = std::get<1>(ret);
 
     int nWorkers = std::thread::hardware_concurrency();
     std::mutex mutex;
@@ -253,7 +256,11 @@ int main(int argc, char ** argv) {
                     char res = -1;
                     double maxcc = -1.0f;
                     for (const auto & ka : keySoundAverageAmpl) {
-                        auto [bestcc, bestoffset] = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
+                        //auto [bestcc, bestoffset] = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
+                        auto ret = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
+                        auto bestcc     = std::get<0>(ret);
+                        auto bestoffset = std::get<1>(ret);
+
                         //printf(" %8.4f ", bestcc);
                         if (bestcc > maxcc) {
                             res = ka.first;
@@ -520,7 +527,10 @@ int main(int argc, char ** argv) {
 
                     for (int iwaveform = alignToWaveform + 1; iwaveform < nWaveforms; ++iwaveform) {
                         const auto & waveform1 = history[iwaveform];
-                        auto [bestcc, bestoffset] = findBestCC(waveform0, waveform1, is0, is1, alignWindow);
+                        //auto [bestcc, bestoffset] = findBestCC(waveform0, waveform1, is0, is1, alignWindow);
+                        auto ret = findBestCC(waveform0, waveform1, is0, is1, alignWindow);
+                        auto bestcc     = std::get<0>(ret);
+                        auto bestoffset = std::get<1>(ret);
 
                         ccs[iwaveform][alignToWaveform] = { bestcc, bestoffset };
                         ccs[alignToWaveform][iwaveform] = { bestcc, -bestoffset };
@@ -528,7 +538,10 @@ int main(int argc, char ** argv) {
 
                     double curccsum2 = 0.0f;
                     for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
-                        auto [cc, offset] = ccs[iwaveform][alignToWaveform];
+                        //auto & [cc, offset] = ccs[iwaveform][alignToWaveform];
+                        auto & cc     = std::get<0>(ccs[iwaveform][alignToWaveform]);
+                        auto & offset = std::get<1>(ccs[iwaveform][alignToWaveform]);
+
                         if (std::abs(offset) > 5) continue;
                         curccsum2 += cc;
                     }
@@ -550,7 +563,9 @@ int main(int argc, char ** argv) {
                     if (iwaveform == bestw) continue;
 
                     auto & waveform1 = history[iwaveform];
-                    auto [cc, offset] = ccs[iwaveform][bestw];
+                    //auto [cc, offset] = ccs[iwaveform][bestw];
+                    auto cc     = std::get<0>(ccs[iwaveform][bestw]);
+                    auto offset = std::get<1>(ccs[iwaveform][bestw]);
 
                     auto newWaveform = TKeyWaveform();
                     newWaveform.resize(kSamplesPerWaveform);
@@ -578,7 +593,10 @@ int main(int argc, char ** argv) {
                 avgWaveform.resize(kSamplesPerWaveform);
                 std::fill(avgWaveform.begin(), avgWaveform.end(), 0.0f);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
-                    auto [cc, offset] = ccs[iwaveform][bestw];
+                    //auto [cc, offset] = ccs[iwaveform][bestw];
+                    auto cc     = std::get<0>(ccs[iwaveform][bestw]);
+                    auto offset = std::get<1>(ccs[iwaveform][bestw]);
+
                     if (cc < 0.50f || std::abs(offset) > 5) continue;
                     printf("        Adding waveform %d - cc = %g, offset = %d\n", iwaveform, cc, offset);
                     ccsum += cc*cc;

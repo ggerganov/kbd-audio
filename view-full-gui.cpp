@@ -82,7 +82,7 @@ struct stParameters {
 
 struct stWaveformView {
     const TSample * samples     = nullptr;
-    int64_t                     n = 0;
+    int64_t n                   = 0;
 };
 
 template <typename T>
@@ -144,9 +144,11 @@ bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveform
     waveformLowRes.resize(waveform.n);
 
     int k = nWindow;
-
     std::deque<int64_t> que(k);
-    auto [samples, n] = waveform;
+
+    //auto [samples, n] = waveform;
+    auto samples = waveform.samples;
+    auto n       = waveform.n;
 
     TWaveform waveformAbs(n);
     for (int64_t i = 0; i < n; ++i) {
