@@ -40,9 +40,9 @@ float toSeconds(T t0, T t1) {
 
 inline float frand() { return ((float)rand())/RAND_MAX; }
 
-TWaveformView getView(const TWaveform & waveform, int64_t idx) { return { waveform.data() + idx, waveform.size() - idx }; }
+TWaveformView getView(const TWaveform & waveform, int64_t idx) { return TWaveformView { waveform.data() + idx, waveform.size() - idx }; }
 
-TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return { waveform.data() + idx, len }; }
+TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return TWaveformView { waveform.data() + idx, len }; }
 
 bool readFromFile(const std::string & fname, TWaveform & res) {
     std::ifstream fin(fname, std::ios::binary | std::ios::ate);
@@ -139,7 +139,7 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res) {
             if (itest >= 2*k && itest < nSamples - 2*k && que.front() == itest) {
                 double acur = samples[itest];
                 if (acur > thresholdBackground*rbAverage){
-                    res.push_back({waveform, itest, 0, 0.0});
+                    res.push_back(TKeyPressData {waveform, itest, 0, 0.0});
                 }
             }
         }
@@ -176,7 +176,7 @@ std::tuple<TSum, TSum2> calcSum(const TWaveformView & waveform) {
         sum2 += a0*a0;
     }
 
-    return { sum, sum2 };
+    return std::tuple<TSum, TSum2>(sum, sum2);
 }
 
 TCC calcCC(
@@ -250,14 +250,14 @@ std::tuple<TCC, TOffset> findBestCC(
     auto sum02 = std::get<1>(ret);
 
     for (int o = 0; o < 2*alignWindow; ++o) {
-        auto cc = calcCC(waveform0, { samples1 + o, n0 }, sum0, sum02);
+        auto cc = calcCC(waveform0, TWaveformView { samples1 + o, n0 }, sum0, sum02);
         if (cc > bestcc) {
             besto = o - alignWindow;
             bestcc = cc;
         }
     }
 
-    return { bestcc, besto };
+    return std::tuple<TCC, TOffset>(bestcc, besto);
 }
 
 bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & res) {
@@ -271,7 +271,7 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
     for (auto & x : res) x.resize(nPresses);
 
     for (int i = 0; i < nPresses; ++i) {
-        res[i][i] = { 1.0f, 0 };
+        res[i][i] = TMatch { 1.0f, 0 };
         //auto & [waveform0, pos0, _i2, avgcc] = keyPresses[i];
         auto & waveform0 = std::get<0>(keyPresses[i]);
         auto & pos0      = std::get<1>(keyPresses[i]);
@@ -295,12 +295,12 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
 
             //auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + (int)(0.5f*w),               2*w },
             //                                       { samples1 + pos1 + (int)(0.5f*w) - alignWindow, 2*w + 2*alignWindow }, alignWindow);
-            auto ret = findBestCC({ samples0 + pos0 + (int)(0.5f*w),               2*w },
-                                  { samples1 + pos1 + (int)(0.5f*w) - alignWindow, 2*w + 2*alignWindow }, alignWindow);
+            auto ret = findBestCC(TWaveformView { samples0 + pos0 + (int)(0.5f*w),               2*w },
+                                  TWaveformView { samples1 + pos1 + (int)(0.5f*w) - alignWindow, 2*w + 2*alignWindow }, alignWindow);
             auto bestcc     = std::get<0>(ret);
             auto bestoffset = std::get<1>(ret);
 
-            res[j][i] = { bestcc, bestoffset };
+            res[j][i] = TMatch { bestcc, bestoffset };
             //res[i][j] = { bestcc, -bestoffset };
 
             avgcc += bestcc;

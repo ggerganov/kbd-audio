@@ -51,7 +51,7 @@ std::tuple<TSum, TSum2> calcSum(const TKeyWaveform & waveform, int is0, int is1)
         sum2 += a0*a0;
     }
 
-    return { sum, sum2 };
+    return std::tuple<TSum, TSum2>(sum, sum2);
 }
 
 using TValueCC = double;
@@ -136,7 +136,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
     }
     for (auto & worker : workers) worker.join();
 
-    return { bestcc, besto };
+    return std::tuple<TValueCC, TOffset>(bestcc, besto);
 }
 
 // globals
@@ -518,7 +518,7 @@ int main(int argc, char ** argv) {
                 std::map<int, std::map<int, std::tuple<TValueCC, TOffset>>> ccs;
 
                 for (int alignToWaveform = 0; alignToWaveform < nWaveforms; ++alignToWaveform) {
-                    ccs[alignToWaveform][alignToWaveform] = { 1.0f, 0 };
+                    ccs[alignToWaveform][alignToWaveform] = std::tuple<TValueCC, TOffset>(1.0f, 0);
 
                     int is0 = centerSample - kSamplesPerFrame/2;
                     int is1 = centerSample + kSamplesPerFrame/2;
@@ -532,8 +532,8 @@ int main(int argc, char ** argv) {
                         auto bestcc     = std::get<0>(ret);
                         auto bestoffset = std::get<1>(ret);
 
-                        ccs[iwaveform][alignToWaveform] = { bestcc, bestoffset };
-                        ccs[alignToWaveform][iwaveform] = { bestcc, -bestoffset };
+                        ccs[iwaveform][alignToWaveform] = std::tuple<TValueCC, TOffset>(bestcc, bestoffset);
+                        ccs[alignToWaveform][iwaveform] = std::tuple<TValueCC, TOffset>(bestcc, -bestoffset);
                     }
 
                     double curccsum2 = 0.0f;

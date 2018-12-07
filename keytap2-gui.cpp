@@ -304,7 +304,7 @@ std::tuple<TSum, TSum2> calcSum(const TWaveformView & waveform) {
         sum2 += a0*a0;
     }
 
-    return { sum, sum2 };
+    return std::tuple<TSum, TSum2>(sum, sum2);
 }
 
 TCC calcCC(
@@ -385,7 +385,7 @@ std::tuple<TCC, TOffset> findBestCC(
         }
     }
 
-    return { bestcc, besto };
+    return std::tuple<TSum, TSum2>(bestcc, besto);
 }
 
 bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & res) {
