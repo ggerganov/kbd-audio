@@ -34,71 +34,103 @@ Dependencies:
 
 ## Tools
 
-### record-full
+Short summary of the available tools. If the status of the tool is not **stable**, expect problems and non-optimal results.
 
-Record audio to a raw binary file on disk
+| Name                | Type    | Status      |
+| ---                 | ---     | ---         |
+| **record**          | text    | **stable**  |
+| **record-full**     | text    | **stable**  |
+| **play**            | text    | **stable**  |
+| **play-full**       | text    | **stable**  |
+| **view-gui**        | gui     | **stable**  |
+| **view-full-gui**   | gui     | **stable**  |
+| **keytap**          | text    | outdated    |
+| **keytap-gui**      | gui     | **stable**  |
+| **keytap2**         | text    | development |
+| **keytap2-gui**     | gui     | development |
+| -                   | *extra* | -           |
+| **guess_qp**        | text    | experiment  |
+| **guess_qp2**       | text    | experiment  |
+| **key_detector**    | text    | experiment  |
+| **scale**           | text    | experiment  |
+| **subreak**         | text    | experiment  |
+| **key_average_gui** | gui     | experiment  |
 
-**Usage:** ./record-full output.kbd
+## Tool details
 
+* **record-full**
 
-### play-full
+  Record audio to a raw binary file on disk
 
-Playback a recording captured via the **record-full** tool
+  **Usage:** ./record-full output.kbd
 
-**Usage:** ./play-full input.kbd
+  ---
 
+* **play-full**
 
-### record
+  Playback a recording captured via the **record-full** tool
 
-Record audio only while typing. Useful for collecting training data for **keytap**
+  **Usage:** ./play-full input.kbd
 
-**Usage:** ./record output.kbd
+  ---
 
+* **record**
 
-### play
+  Record audio only while typing. Useful for collecting training data for **keytap**
 
-Playback a recording created via the **record** tool
+  **Usage:** ./record output.kbd
 
-**Usage:** ./play input.kbd
+  ---
 
+* **play**
 
-### keytap
+  Playback a recording created via the **record** tool
 
-Detect pressed keys via microphone audio capture in real-time. Uses training data captured via the **record** tool.
+  **Usage:** ./play input.kbd
 
-**Usage:** ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ...
+  ---
 
-[**Live demo *(WebAssembly threads required)***](https://ggerganov.github.io/jekyll/update/2018/11/24/keytap.html)
+* **keytap-gui**
 
-<a href="https://i.imgur.com/mnRvT1X.gif" target="_blank">![keytap-gui](https://i.imgur.com/FXa60Pr.gif)</a>
+  Detect pressed keys via microphone audio capture in real-time. Uses training data captured via the **record** tool.
 
+  **Usage:** ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ...
 
-### keytap2 *(work in progress)*
+  [**Live demo *(WebAssembly threads required)***](https://ggerganov.github.io/jekyll/update/2018/11/24/keytap.html)
 
-Detect pressed keys via microphone audio capture. Uses statistical information (n-gram frequencies) about the language. **No training data is required**. The *'recording.kbd'* input file has to be generated via the **record-full** tool and contains the audio data that will be analyzed. The *'n-gram.txt'* file has to contain n-gram probabilities for the corresponding language. 
+  <a href="https://i.imgur.com/mnRvT1X.gif" target="_blank">![keytap-gui](https://i.imgur.com/FXa60Pr.gif)</a>
 
-**Usage:** ./keytap2-gui recording.kbd n-gram.txt
+  ---
 
-<a href="https://i.imgur.com/yR3m5Bm.jpg" target="_blank">![keytap2-gui](https://i.imgur.com/yR3m5Bm.jpg)</a>
+* **keytap2-gui** *(work in progress)*
 
+  Detect pressed keys via microphone audio capture. Uses statistical information (n-gram frequencies) about the language. **No training data is required**. The *'recording.kbd'* input file has to be generated via the **record-full** tool and contains the audio data that will be analyzed. The *'n-gram.txt'* file has to contain n-gram probabilities for the corresponding language. 
 
-### view-full
+  **Usage:** ./keytap2-gui recording.kbd n-gram.txt
 
-Visualize waveforms recorded with the **record-full** tool. Can also playback the audio data.
+  <a href="https://i.imgur.com/yR3m5Bm.jpg" target="_blank">![keytap2-gui](https://i.imgur.com/yR3m5Bm.jpg)</a>
 
-**Usage:** ./view-full-gui input.kbd
+  ---
 
-<a href="https://i.imgur.com/scjTaXw.png" target="_blank">![view-full-gui](https://i.imgur.com/scjTaXw.png)</a>
+* **view-full-gui**
 
+  Visualize waveforms recorded with the **record-full** tool. Can also playback the audio data.
 
-### view
+  **Usage:** ./view-full-gui input.kbd
 
-Visualize training data recorded with the **record** tool. Can also playback the audio data.
+  <a href="https://i.imgur.com/scjTaXw.png" target="_blank">![view-full-gui](https://i.imgur.com/scjTaXw.png)</a>
 
-**Usage:** ./view-gui input.kbd
+  ---
 
-<a href="https://i.imgur.com/2binGaZ.png" target="_blank">![view-full-gui](https://i.imgur.com/2binGaZ.png)</a>
+* **view-gui**
 
+  Visualize training data recorded with the **record** tool. Can also playback the audio data.
+
+  **Usage:** ./view-gui input.kbd
+
+  <a href="https://i.imgur.com/2binGaZ.png" target="_blank">![view-full-gui](https://i.imgur.com/2binGaZ.png)</a>
+
+  ---
 
 ## Feedback
 
