@@ -117,11 +117,11 @@ TAlphabet getAlphabetRandom(int seed = 0, const std::vector<int> & hint = {}) {
         for (int i = 0; i <= kN; ++i) res.push_back(i);
     } else {
         std::map<int, bool> used;
-        for (auto & h : hint) if (h >= 1 && h <= 26) used[h] = true;
+        for (auto & h : hint) if (h >= 1 && h <= 27) used[h] = true;
         res.push_back(0);
         int curi = 1;
         for (int i = 1; i <= kN; ++i) {
-            if (hint[i] < 1 || hint[i] > 26) {
+            if (hint[i] < 1 || hint[i] > 27) {
                 while (used[curi]) ++curi;
                 res.push_back(curi);
                 ++curi;
