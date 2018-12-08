@@ -34,13 +34,18 @@ TCode calcCode(const char * data, int n) {
 }
 
 template <typename T>
-void shuffle(T & t, int start = -1, int end = -1) {
+void shuffle(T & t, int start = -1, int end = -1, const std::vector<int> & hint = {}) {
     if (start == -1) start = 0;
     if (end == -1) end = t.size();
 
     int n = t.size();
     for (int i = end - 1; i > start; --i) {
-        std::swap(t[i], t[rand()%(i - start + 1)+start]);
+        int i0 = i;
+        int i1 = rand()%(i - start + 1)+start;
+        if (hint.size() > 0 && (hint[i0] != -1 || hint[i1] != -1)) {
+            continue;
+        }
+        std::swap(t[i0], t[i1]);
     }
 }
 
@@ -105,11 +110,28 @@ bool loadFreqMap(const char * fname, TFreqMap & res) {
     return true;
 }
 
-TAlphabet getAlphabetRandom(int seed = 0) {
+TAlphabet getAlphabetRandom(int seed = 0, const std::vector<int> & hint = {}) {
     TAlphabet res;
 
-    for (int i = 0; i <= kN; ++i) res.push_back(i);
-    shuffle(res, 1);
+    if (hint.size() == 0) {
+        for (int i = 0; i <= kN; ++i) res.push_back(i);
+    } else {
+        std::map<int, bool> used;
+        for (auto & h : hint) if (h >= 1 && h <= 26) used[h] = true;
+        res.push_back(0);
+        int curi = 1;
+        for (int i = 1; i <= kN; ++i) {
+            if (hint[i] < 1 || hint[i] > 26) {
+                while (used[curi]) ++curi;
+                res.push_back(curi);
+                ++curi;
+            } else {
+                res.push_back(hint[i]);
+            }
+        }
+    }
+
+    shuffle(res, 1, -1, hint);
 
     return res;
 }
@@ -248,8 +270,17 @@ void printText(const std::string & t) {
     printf("\n");
 }
 
-bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & res, int nMainIters = 1e9) {
-    TAlphabet besta = getAlphabetRandom();
+void printText(const std::string & t, std::string & res) {
+    res = t;
+    int i = 0;
+    for (auto & c : t) {
+        if (c >= 1 && c <= 26) res[i] = 'a' + c - 1; else res[i] = ' ';
+        ++i;
+    }
+}
+
+bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & res, int nMainIters = 1e9, const std::vector<int> & hint = {}) {
+    TAlphabet besta = getAlphabetRandom(0, hint);
 
     auto lena = kN;
 
@@ -257,18 +288,14 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
     auto beste = enc;
     translate(besta, enc, cure);
     auto bestp = calcScore(freqMap, cure);
-    printf("XXX %g\n", bestp);
+    printf("Initial prob: %g\n", bestp);
 
     auto bestbestp = bestp;
-
-    TProb pmax = 10.0;
-    std::vector<TProb> pletter(kN + 1);
-    std::fill(pletter.begin(), pletter.end(), pmax);
 
     int nIters = 0;
     while (nMainIters--) {
         if (++nIters > 10000) {
-            TAlphabet besta = getAlphabetRandom();
+            TAlphabet besta = getAlphabetRandom(0, hint);
             translate(besta, enc, cure);
             bestp = calcScore(freqMap, cure);
             printf("reset\n");
@@ -276,7 +303,7 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
         }
 
         auto itera = besta;
-		int nswaps = 3;
+		int nswaps = kN > 26 ? 3 : 0;
         for (int i = 0; i < nswaps; ++i) {
             int a0 = rand()%lena + 1;
             int a1 = rand()%lena + 1;
@@ -285,7 +312,10 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
                 a1 = rand()%lena + 1;
             }
 
-            std::swap(itera[a0], itera[a1]);
+            if (hint.size() > 0 && (hint[a0] != -1 || hint[a1] != -1)) {
+            } else {
+                std::swap(itera[a0], itera[a1]);
+            }
         }
 
         translate(itera, enc, cure);
@@ -297,6 +327,10 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
             while (a0 == a1) {
                 a0 = rand()%26 + 1;
                 a1 = rand()%26 + 1;
+            }
+
+            if (hint.size() > 0 && (hint[a0] != -1 || hint[a1] != -1)) {
+                continue;
             }
 
             std::swap(cura[a0], cura[a1]);
@@ -327,12 +361,13 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
                 }
                 printf("'\n");
                 printText(beste);
-                printf("[+] pmax = %g\n", pmax);
                 printf("\n");
             }
             nIters = 0;
         }
     }
+
+    printText(beste, res);
 
     return true;
 }
