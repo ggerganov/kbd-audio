@@ -385,7 +385,7 @@ std::tuple<TCC, TOffset> findBestCC(
         }
     }
 
-    return std::tuple<TSum, TSum2>(bestcc, besto);
+    return std::tuple<TCC, TOffset>(bestcc, besto);
 }
 
 bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & res) {
