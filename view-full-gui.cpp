@@ -8,6 +8,8 @@
 #define IMGUI_IMPL_OPENGL_LOADER_GLEW
 #endif
 
+#include "constants.h"
+
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
@@ -74,7 +76,7 @@ using TWaveformView         = stWaveformView;
 
 struct stParameters {
     int keyPressWidth_samples   = 256;
-    int sampleRate              = 24000;
+    int sampleRate              = kSampleRate;
     int offsetFromPeak          = keyPressWidth_samples/2;
     int alignWindow             = 256;
     float thresholdClustering   = 0.5f;

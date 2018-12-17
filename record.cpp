@@ -26,16 +26,12 @@ int main(int argc, const char ** argv) {
     auto tEnd = std::chrono::high_resolution_clock::now();
 
     size_t totalSize_bytes = 0;
-    constexpr float kBufferSize_s = 0.075f;
-    constexpr int64_t kSampleRate = 24000;
-
     int keyPressed = -1;
-    int bufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
     std::map<int, int> nTimes;
-    printf("Recording %d frames per key press\n", bufferSize_frames);
+    printf("Recording %d frames per key press\n", kTrainBufferSize_frames);
 
     std::ofstream fout(argv[1], std::ios::binary);
-    fout.write((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
+    fout.write((char *)(&kTrainBufferSize_frames), sizeof(kTrainBufferSize_frames));
 
     AudioLogger audioLogger;
     AudioLogger::Callback cbAudio = [&](const auto & frames) {
@@ -71,7 +67,7 @@ int main(int argc, const char ** argv) {
             tStart = std::chrono::high_resolution_clock::now();
             if (keyPressed == -1) {
                 keyPressed = key;
-                audioLogger.record(kBufferSize_s);
+                audioLogger.record(kTrainBufferSize_s);
             }
         }
         tcsetattr ( STDIN_FILENO, TCSANOW, &oldt );

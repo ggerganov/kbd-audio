@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "constants.h"
+
 #include <memory>
 #include <array>
 #include <vector>
@@ -12,14 +14,6 @@
 
 class AudioLogger {
     public:
-        constexpr static int64_t getBufferSize_frames(int64_t sampleRate, float bufferSize_s) {
-            return (bufferSize_s*sampleRate)/kSamplesPerFrame;
-        }
-
-        static constexpr int64_t kSamplesPerFrame = 512;
-        static constexpr int64_t kMaxSampleRate = 96000;
-        static constexpr float   kMaxBufferSize_s = 1.000f;
-
         using Sample = float;
         using Frame = std::array<Sample, kSamplesPerFrame>;
         using Record = std::vector<Frame>;

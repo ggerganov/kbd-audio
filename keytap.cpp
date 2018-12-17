@@ -3,6 +3,7 @@
  *  \author Georgi Gerganov
  */
 
+#include "constants.h"
 #include "audio_logger.h"
 
 #include <map>
@@ -17,20 +18,6 @@
 
 #define MY_DEBUG
 #define OUTPUT_WAVEFORMS
-
-// constants
-
-constexpr float kBufferSize_s = 0.075f;
-constexpr uint64_t kSampleRate = 24000;
-
-constexpr uint64_t kRingBufferSize = 16*1024;
-constexpr int bkgrStep_samples = 7;
-constexpr int keyDuration_samples = 0.005f*kSampleRate;
-
-constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
-
-constexpr auto kSamplesPerFrame = AudioLogger::kSamplesPerFrame;
-constexpr auto kSamplesPerWaveform = kSamplesPerFrame*kBufferSize_frames;
 
 // types
 
@@ -189,8 +176,8 @@ int main(int argc, char ** argv) {
         {
             int bufferSize_frames = 1;
             fins[i].read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
-            if (bufferSize_frames != kBufferSize_frames) {
-                printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kBufferSize_frames);
+            if (bufferSize_frames != kTrainBufferSize_frames) {
+                printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kTrainBufferSize_frames);
                 return -1;
             }
         }
@@ -210,7 +197,7 @@ int main(int argc, char ** argv) {
     // ring buffer
     int rbBegin = 0;
     float rbAverage = 0.0f;
-    std::array<float, kRingBufferSize> rbSamples;
+    std::array<float, kBkgrRingBufferSize> rbSamples;
     rbSamples.fill(0.0f);
 
     AudioLogger audioLogger;
@@ -246,7 +233,7 @@ int main(int argc, char ** argv) {
                 const auto & ampl = workData.ampl;
                 const auto & positionsToPredict = workData.positionsToPredict;
 
-                int nFramesPerWaveform = kBufferSize_frames;
+                int nFramesPerWaveform = kTrainBufferSize_frames;
                 int alignWindow = ((nFramesPerWaveform/2)*kSamplesPerFrame)/2;
 
                 for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
@@ -286,9 +273,9 @@ int main(int argc, char ** argv) {
     });
 
     AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & frames) {
-        if (frames.size() != kBufferSize_frames && isReadyToPredict == false) {
+        if (frames.size() != kTrainBufferSize_frames && isReadyToPredict == false) {
             printf("Unexpected number of frames - %d, expected - %d. Should never happen\n",
-                   (int) frames.size(), (int) kBufferSize_frames);
+                   (int) frames.size(), (int) kTrainBufferSize_frames);
             return;
         }
 
@@ -301,7 +288,7 @@ int main(int argc, char ** argv) {
             {
                 float amax = 0.0f;
                 for (int f = 0; f < frames.size(); ++f) {
-                    for (int s = 0; s < frames[f].size(); s += bkgrStep_samples) {
+                    for (int s = 0; s < frames[f].size(); s += kBkgrStep_samples) {
                         rbAverage *= rbSamples.size();
                         rbAverage -= rbSamples[rbBegin];
                         auto acur = std::abs(frames[f][s]);
@@ -330,7 +317,7 @@ int main(int argc, char ** argv) {
                         auto acur = frames[f][s];
                         //if (acur > 10.0f*rbAverage) {
                         if (acur > 0.5f*amax && ((s == frames[f].size() - 1) || (acur > frames[f][s-1] && acur > frames[f][s+1]))) {
-                            skip_samples = keyDuration_samples;
+                            skip_samples = kKeyDuration_samples;
                             positionsToPredict.push_back(f*kSamplesPerFrame + s);
                             //printf("Key press detected\n");
                         }
@@ -384,7 +371,7 @@ int main(int argc, char ** argv) {
         if (keyPressed == -1 && isReadyToPredict == false) {
             g_predictedKey = -1;
             keyPressed = key;
-            audioLogger.record(kBufferSize_s);
+            audioLogger.record(kTrainBufferSize_s);
         }
     };
 
@@ -402,7 +389,7 @@ int main(int argc, char ** argv) {
                 } else {
                     printf("%c", keyPressed);
                     fflush(stdout);
-                    for (int i = 0; i < kBufferSize_frames; ++i) {
+                    for (int i = 0; i < kTrainBufferSize_frames; ++i) {
                         fins[curFile].read((char *)(frame.data()), sizeof(AudioLogger::Sample)*frame.size());
                         record.push_back(frame);
                     }
@@ -421,7 +408,7 @@ int main(int argc, char ** argv) {
                 auto & history = keySoundHistoryAmpl[key];
 
                 int nWaveforms = history.size();
-                int nFramesPerWaveform = kBufferSize_frames;
+                int nFramesPerWaveform = kTrainBufferSize_frames;
 
                 printf("    - Training key '%c'\n", key);
                 printf("    - History size = %d key waveforms\n", nWaveforms);

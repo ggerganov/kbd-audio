@@ -3,10 +3,10 @@
  *  \author Georgi Gerganov
  */
 
+#include "constants.h"
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_audio.h>
-
-#include "audio_logger.h"
 
 #include <fstream>
 
@@ -56,10 +56,10 @@ int main(int argc, char ** argv) {
     SDL_AudioSpec playbackSpec;
     SDL_zero(playbackSpec);
 
-    playbackSpec.freq = 24000;
+    playbackSpec.freq = kSampleRate;
     playbackSpec.format = AUDIO_F32SYS;
     playbackSpec.channels = 1;
-    playbackSpec.samples = bufferSize_frames*AudioLogger::kSamplesPerFrame;
+    playbackSpec.samples = bufferSize_frames*kSamplesPerFrame;
     playbackSpec.callback = cbPlayback;
     playbackSpec.userdata = (void *)(&fin);
 

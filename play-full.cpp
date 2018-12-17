@@ -3,7 +3,7 @@
  *  \author Georgi Gerganov
  */
 
-#include "audio_logger.h"
+#include "constants.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_audio.h>
@@ -35,8 +35,6 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
-    int bufferSize_frames = 1;
-
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
         return -1;
@@ -51,10 +49,10 @@ int main(int argc, char ** argv) {
     SDL_AudioSpec playbackSpec;
     SDL_zero(playbackSpec);
 
-    playbackSpec.freq = 24000;
+    playbackSpec.freq = kSampleRate;
     playbackSpec.format = AUDIO_F32SYS;
     playbackSpec.channels = 1;
-    playbackSpec.samples = bufferSize_frames*AudioLogger::kSamplesPerFrame;
+    playbackSpec.samples = kSamplesPerFrame;
     playbackSpec.callback = cbPlayback;
     playbackSpec.userdata = (void *)(&fin);
 

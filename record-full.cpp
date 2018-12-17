@@ -4,7 +4,6 @@
  */
 
 #include "constants.h"
-#include "audio_logger.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_audio.h>
@@ -30,8 +29,6 @@ int main(int argc, const char ** argv) {
         return -1;
     }
 
-    int bufferSize_frames = 1;
-
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
         return -1;
@@ -46,10 +43,10 @@ int main(int argc, const char ** argv) {
     SDL_AudioSpec captureSpec;
     SDL_zero(captureSpec);
 
-    captureSpec.freq = 24000;
+    captureSpec.freq = kSampleRate;
     captureSpec.format = AUDIO_F32SYS;
     captureSpec.channels = 1;
-    captureSpec.samples = AudioLogger::kSamplesPerFrame;
+    captureSpec.samples = kSamplesPerFrame;
     captureSpec.callback = cbPlayback;
     captureSpec.userdata = (void *)(&fout);
 

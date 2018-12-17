@@ -1,6 +1,8 @@
 cmake_minimum_required (VERSION 2.8)
 project (KBD-Audio)
 
+option(BUILD_EXPERIMENTAL "Build experimental tools" OFF)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS "on")
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -69,15 +71,6 @@ target_link_libraries(ImGui PRIVATE
     ${COREFOUNDATION_LIBRARY}
     )
 
-add_executable(key_average_gui key_average_gui.cpp)
-target_link_libraries(key_average_gui PRIVATE Core ImGui)
-
-add_executable(guess_qp guess_qp.cpp)
-target_link_libraries(guess_qp PRIVATE Core)
-
-add_executable(guess_qp2 guess_qp2.cpp)
-target_link_libraries(guess_qp2 PRIVATE Core)
-
 add_executable(keytap keytap.cpp)
 target_link_libraries(keytap PRIVATE Core)
 
@@ -90,17 +83,11 @@ target_link_libraries(keytap-gui PRIVATE Core ImGui)
 add_executable(keytap2-gui keytap2-gui.cpp)
 target_link_libraries(keytap2-gui PRIVATE Core ImGui)
 
-add_executable(key_detector key_detector.cpp)
-target_link_libraries(key_detector PRIVATE Core)
-
 add_executable(play play.cpp)
 target_link_libraries(play PRIVATE Core)
 
 add_executable(play-full play-full.cpp)
 target_link_libraries(play-full PRIVATE Core)
-
-add_executable(scale scale.cpp)
-target_link_libraries(scale PRIVATE Core)
 
 add_executable(record record.cpp)
 target_link_libraries(record PRIVATE Core)
@@ -108,11 +95,31 @@ target_link_libraries(record PRIVATE Core)
 add_executable(record-full record-full.cpp)
 target_link_libraries(record-full PRIVATE Core)
 
-add_executable(subbreak subbreak.cpp)
-target_link_libraries(subbreak PRIVATE Core)
-
 add_executable(view-gui view-gui.cpp)
 target_link_libraries(view-gui PRIVATE Core ImGui)
 
 add_executable(view-full-gui view-full-gui.cpp)
 target_link_libraries(view-full-gui PRIVATE Core ImGui)
+
+#
+## Experimental stuff
+
+if (BUILD_EXPERIMENTAL)
+    add_executable(key_average_gui key_average_gui.cpp)
+    target_link_libraries(key_average_gui PRIVATE Core ImGui)
+
+    add_executable(guess_qp guess_qp.cpp)
+    target_link_libraries(guess_qp PRIVATE Core)
+
+    add_executable(guess_qp2 guess_qp2.cpp)
+    target_link_libraries(guess_qp2 PRIVATE Core)
+
+    add_executable(key_detector key_detector.cpp)
+    target_link_libraries(key_detector PRIVATE Core)
+
+    add_executable(scale scale.cpp)
+    target_link_libraries(scale PRIVATE Core)
+
+    add_executable(subbreak subbreak.cpp)
+    target_link_libraries(subbreak PRIVATE Core)
+endif()

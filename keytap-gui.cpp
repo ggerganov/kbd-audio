@@ -49,21 +49,6 @@ void mainUpdate() {
 
 // constants
 
-constexpr float kTrainBufferSize_s = 0.075f;
-constexpr float kPredictBufferSize_s = 0.200f;
-constexpr int64_t kSampleRate = 24000;
-
-constexpr int64_t kRingBufferSize = 4*1024;
-constexpr int bkgrStep_samples = 1;
-//constexpr int keyDuration_samples = 0.005f*kSampleRate;
-constexpr int keyDuration_samples = 1;
-
-constexpr int64_t kTrainBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kTrainBufferSize_s) - 1;
-constexpr int64_t kPredictBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kPredictBufferSize_s) - 1;
-
-constexpr auto kSamplesPerFrame = AudioLogger::kSamplesPerFrame;
-constexpr auto kSamplesPerWaveform = kSamplesPerFrame*kTrainBufferSize_frames;
-
 static const std::vector<float> kRowOffset = { 0.0f, 1.5f, 1.8f, 2.1f, 5.5f };
 static const std::vector<std::vector<int>> kKeyboard = {
     { '`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 127},
@@ -380,7 +365,7 @@ int main(int argc, char ** argv) {
     // ring buffer
     int rbBegin = 0;
     double rbAverage = 0.0f;
-    std::array<double, kRingBufferSize> rbSamples;
+    std::array<double, kBkgrRingBufferSize> rbSamples;
     rbSamples.fill(0.0f);
 
     // Train data
@@ -517,7 +502,7 @@ int main(int argc, char ** argv) {
             {
                 float amax = 0.0f;
                 for (int f = 0; f < frames.size(); ++f) {
-                    for (int s = 0; s < frames[f].size(); s += bkgrStep_samples) {
+                    for (int s = 0; s < frames[f].size(); s += kBkgrStep_samples) {
                         rbAverage *= rbSamples.size();
                         rbAverage -= rbSamples[rbBegin];
                         auto acur = std::abs(frames[f][s]);

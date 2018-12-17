@@ -8,6 +8,7 @@
 #include "emscripten/emscripten.h"
 #endif
 
+#include "constants.h"
 #include "audio_logger.h"
 
 #include <stdio.h>
@@ -68,7 +69,7 @@ int main(int, char**) {
     constexpr int bkgrStep_samples = 7;
     constexpr int keyDuration_samples = 0.100*kSampleRate;
 
-    constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+    constexpr uint64_t kBufferSize_frames = 2*getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
 
     using ValueCC = float;
     using Offset = int;
@@ -156,7 +157,7 @@ int main(int, char**) {
 
         if (isReadyToPredict) {
 
-            int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
+            int nSamplesPerFrame = kSamplesPerFrame;
 
             std::vector<int> positionsToPredict;
 
@@ -305,7 +306,7 @@ int main(int, char**) {
 
                 int nWaveforms = history.size();
                 int nFramesPerWaveform = history[0].size();
-                int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
+                int nSamplesPerFrame = kSamplesPerFrame;
 
                 printf("    - Training key '%c'\n", key);
                 printf("    - History size = %d key waveforms\n", nWaveforms);

@@ -4,7 +4,6 @@
  */
 
 #include "constants.h"
-#include "audio_logger.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
@@ -31,10 +30,6 @@
 // globals
 int g_windowSizeX = 1600;
 int g_windowSizeY = 400;
-
-constexpr float kTrainBufferSize_s = 0.075f;
-constexpr int64_t kSampleRate = 24000;
-constexpr int64_t kTrainBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kTrainBufferSize_s) - 1;
 
 struct stParameters;
 struct stWaveformView;
@@ -94,7 +89,7 @@ bool readFromFile(const TParameters & params, const std::string & fname, TWavefo
                       , "TSampleInput not recognised");
 
         int32_t offset = 0;
-        std::streamsize size = bufferSize_frames*AudioLogger::kSamplesPerFrame*sizeof(TSampleInput);
+        std::streamsize size = bufferSize_frames*kSamplesPerFrame*sizeof(TSampleInput);
         while (true) {
             TKey keyPressed = 0;
             fin.read((char *)(&keyPressed), sizeof(keyPressed));
@@ -286,7 +281,7 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
         offset = std::max(0, std::min((int) offset, (int) waveform.size() - nview));
 
         for (int i = 0; i < (int) trainKeys.size(); ++i) {
-            int pos = i*AudioLogger::kSamplesPerFrame*5 + 2.5*AudioLogger::kSamplesPerFrame;
+            int pos = i*kSamplesPerFrame*5 + 2.5*kSamplesPerFrame;
             if (pos + params.offsetFromPeak + params.keyPressWidth_samples < offset) continue;
             if (pos + params.offsetFromPeak - params.keyPressWidth_samples >= offset + nview) break;
 

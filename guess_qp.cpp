@@ -8,6 +8,7 @@
 #include "emscripten/emscripten.h"
 #endif
 
+#include "constants.h"
 #include "audio_logger.h"
 
 #include <stdio.h>
@@ -64,7 +65,7 @@ int main(int, char**) {
     constexpr uint64_t kSampleRate = 48000;
 #endif
 
-    constexpr uint64_t kBufferSize_frames = 2*AudioLogger::getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+    constexpr uint64_t kBufferSize_frames = 2*getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
 
     using ValueCC = float;
     using Offset = int;
@@ -148,7 +149,7 @@ int main(int, char**) {
             }
 
             int nFramesPerWaveform = ampl.size();
-            int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
+            int nSamplesPerFrame = kSamplesPerFrame;
             int centerSample = nFramesPerWaveform*nSamplesPerFrame/2;
             int alignWindow = centerSample/2;
 
@@ -241,7 +242,7 @@ int main(int, char**) {
 
                 int nWaveforms = history.size();
                 int nFramesPerWaveform = history[0].size();
-                int nSamplesPerFrame = AudioLogger::kSamplesPerFrame;
+                int nSamplesPerFrame = kSamplesPerFrame;
 
                 printf("    - Training key '%c'\n", key);
                 printf("    - History size = %d key waveforms\n", nWaveforms);
