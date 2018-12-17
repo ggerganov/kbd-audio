@@ -62,7 +62,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Record audio to a raw binary file on disk
 
-  **Usage:** ./record-full output.kbd
+      ./record-full output.kbd [-cN]
 
   ---
 
@@ -70,15 +70,15 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Playback a recording captured via the **record-full** tool
 
-  **Usage:** ./play-full input.kbd
-
+      ./play-full input.kbd [-pN]
+        
   ---
 
 * **record**
 
   Record audio only while typing. Useful for collecting training data for **keytap**
 
-  **Usage:** ./record output.kbd
+      ./record output.kbd [-cN]
 
   ---
 
@@ -86,15 +86,15 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Playback a recording created via the **record** tool
 
-  **Usage:** ./play input.kbd
-
+      ./play input.kbd [-pN]
+        
   ---
 
 * **keytap-gui**
 
   Detect pressed keys via microphone audio capture in real-time. Uses training data captured via the **record** tool.
 
-  **Usage:** ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ...
+      ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ... [-cN]
 
   [**Live demo *(WebAssembly threads required)***](https://ggerganov.github.io/jekyll/update/2018/11/24/keytap.html)
 
