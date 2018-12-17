@@ -7,6 +7,7 @@
 
 #include <map>
 #include <string>
+#include <cstring>
 
 static std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
     int last = argc;
