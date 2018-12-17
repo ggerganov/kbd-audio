@@ -57,6 +57,7 @@ struct stParameters {
     int offsetFromPeak          = keyPressWidth_samples/2;
     int alignWindow             = 256;
     float thresholdClustering   = 0.5f;
+    int nMinKeysInCluster       = 3;
     std::string fnameLetterMask = "";
 };
 
@@ -435,6 +436,90 @@ bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & key
             avgcc += bestcc;
         }
         avgcc /= (nPresses - 1);
+    }
+
+    return true;
+}
+
+bool clusterDBSCAN(const TSimilarityMap & sim, TCC epsCC, int minPts, TKeyPressCollection & keyPresses) {
+    int n = keyPresses.size();
+    for (int i = 0; i < n; ++i) {
+        auto & cid = keyPresses[i].cid;
+
+        cid = -1;
+    }
+
+    int curId = n + 1;
+
+    curId = 0;
+
+    for (int i = 0; i < n; ++i) {
+        auto & cid = keyPresses[i].cid;
+
+        if (cid != -1) continue;
+        std::vector<int> nbi;
+        for (int j = 0; j < n; ++j) {
+            auto & cc = sim[i][j].cc;
+
+            if (cc > epsCC) nbi.push_back(j);
+        }
+
+        if (nbi.size() < minPts) {
+            cid = 0;
+            continue;
+        }
+
+        cid = ++curId;
+        for (int q = 0; q < (int) nbi.size(); ++q) {
+            auto & qcid = keyPresses[nbi[q]].cid;
+
+            if (qcid == 0) qcid = curId;
+            if (qcid != -1) continue;
+            qcid = curId;
+
+            std::vector<int> nbq;
+            for (int j = 0; j < n; ++j) {
+                auto & cc = sim[nbi[q]][j].cc;
+
+                if (cc > epsCC) nbq.push_back(j);
+            }
+
+            if (nbq.size() >= minPts) {
+                nbi.insert(nbi.end(), nbq.begin(), nbq.end());
+            }
+        }
+    }
+
+    {
+        int nclusters = 0;
+        std::map<int, bool> used;
+        for (const auto & kp : keyPresses) {
+            if (used[kp.cid] == false) {
+                used[kp.cid] = true;
+                ++nclusters;
+            }
+        }
+
+        keyPresses.nClusters = nclusters;
+    }
+
+    {
+        int curId = 0;
+        int n = keyPresses.size();
+        std::vector<int> newcid(n, 0);
+        for (int i = 0; i < n; ++i) {
+            if (newcid[i] != 0) continue;
+            ++curId;
+            for (int j = 0; j < n; ++j) {
+                if (keyPresses[i].cid == keyPresses[j].cid) {
+                    newcid[j] = curId;
+                }
+            }
+        }
+
+        for (int i = 0; i < n; ++i) {
+            keyPresses[i].cid = newcid[i];
+        }
     }
 
     return true;
@@ -978,10 +1063,17 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
 
 bool renderClusters(TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
     if (ImGui::Begin("Clusters")) {
+        static bool useDBSCAN = true;
         ImGui::Text("Clusters: %d\n", keyPresses.nClusters);
         ImGui::SliderFloat("Threshold", &params.thresholdClustering, 0.0f, 1.0f);
+        ImGui::SliderInt("N min", &params.nMinKeysInCluster, 0, 8);
+        ImGui::Checkbox("DBSCAN", &useDBSCAN);
         if (ImGui::Button("Calculate") || ImGui::IsKeyPressed(23)) { // t
-            clusterG(similarityMap, keyPresses, params.thresholdClustering);
+            if (useDBSCAN == false) {
+                clusterG(similarityMap, keyPresses, params.thresholdClustering);
+            } else {
+                clusterDBSCAN(similarityMap, params.thresholdClustering, params.nMinKeysInCluster, keyPresses);
+            }
         }
 
         int n = keyPresses.size();
