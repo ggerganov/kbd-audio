@@ -22,7 +22,7 @@ class AudioLogger {
         AudioLogger();
         ~AudioLogger();
 
-        bool install(int64_t sampleRate, Callback callback);
+        bool install(int64_t sampleRate, Callback callback, int captureId = 0);
         bool terminate();
         bool addFrame(const Sample * stream);
         bool record(float bufferSize_s);

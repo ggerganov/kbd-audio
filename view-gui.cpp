@@ -418,7 +418,7 @@ bool prepareAudioOut(const TParameters & params) {
         return false;
     }
 
-    printf("Opened playback device %d\n", g_deviceIdOut);
+    printf("Opened playback device succesfully!\n");
     printf("    Frequency:  %d\n", obtainedSpec.freq);
     printf("    Format:     %d\n", obtainedSpec.format);
     printf("    Channels:   %d\n", obtainedSpec.channels);

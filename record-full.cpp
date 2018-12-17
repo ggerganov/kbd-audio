@@ -4,6 +4,7 @@
  */
 
 #include "constants.h"
+#include "common.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_audio.h>
@@ -17,11 +18,17 @@ void cbPlayback(void * userdata, uint8_t * stream, int len) {
     fout->write((char *)(stream), len); // todo
 }
 
-int main(int argc, const char ** argv) {
+int main(int argc, char ** argv) {
+    printf("Usage: %s output.kbd [-cN]\n", argv[0]);
+    printf("    -cN - select capture device N\n");
+    printf("\n");
+
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s output.kbd\n", argv[0]);
         return -127;
     }
+
+    auto argm = parseCmdArguments(argc, argv);
+    int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
 
     std::ofstream fout(argv[1], std::ios::binary);
     if (fout.good() == false) {
@@ -40,6 +47,11 @@ int main(int argc, const char ** argv) {
         printf("    - Capture device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_TRUE));
     }
 
+    if (captureId < 0 || captureId >= nDevices) {
+        printf("Invalid capture device id selected - %d\n", captureId);
+        return -1;
+    }
+
     SDL_AudioSpec captureSpec;
     SDL_zero(captureSpec);
 
@@ -53,7 +65,8 @@ int main(int argc, const char ** argv) {
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    auto deviceIdIn = SDL_OpenAudioDevice(NULL, SDL_TRUE, &captureSpec, &obtainedSpec, 0);
+    printf("Attempt to open capture device %d : '%s' ...\n", captureId, SDL_GetAudioDeviceName(captureId, SDL_TRUE));
+    auto deviceIdIn = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(captureId, SDL_TRUE), SDL_TRUE, &captureSpec, &obtainedSpec, 0);
     if (!deviceIdIn) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for capture: %s!\n", SDL_GetError());
         SDL_Quit();
@@ -62,7 +75,7 @@ int main(int argc, const char ** argv) {
 
     int sampleSize_bytes = 4; // todo
 
-    printf("Opened capture device %d\n", deviceIdIn);
+    printf("Opened capture device succesfully!\n");
     printf("    Frequency:  %d\n", obtainedSpec.freq);
     printf("    Format:     %d (%d bytes)\n", obtainedSpec.format, sampleSize_bytes);
     printf("    Channels:   %d\n", obtainedSpec.channels);

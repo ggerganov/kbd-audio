@@ -4,6 +4,7 @@
  */
 
 #include "constants.h"
+#include "common.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_audio.h>
@@ -27,10 +28,16 @@ void cbPlayback(void * userdata, uint8_t * stream, int len) {
 }
 
 int main(int argc, char ** argv) {
+    printf("Usage: %s input.kbd [-pN]\n", argv[0]);
+    printf("    -pN - select playback device N\n");
+    printf("\n");
+
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s input.kbd\n", argv[0]);
         return -127;
     }
+
+    auto argm = parseCmdArguments(argc, argv);
+    int captureId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
 
     std::ifstream fin(argv[1], std::ios::binary);
     if (fin.good() == false) {
@@ -53,6 +60,11 @@ int main(int argc, char ** argv) {
         printf("    - Playback device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_FALSE));
     }
 
+    if (captureId < 0 || captureId >= nDevices) {
+        printf("Invalid playback device id selected - %d\n", captureId);
+        return -1;
+    }
+
     SDL_AudioSpec playbackSpec;
     SDL_zero(playbackSpec);
 
@@ -66,7 +78,8 @@ int main(int argc, char ** argv) {
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    auto deviceIdOut = SDL_OpenAudioDevice(NULL, SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
+    printf("Attempt to open playback device %d : '%s' ...\n", captureId, SDL_GetAudioDeviceName(captureId, SDL_FALSE));
+    auto deviceIdOut = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(captureId, SDL_FALSE), SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
     if (!deviceIdOut) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for playback: %s!\n", SDL_GetError());
         SDL_Quit();
@@ -75,7 +88,7 @@ int main(int argc, char ** argv) {
 
     int sampleSize_bytes = 4; // todo
 
-    printf("Opened playback device %d\n", deviceIdOut);
+    printf("Opened playback device succesfully!\n");
     printf("    Frequency:  %d\n", obtainedSpec.freq);
     printf("    Format:     %d (%d bytes)\n", obtainedSpec.format, sampleSize_bytes);
     printf("    Channels:   %d\n", obtainedSpec.channels);

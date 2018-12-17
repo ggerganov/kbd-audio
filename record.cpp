@@ -4,6 +4,7 @@
  */
 
 #include "constants.h"
+#include "common.h"
 #include "audio_logger.h"
 
 #include <stdio.h>
@@ -16,11 +17,17 @@
 #include <thread>
 #include <fstream>
 
-int main(int argc, const char ** argv) {
+int main(int argc, char ** argv) {
+    printf("Usage: %s output.kbd [-cN]\n", argv[0]);
+    printf("    -cN - select capture device N\n");
+    printf("\n");
+
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s output.kbd\n", argv[0]);
         return -127;
     }
+
+    auto argm = parseCmdArguments(argc, argv);
+    int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
 
     auto tStart = std::chrono::high_resolution_clock::now();
     auto tEnd = std::chrono::high_resolution_clock::now();
@@ -51,7 +58,7 @@ int main(int argc, const char ** argv) {
         keyPressed = -1;
     };
 
-    if (audioLogger.install(kSampleRate, cbAudio) == false) {
+    if (audioLogger.install(kSampleRate, cbAudio, captureId) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
         return -1;
     }

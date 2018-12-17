@@ -49,7 +49,7 @@ AudioLogger::AudioLogger() : data_(new AudioLogger::Data()) {}
 
 AudioLogger::~AudioLogger() {}
 
-bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback) {
+bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback, int captureId) {
     auto & data = getData();
 
     data.sampleRate = sampleRate;
@@ -65,6 +65,11 @@ bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback) {
         printf("    - Capture device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_TRUE));
     }
 
+    if (captureId < 0 || captureId >= nDevices) {
+        printf("Invalid capture device id selected - %d\n", captureId);
+        return false;
+    }
+
     SDL_AudioSpec captureSpec;
     SDL_zero(captureSpec);
 
@@ -78,7 +83,8 @@ bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback) {
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    data.deviceIdIn = SDL_OpenAudioDevice(NULL, SDL_TRUE, &captureSpec, &obtainedSpec, 0);
+    printf("Attempt to open capture device %d : '%s' ...\n", captureId, SDL_GetAudioDeviceName(captureId, SDL_TRUE));
+    data.deviceIdIn = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(captureId, SDL_TRUE), SDL_TRUE, &captureSpec, &obtainedSpec, 0);
     if (!data.deviceIdIn) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for capture: %s!\n", SDL_GetError());
         SDL_Quit();
@@ -101,7 +107,7 @@ bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback) {
             break;
     }
 
-    printf("Opened capture device %d\n", data.deviceIdIn);
+    printf("Opened capture device succesfully!\n");
     printf("    Frequency:  %d\n", obtainedSpec.freq);
     printf("    Format:     %d (%d bytes)\n", obtainedSpec.format, data.sampleSize_bytes);
     printf("    Channels:   %d\n", obtainedSpec.channels);

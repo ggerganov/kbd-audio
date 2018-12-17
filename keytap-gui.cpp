@@ -10,6 +10,7 @@
 #endif
 
 #include "constants.h"
+#include "common.h"
 #include "audio_logger.h"
 
 #include "imgui.h"
@@ -226,12 +227,18 @@ extern "C" {
 int main(int argc, char ** argv) {
 	printf("hardware_concurrency = %d\n", (int) std::thread::hardware_concurrency());
 
+    printf("Usage: %s input.kbd [input2.kbd ...] [-cN]\n", argv[0]);
+    printf("    -cN - select capture device N\n");
+    printf("\n");
+
     if (argc < 2) {
-        printf("Usage: %s input.kbd [input2.kbd ...]\n", argv[0]);
 #ifndef __EMSCRIPTEN__
         return -127;
 #endif
     }
+
+    auto argm = parseCmdArguments(argc, argv);
+    int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
 
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
@@ -313,6 +320,7 @@ int main(int argc, char ** argv) {
     std::ifstream frecord;
     std::map<int, std::ifstream> fins;
     for (int i = 0; i < argc - 1; ++i) {
+        if (argv[i + 1][0] == '-') continue;
         printf("Opening file '%s'\n", argv[i + 1]);
         fins[i] = std::ifstream(argv[i + 1], std::ios::binary);
         if (fins[i].good() == false) {
@@ -578,7 +586,7 @@ int main(int argc, char ** argv) {
     };
 
     g_init = [&]() {
-        if (audioLogger.install(kSampleRate, cbAudio) == false) {
+        if (audioLogger.install(kSampleRate, cbAudio, captureId) == false) {
             fprintf(stderr, "Failed to install audio logger\n");
             return -1;
         }
