@@ -199,8 +199,6 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
         int viewMin = 512;
         int viewMax = waveform.size();
 
-        bool ignoreDelete = false;
-
         static int nview = waveform.size();
         static int offset = (waveform.size() - nview)/2;
         static float amin = -16000;
@@ -214,7 +212,6 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
         static TWaveform waveformThreshold = waveform;
 
         auto wview = getView(waveformLowRes, offset, nview);
-        auto tview = getView(waveformThreshold, offset, nview);
         auto wsize = ImGui::GetContentRegionAvail();
         wsize.y -= 50.0f;
 
@@ -303,14 +300,6 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
                 ImVec2 p1 = { savePos.x + x1*wsize.x, savePos.y };
                 ImVec2 p2 = { savePos.x + x2*wsize.x, savePos.y + wsize.y };
 
-                float xmin = std::min(std::min(p0.x, p1.x), p2.x);
-                float xmax = std::max(std::max(p0.x, p1.x), p2.x);
-
-                bool isHovered = (mpos.x > xmin && mpos.x < xmax && mpos.y > p1.y && mpos.y < p2.y);
-
-                float col = isHovered ? 0.7f : 0.3f;
-                //drawList->AddRectFilled(p1, p2, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, col }));
-
                 if (nview < 64.0*wsize.x) {
                     ImGui::SetCursorScreenPos({ savePos.x + 0.5f*((x1 + x2)*wsize.x - ImGui::CalcTextSize(std::to_string(i).c_str()).x), savePos.y + wsize.y - ImGui::GetTextLineHeightWithSpacing() });
                     ImGui::Text("%d - %s", i, kKeyText.at(trainKeys[i]));
@@ -332,10 +321,7 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
         //auto io = ImGui::GetIO();
         //ImGui::Text("Keys pressed:");   for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyPressed(i))             { ImGui::SameLine(); ImGui::Text("%d", i); }
 
-        static bool recalculate = true;
         static bool playHalfSpeed = false;
-        static int historySize = 6*1024;
-        static float thresholdBackground = 10.0;
         ImGui::PushItemWidth(100.0);
 
         ImGui::Checkbox("x0.5", &playHalfSpeed);

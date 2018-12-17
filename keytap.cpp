@@ -188,7 +188,6 @@ int main(int argc, char ** argv) {
     std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
 
     bool doRecord = false;
-    bool printStatus = true;
     bool isReadyToPredict = false;
     bool processingInput = true;
 
@@ -246,7 +245,7 @@ int main(int argc, char ** argv) {
                         //auto [bestcc, bestoffset] = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
                         auto ret = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
                         auto bestcc     = std::get<0>(ret);
-                        auto bestoffset = std::get<1>(ret);
+                        //auto bestoffset = std::get<1>(ret);
 
                         //printf(" %8.4f ", bestcc);
                         if (bestcc > maxcc) {
@@ -302,7 +301,7 @@ int main(int argc, char ** argv) {
 
                 int skip_samples = 0;
                 int nFrames = frames.size();
-                int nFrames2 = std::max(1, nFrames/2);
+                //int nFrames2 = std::max(1, nFrames/2);
                 //for (int f = nFrames2 - nFrames2/2; f <= nFrames2 + nFrames2/2; ++f) {
                 for (int f = nFrames/4; f < frames.size() - 2; ++f) {
                     for (int s = 0; s < frames[f].size(); ++s) {
@@ -551,7 +550,7 @@ int main(int argc, char ** argv) {
 
                     auto & waveform1 = history[iwaveform];
                     //auto [cc, offset] = ccs[iwaveform][bestw];
-                    auto cc     = std::get<0>(ccs[iwaveform][bestw]);
+                    //auto cc     = std::get<0>(ccs[iwaveform][bestw]);
                     auto offset = std::get<1>(ccs[iwaveform][bestw]);
 
                     auto newWaveform = TKeyWaveform();

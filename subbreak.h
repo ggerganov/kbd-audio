@@ -38,7 +38,6 @@ void shuffle(T & t, int start = -1, int end = -1, const std::vector<int> & hint 
     if (start == -1) start = 0;
     if (end == -1) end = t.size();
 
-    int n = t.size();
     for (int i = end - 1; i > start; --i) {
         int i0 = i;
         int i1 = rand()%(i - start + 1)+start;

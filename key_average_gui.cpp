@@ -23,8 +23,6 @@
 #include <chrono>
 
 int main(int, char**) {
-    auto t0 = std::chrono::high_resolution_clock::now();
-
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return -1;

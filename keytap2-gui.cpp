@@ -364,7 +364,7 @@ std::tuple<TCC, TOffset> findBestCC(
     TOffset besto = -1;
 
     //auto [samples0, n0] = waveform0;
-    auto samples0 = waveform0.samples;
+    //auto samples0 = waveform0.samples;
     auto n0       = waveform0.n;
 
     //auto [samples1, n1] = waveform1;
@@ -414,7 +414,7 @@ bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & key
 
         //auto [samples0, n0] = waveform0;
         auto samples0 = waveform0.samples;
-        auto n0       = waveform0.n;
+        //auto n0       = waveform0.n;
 
         for (int j = 0; j < nPresses; ++j) {
             if (i == j) continue;

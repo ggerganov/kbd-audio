@@ -339,7 +339,6 @@ int main(int argc, char ** argv) {
     int ntest = 0;
 
     bool doRecord = false;
-    bool printStatus = true;
     bool isReadyToPredict = false;
     bool processingInput = true;
     bool processingRecord = false;
@@ -515,7 +514,6 @@ int main(int argc, char ** argv) {
                 }
 
                 int nFrames = frames.size();
-                int nFrames2 = std::max(1, nFrames/2);
 
                 auto _acc = [](const AudioLogger::Record & r, int id) { return std::abs(r[id/kSamplesPerFrame][id%kSamplesPerFrame]); };
 
@@ -831,7 +829,7 @@ int main(int argc, char ** argv) {
 
                     auto & waveform1 = history[iwaveform];
                     //auto [cc, offset] = ccs[iwaveform][bestw];
-                    auto cc     = std::get<0>(ccs[iwaveform][bestw]);
+                    //auto cc     = std::get<0>(ccs[iwaveform][bestw]);
                     auto offset = std::get<1>(ccs[iwaveform][bestw]);
 
                     auto newWaveform = TKeyWaveform();

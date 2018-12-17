@@ -215,8 +215,6 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
         int viewMin = 512;
         int viewMax = waveform.size();
 
-        bool ignoreDelete = false;
-
         static int nview = waveform.size();
         static int offset = (waveform.size() - nview)/2;
         static float amin = -16000;
@@ -230,7 +228,6 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
         static TWaveform waveformThreshold = waveform;
 
         auto wview = getView(waveformLowRes, offset, nview);
-        auto tview = getView(waveformThreshold, offset, nview);
         auto wsize = ImGui::GetContentRegionAvail();
         wsize.y -= 50.0f;
 
@@ -309,10 +306,7 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
         //auto io = ImGui::GetIO();
         //ImGui::Text("Keys pressed:");   for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyPressed(i))             { ImGui::SameLine(); ImGui::Text("%d", i); }
 
-        static bool recalculate = true;
         static bool playHalfSpeed = false;
-        static int historySize = 6*1024;
-        static float thresholdBackground = 10.0;
         ImGui::PushItemWidth(100.0);
 
         ImGui::Checkbox("x0.5", &playHalfSpeed);

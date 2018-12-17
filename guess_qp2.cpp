@@ -82,8 +82,6 @@ int main(int, char**) {
     std::map<TKey, TKeyHistory> keySoundHistoryAmpl;
     std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
 
-    float bufferSize_s = 1.000f;
-
     int timesToPressQ = 5;
     int timesToPressP = 5;
 
@@ -206,8 +204,6 @@ int main(int, char**) {
                     ampl[k] = frames[k];
                 }
 
-                int nFramesPerWaveform = ampl.size();
-                int centerSample = nFramesPerWaveform*nSamplesPerFrame/2;
                 int alignWindow = nSamplesPerFrame;
 
                 for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {

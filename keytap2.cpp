@@ -231,7 +231,7 @@ std::tuple<TCC, TOffset> findBestCC(
     TOffset besto = -1;
 
     //auto [samples0, n0] = waveform0;
-    auto samples0 = std::get<0>(waveform0);
+    //auto samples0 = std::get<0>(waveform0);
     auto n0       = std::get<1>(waveform0);
 
     //auto [samples1, n1] = waveform1;
@@ -280,7 +280,7 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
 
         //auto [samples0, n0] = waveform0;
         auto samples0 = std::get<0>(waveform0);
-        auto n0       = std::get<1>(waveform0);
+        //auto n0       = std::get<1>(waveform0);
 
         for (int j = 0; j < nPresses; ++j) {
             if (i == j) continue;
@@ -291,7 +291,7 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
 
             //auto [samples1, n1] = waveform1;
             auto samples1 = std::get<0>(waveform1);
-            auto n1       = std::get<1>(waveform1);
+            //auto n1       = std::get<1>(waveform1);
 
             //auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + (int)(0.5f*w),               2*w },
             //                                       { samples1 + pos1 + (int)(0.5f*w) - alignWindow, 2*w + 2*alignWindow }, alignWindow);
@@ -518,7 +518,7 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
                 if ((ck == ci || ck == cj) && (cq == ci || cq == cj)) {
                     //auto & [cc, offset] = sim[k][q];
                     auto & cc     = std::get<0>(sim[k][q]);
-                    auto & offset = std::get<1>(sim[k][q]);
+                    //auto & offset = std::get<1>(sim[k][q]);
 
                     sumcc += cc;
                     ++nsum;
@@ -526,7 +526,7 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
                 if (ck == ci && cq == ci) {
                     //auto & [cc, offset] = sim[k][q];
                     auto & cc     = std::get<0>(sim[k][q]);
-                    auto & offset = std::get<1>(sim[k][q]);
+                    //auto & offset = std::get<1>(sim[k][q]);
 
                     sumcci += cc;
                     ++nsumi;
@@ -534,7 +534,7 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
                 if (ck == cj && cq == cj) {
                     //auto & [cc, offset] = sim[k][q];
                     auto & cc     = std::get<0>(sim[k][q]);
-                    auto & offset = std::get<1>(sim[k][q]);
+                    //auto & offset = std::get<1>(sim[k][q]);
 
                     sumccj += cc;
                     ++nsumj;
@@ -735,7 +735,7 @@ int main(int argc, char ** argv) {
         for (int j = 0; j < n; ++j) {
             //auto [cc, offset] = similarityMap[i][j];
             auto cc     = std::get<0>(similarityMap[i][j]);
-            auto offset = std::get<1>(similarityMap[i][j]);
+            //auto offset = std::get<1>(similarityMap[i][j]);
 
             if (cc > -0.45) {
                 printf("%4.0f ", cc*100);
