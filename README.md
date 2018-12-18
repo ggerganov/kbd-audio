@@ -18,7 +18,7 @@ Dependencies:
 
  - **SDL2** - used to capture audio and to open GUI windows [libsdl](https://www.libsdl.org)
  - **FFTW3** - some of the helper tools perform Fourier transformations [fftw](http://www.fftw.org)
- 
+
 **Linux and Mac OS**
 
     git clone https://github.com/ggerganov/kbd-audio
@@ -27,7 +27,7 @@ Dependencies:
     mkdir build && cd build
     cmake ..
     make
-    
+
 **Windows**
 
     (todo, PRs welcome)
@@ -44,7 +44,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 | **play-full**       | text    | **stable**  |
 | **view-gui**        | gui     | **stable**  |
 | **view-full-gui**   | gui     | **stable**  |
-| **keytap**          | text    | outdated    |
+| **keytap**          | text    | **stable**  |
 | **keytap-gui**      | gui     | **stable**  |
 | **keytap2**         | text    | development |
 | **keytap2-gui**     | gui     | development |
@@ -71,7 +71,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
   Playback a recording captured via the **record-full** tool
 
       ./play-full input.kbd [-pN]
-        
+
   ---
 
 * **record**
@@ -87,16 +87,24 @@ Short summary of the available tools. If the status of the tool is not **stable*
   Playback a recording created via the **record** tool
 
       ./play input.kbd [-pN]
-        
+
+  ---
+
+* **keytap**
+
+  Detect pressed keys via microphone audio capture in real-time. Uses training data captured via the **record** tool.
+
+      ./keytap input0.kbd [input1.kbd] [input2.kbd] ... [-cN] [-pF] [-tF]
+
   ---
 
 * **keytap-gui**
 
-  Detect pressed keys via microphone audio capture in real-time. Uses training data captured via the **record** tool.
+  Detect pressed keys via microphone audio capture in real-time. Uses training data captured via the **record** tool. GUI version.
 
       ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ... [-cN]
 
-  [**Live demo *(WebAssembly threads required)***](https://ggerganov.github.io/jekyll/update/2018/11/24/keytap.html)
+  [**Live demo *(WebAssembly threads required)* **](https://ggerganov.github.io/jekyll/update/2018/11/24/keytap.html)
 
   <a href="https://i.imgur.com/mnRvT1X.gif" target="_blank">![keytap-gui](https://i.imgur.com/FXa60Pr.gif)</a>
 
@@ -106,7 +114,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Detect pressed keys via microphone audio capture. Uses statistical information (n-gram frequencies) about the language. **No training data is required**. The *'recording.kbd'* input file has to be generated via the **record-full** tool and contains the audio data that will be analyzed. The *'n-gram.txt'* file has to contain n-gram probabilities for the corresponding language. 
 
-  **Usage:** ./keytap2-gui recording.kbd n-gram.txt
+      ./keytap2-gui recording.kbd n-gram.txt
 
   <a href="https://i.imgur.com/yR3m5Bm.jpg" target="_blank">![keytap2-gui](https://i.imgur.com/yR3m5Bm.jpg)</a>
 
@@ -116,7 +124,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Visualize waveforms recorded with the **record-full** tool. Can also playback the audio data.
 
-  **Usage:** ./view-full-gui input.kbd
+      ./view-full-gui input.kbd
 
   <a href="https://i.imgur.com/scjTaXw.png" target="_blank">![view-full-gui](https://i.imgur.com/scjTaXw.png)</a>
 
@@ -126,7 +134,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Visualize training data recorded with the **record** tool. Can also playback the audio data.
 
-  **Usage:** ./view-gui input.kbd
+      ./view-gui input.kbd
 
   <a href="https://i.imgur.com/2binGaZ.png" target="_blank">![view-full-gui](https://i.imgur.com/2binGaZ.png)</a>
 
