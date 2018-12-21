@@ -2,10 +2,14 @@ cmake_minimum_required (VERSION 2.8)
 project (KBD-Audio)
 
 option(BUILD_EXPERIMENTAL "Build experimental tools" OFF)
+option(USE_FINDSDL2 "Use the FindSDL2.cmake script" OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS "on")
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+if (USE_FINDSDL2)
+    set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdl2")
+endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
@@ -20,9 +24,22 @@ set (CMAKE_CXX_STANDARD 14)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Threads REQUIRED)
-find_package(SDL2 REQUIRED)
-find_package(FFTW REQUIRED)
 find_package(OpenGL REQUIRED)
+#find_package(SDL2)
+find_package(FFTW)
+
+if (NOT USE_FINDSDL2 AND NOT SDL2_FOUND)
+    message(WARNING "Unable to find SDL2 library. It is either not installed or CMake cannot find it."
+        " In the latter case, setting the USE_FINDSDL2 variable might help:\n"
+        "   $ cmake -D USE_FINDSDL2 .."
+        )
+
+    message(FATAL_ERROR "Aborting")
+endif()
+
+if (NOT FFTW_FOUND)
+    message(WARNING "FFTW library not available. Some targets will not be built")
+endif()
 
 string(STRIP "${SDL2_LIBRARIES}" SDL2_LIBRARIES)
 
@@ -44,13 +61,11 @@ add_library(Core STATIC
     )
 
 target_include_directories(Core PRIVATE
-    ${FFTW_INCLUDE_DIRS}
     )
 
 target_link_libraries(Core PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
     ${SDL2_LIBRARIES}
-    ${FFTWF_LIBRARIES}
     ${COREFOUNDATION_LIBRARY}
     )
 
@@ -109,8 +124,13 @@ target_link_libraries(view-full-gui PRIVATE Core ImGui)
 ## Experimental stuff
 
 if (BUILD_EXPERIMENTAL)
-    add_executable(key_average_gui key_average_gui.cpp)
-    target_link_libraries(key_average_gui PRIVATE Core ImGui)
+    if (FFTW_FOUND)
+        add_executable(key_average_gui key_average_gui.cpp)
+        target_include_directories(key_average_gui PRIVATE ${FFTW_INCLUDE_DIRS})
+        target_link_libraries(key_average_gui PRIVATE Core ImGui ${FFTW_LIBRARIES})
+    else()
+        message(WARNING "Skipping 'key_average_gui' target because FFTW is not available")
+    endif()
 
     add_executable(guess_qp guess_qp.cpp)
     target_link_libraries(guess_qp PRIVATE Core)

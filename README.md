@@ -17,7 +17,7 @@ Check this blog post for more details:
 Dependencies:
 
  - **SDL2** - used to capture audio and to open GUI windows [libsdl](https://www.libsdl.org)
- - **FFTW3** - some of the helper tools perform Fourier transformations [fftw](http://www.fftw.org)
+ - **FFTW3** *(optional)* - some of the helper tools perform Fourier transformations [fftw](http://www.fftw.org)
 
 **Linux and Mac OS**
 

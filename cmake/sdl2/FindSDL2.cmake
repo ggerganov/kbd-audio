@@ -75,7 +75,7 @@ if(NOT SDL2_DIR)
   set(SDL2_DIR "" CACHE PATH "SDL2 directory")
 endif()
 
-find_path(SDL2_INCLUDE_DIR SDL.h
+find_path(SDL2_INCLUDE_DIR SDL_scancode.h
   HINTS
     ENV SDLDIR
     ${SDL2_DIR}
