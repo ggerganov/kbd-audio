@@ -25,7 +25,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Threads REQUIRED)
 find_package(OpenGL REQUIRED)
-#find_package(SDL2)
+find_package(SDL2)
 find_package(FFTW)
 
 if (NOT USE_FINDSDL2 AND NOT SDL2_FOUND)
