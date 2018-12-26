@@ -100,7 +100,7 @@ bool loadFreqMap(const char * fname, TFreqMap & res) {
     printf("    Total n-grams loaded = %g\n", (double) nTotal);
 
     //pMin = std::log(1000.0/nTotal);
-    pMin = std::log(0.01/nTotal);
+    pMin = std::log(100.01/nTotal);
     printf("    P-min = %g\n", pMin);
     for (auto & p : fmap) {
         if (p >= 0.5) p = pMin;
@@ -193,7 +193,7 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
             curc += c;
             --k;
         } else {
-            //res += pMin;
+            res += pMin;
         }
     }
 
@@ -212,7 +212,7 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
                 curc += c;
                 break;
             } else {
-                //res += pMin;
+                res += pMin;
             }
         }
 

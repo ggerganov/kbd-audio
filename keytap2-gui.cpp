@@ -59,6 +59,11 @@ struct stParameters {
     float thresholdClustering   = 0.5f;
     int nMinKeysInCluster       = 3;
     std::string fnameLetterMask = "";
+
+    // simulated annealing
+    int saMaxIterations = 1000000;
+    float temp0 = 1e8;
+    float coolingRate = 0.99995;
 };
 
 struct stMatch {
@@ -650,6 +655,143 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses, TCC 
     return true;
 }
 
+float costF(const TSimilarityMap & ccMap, const TKeyPressCollection & keyPresses) {
+    int len = keyPresses.size();
+    float res = 0.0f;
+    for (int i = 0; i < len; ++i) {
+        for (int j = i + 1; j < len; ++j) {
+            if (keyPresses[i].cid == keyPresses[j].cid) {
+                res += 1.0f - ccMap.at(i).at(j).cc;
+            }
+        }
+    }
+
+    return -res;
+}
+
+float costFUpdate(const TSimilarityMap & ccMap, const TKeyPressCollection & keyPresses, int i, int cid, float c0) {
+    int len = keyPresses.size();
+    float res = -c0;
+    for (int j = 0; j < len; ++j) {
+        if (cid == keyPresses[j].cid) {
+            res -= 1.0f - ccMap.at(i).at(j).cc;
+        }
+        if (keyPresses[i].cid == keyPresses[j].cid) {
+            res += 1.0f - ccMap.at(i).at(j).cc;
+        }
+    }
+
+    return -res;
+}
+
+bool doSimulatedAnnealing(const TParameters & params, const TSimilarityMap & ccMap, TKeyPressCollection & keyPresses) {
+    int N = keyPresses.size();
+
+    std::map<int, int> csize;
+    for (auto & c : keyPresses) {
+        c.cid = rand()&27 + 1;
+        ++csize[c.cid];
+    }
+    int nonzero = csize.size();
+
+    int ncc = 0;
+    float ccavg = 0.0;
+    for (int j = 0; j < N; ++j) {
+        for (int i = j + 1; i < N; ++i) {
+            ccavg += ccMap.at(j).at(i).cc;
+            ++ncc;
+        }
+    }
+    ccavg /= ncc;
+    printf("Average cc = %g\n", ccavg);
+
+    float temp = params.temp0;
+    float cost0 = costF(ccMap, keyPresses);
+    //cost0 -= wn*nonzero;
+
+    for (int iter = 0; iter < params.saMaxIterations; ++iter) {
+        if (iter%5000 == 0) {
+            printf("Iter %5d : temp = %16.4f, cost0 = %8.4f, nonzero = %d\n", iter, temp, cost0, nonzero);
+        }
+
+        bool doMerge = false;
+        //f (nonzero > 1 && frand() > 0.990f) doMerge = true;
+        if (iter > params.saMaxIterations - 10001) doMerge = true;
+
+        if (doMerge) {
+            auto keyPressesNew = keyPresses;
+
+            int i0 = rand()%N;
+            int i1 = rand()%N;
+            while (keyPresses[i0].cid == keyPresses[i1].cid) {
+                i0 = rand()%N;
+                i1 = rand()%N;
+            }
+
+            int cid0 = keyPresses[i0].cid;
+            int cid1 = keyPresses[i1].cid;
+
+            int n0 = csize[cid0];
+            int n1 = csize[cid1];
+
+            --nonzero;
+            int saven = csize[cid1];
+            csize[cid0] += saven;
+            csize[cid1] -= saven;
+
+            for (int i = 0; i < N; ++i) {
+                if (keyPressesNew[i].cid == cid1) {
+                    keyPressesNew[i].cid = cid0;
+                }
+            }
+
+            float cost1 = costF(ccMap, keyPressesNew);
+            cost1 += 0.4f*n0*n1*(1.0f - ccavg);
+
+            float delta = cost1 - cost0;
+            if (delta > 0 || (std::exp(delta/temp) > frand())) {
+                cost0 = cost1;
+                cost0 = cost1 - 0.4f*n0*n1*(1.0f - ccavg);
+                keyPresses = keyPressesNew;
+            } else {
+                ++nonzero;
+                csize[cid0] -= saven;
+                csize[cid1] += saven;
+            }
+        } else {
+            int i = rand()%N;
+            int cid = keyPresses[i].cid;
+            while (cid == keyPresses[i].cid) {
+                keyPresses[i].cid = rand()%27 + 1;
+            }
+
+            float cost1 = costFUpdate(ccMap, keyPresses, i, cid, cost0);
+
+            if (csize[cid] == 1) nonzero--;
+            if (csize[keyPresses[i].cid] == 0) nonzero++;
+
+            float delta = cost1 - cost0;
+            if (delta > 0 || (std::exp(delta/temp) > frand())) {
+                cost0 = cost1;
+
+                csize[keyPresses[i].cid]++;
+                csize[cid]--;
+            } else {
+                if (csize[cid] == 1) nonzero++;
+                if (csize[keyPresses[i].cid] == 0) nonzero--;
+
+                keyPresses[i].cid = cid;
+            }
+        }
+
+        temp *= params.coolingRate;
+    }
+
+    keyPresses.nClusters = nonzero;
+
+    return true;
+}
+
 bool adjustKeyPresses(const TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & sim) {
     struct Pair {
         int i = -1;
@@ -1063,13 +1205,17 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
 
 bool renderClusters(TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
     if (ImGui::Begin("Clusters")) {
-        static bool useDBSCAN = true;
+        static bool useDBSCAN = false;
+        static bool useSA = true;
         ImGui::Text("Clusters: %d\n", keyPresses.nClusters);
         ImGui::SliderFloat("Threshold", &params.thresholdClustering, 0.0f, 1.0f);
         ImGui::SliderInt("N min", &params.nMinKeysInCluster, 0, 8);
         ImGui::Checkbox("DBSCAN", &useDBSCAN);
+        ImGui::Checkbox("Simulated Annealing", &useSA);
         if (ImGui::Button("Calculate") || ImGui::IsKeyPressed(23)) { // t
-            if (useDBSCAN == false) {
+            if (useSA) {
+                doSimulatedAnnealing(params, similarityMap, keyPresses);
+            } else if (useDBSCAN == false) {
                 clusterG(similarityMap, keyPresses, params.thresholdClustering);
             } else {
                 clusterDBSCAN(similarityMap, params.thresholdClustering, params.nMinKeysInCluster, keyPresses);
