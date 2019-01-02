@@ -17,6 +17,13 @@ Check this blog post for more details:
 Dependencies:
 
  - **SDL2** - used to capture audio and to open GUI windows [libsdl](https://www.libsdl.org)
+       
+       [Ubuntu]
+       $ sudo apt install libsdl2-dev
+       
+       [Mac OS with brew]
+       $ brew install sdl2  
+       
  - **FFTW3** *(optional)* - some of the helper tools perform Fourier transformations [fftw](http://www.fftw.org)
 
 **Linux and Mac OS**
