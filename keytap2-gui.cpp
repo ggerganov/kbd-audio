@@ -1220,6 +1220,16 @@ bool renderClusters(TParameters & params, TKeyPressCollection & keyPresses, TSim
             } else {
                 clusterDBSCAN(similarityMap, params.thresholdClustering, params.nMinKeysInCluster, keyPresses);
             }
+
+            float cost = 0.0f;
+            for (int i = 0; i < (int)(keyPresses.size()); ++i) {
+                for (int j = i+1; j < (int)(keyPresses.size()); ++j) {
+                    if (keyPresses[i].cid == keyPresses[j].cid) {
+                        cost += 1.0f - similarityMap[i][j].cc;
+                    }
+                }
+            }
+            printf("clustering cost = %g\n", cost);
         }
 
         int n = keyPresses.size();
