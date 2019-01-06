@@ -2,7 +2,11 @@
 
 ## Description
 
-This is a collection of command-line and GUI tools for capturing and analyzing audio data. The most interesting tool is called **keytap** - it can guess pressed keyboard keys only by analyzing the audio captured from the computer's microphone.
+This is a collection of command-line and GUI tools for capturing and analyzing audio data.
+
+### Keytap
+
+The most interesting tool is called **keytap** - it can guess pressed keyboard keys only by analyzing the audio captured from the computer's microphone.
 
 Check this blog post for more details:
 
@@ -14,7 +18,7 @@ Check this blog post for more details:
 
 ### Keytap2
 
-The **keytap2** tool is another interesting tool for recovering text from audio. It does not require training data - instead it uses statistical information about the frequency of the letters and n-grams in the English language. The tool is still in development, but you can see a short demonstration here:
+The **keytap2** tool is another interesting tool for recovering text from audio. It does not require training data - instead it uses statistical information about the frequencies of the letters and n-grams in the English language. The tool is still in development, but you can see a short demonstration here:
 
 [Video: Keytap2 - Sneak Peek (8:38)](https://youtu.be/DJdT7vsJtxw)
 
