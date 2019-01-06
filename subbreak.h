@@ -294,7 +294,7 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
     int nIters = 0;
     while (nMainIters--) {
         if (++nIters > 10000) {
-            TAlphabet besta = getAlphabetRandom(0, hint);
+            besta = getAlphabetRandom(0, hint);
             translate(besta, enc, cure);
             bestp = calcScore(freqMap, cure);
             printf("reset\n");
