@@ -411,11 +411,10 @@ std::tuple<TCC, TOffset> findBestCC(
 
     //auto [samples1, n1] = waveform1;
     auto samples1 = waveform1.samples;
-    auto n1       = waveform1.n;
 
 #ifdef MY_DEBUG
     if (n0 + 2*alignWindow != n1) {
-        printf("BUG 924830jm92, n0 = %d, n1 = %d, a = %d\n", (int) n0, (int) n1, (int) alignWindow);
+        printf("BUG 924830jm92, n0 = %d, a = %d\n", (int) n0, (int) alignWindow);
     }
 #endif
 
@@ -618,6 +617,15 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses, TCC 
 
         auto ci = keyPresses[curpair.i].cid;
         auto cj = keyPresses[curpair.j].cid;
+
+        int bindi = -1;
+        int bindj = -1;
+        for (int k = 0; k < n; ++k) {
+            if (keyPresses[k].cid == ci && keyPresses[k].bind > -1) bindi = keyPresses[k].bind;
+            if (keyPresses[k].cid == cj && keyPresses[k].bind > -1) bindj = keyPresses[k].bind;
+        }
+
+        if (bindi != bindj && bindi > -1 && bindj > -1) continue;
 
         if (ci == cj) continue;
         auto cnew = std::min(ci, cj);
