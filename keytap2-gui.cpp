@@ -25,7 +25,10 @@
 #include <thread>
 #include <algorithm>
 
-#define MY_DEBUG
+//#define MY_DEBUG
+
+int g_windowSizeX = 1920;
+int g_windowSizeY = 1200;
 
 struct stParameters;
 struct stMatch;
@@ -51,6 +54,38 @@ using TKeyPressPosition     = int64_t;
 using TKeyPressData         = stKeyPressData;
 using TKeyPressCollection   = stKeyPressCollection;
 
+enum Approach {
+    ClusterG = 0,
+    DBSCAN,
+    SimulatedAnnealing,
+
+    COUNT,
+
+    // disabled
+    NonExactSubstitutionCipher0,
+};
+
+std::string getApproachStr(Approach approach) {
+    std::string res = "-";
+    switch (approach) {
+        case ClusterG:
+            res = "ClusterG clustering + Substition Cipher attack";
+            break;
+        case DBSCAN:
+            res = "DBSCAN clustering + Substition Cipher attack";
+            break;
+        case SimulatedAnnealing:
+            res = "Simulated Annealing clustering + Substition Cipher attack";
+            break;
+        case NonExactSubstitutionCipher0:
+            res = "Non-Exact Substitution Cipher attack";
+            break;
+        case COUNT:
+            break;
+    };
+    return res;
+}
+
 struct stParameters {
     int keyPressWidth_samples   = 256;
     int sampleRate              = 24000;
@@ -59,6 +94,8 @@ struct stParameters {
     float thresholdClustering   = 0.5f;
     int nMinKeysInCluster       = 3;
     std::string fnameLetterMask = "";
+
+    Approach approach = ClusterG;
 
     // simulated annealing
     int saMaxIterations = 1000000;
@@ -859,6 +896,8 @@ SDL_AudioDeviceID g_deviceIdOut = 0;
 PlaybackData g_playbackData;
 
 bool renderKeyPresses(TParameters & params, const char * fnameInput, const TWaveform & waveform, TKeyPressCollection & keyPresses) {
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 350.0f), ImGuiCond_Once);
     if (ImGui::Begin("Key Presses")) {
         int viewMin = 512;
         int viewMax = waveform.size();
@@ -1130,6 +1169,8 @@ bool renderKeyPresses(TParameters & params, const char * fnameInput, const TWave
 }
 
 bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
+    ImGui::SetNextWindowPos(ImVec2(0, 350.0f), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(0.5f*g_windowSizeX, g_windowSizeY - 350.0f), ImGuiCond_Once);
     if (ImGui::Begin("Similarity")) {
         int n = similarityMap.size();
         auto wsize = ImGui::GetContentRegionAvail();
@@ -1204,20 +1245,41 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
 }
 
 bool renderClusters(TParameters & params, TKeyPressCollection & keyPresses, TSimilarityMap & similarityMap) {
+    ImGui::SetNextWindowPos(ImVec2(0.5f*g_windowSizeX, 350.0f), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(0.5f*g_windowSizeX, g_windowSizeY - 350.0f - 300.0f), ImGuiCond_Once);
     if (ImGui::Begin("Clusters")) {
-        static bool useDBSCAN = false;
-        static bool useSA = true;
+        if (ImGui::BeginCombo("Approach", getApproachStr(params.approach).c_str())) {
+            for (int i = 0; i < Approach::COUNT; ++i) {
+                if (ImGui::Selectable(getApproachStr((Approach)(i)).c_str(), params.approach == (Approach)(i))) {
+                    params.approach = (Approach)(i);
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        if (params.approach == Approach::NonExactSubstitutionCipher0) {
+            //ImGui::SliderInt("Min Clusters", &params.cipher.minClusters, 2, 27);
+            //ImGui::SliderInt("Max Clusters", &params.cipher.maxClusters, 3, 34);
+            //ImGui::SliderFloat("English letter frequency weight", &params.cipher.wEnglishFreq, 0.0f, 1000.0f);
+            //ImGui::SliderInt("Iterations", &params.cipher.nSubbreakIterations, 1000, 1000000);
+        }
+        if (params.approach == Approach::DBSCAN) {
+            ImGui::SliderFloat("Threshold", &params.thresholdClustering, 0.0f, 1.0f);
+            ImGui::SliderInt("N min", &params.nMinKeysInCluster, 0, 8);
+        }
+        if (params.approach == Approach::ClusterG) {
+            ImGui::SliderFloat("Threshold", &params.thresholdClustering, 0.0f, 1.0f);
+        }
+        if (params.approach == Approach::SimulatedAnnealing) {
+        }
+
         ImGui::Text("Clusters: %d\n", keyPresses.nClusters);
-        ImGui::SliderFloat("Threshold", &params.thresholdClustering, 0.0f, 1.0f);
-        ImGui::SliderInt("N min", &params.nMinKeysInCluster, 0, 8);
-        ImGui::Checkbox("DBSCAN", &useDBSCAN);
-        ImGui::Checkbox("Simulated Annealing", &useSA);
         if (ImGui::Button("Calculate") || ImGui::IsKeyPressed(23)) { // t
-            if (useSA) {
+            if (params.approach == Approach::SimulatedAnnealing) {
                 doSimulatedAnnealing(params, similarityMap, keyPresses);
-            } else if (useDBSCAN == false) {
+            } else if (params.approach == Approach::ClusterG) {
                 clusterG(similarityMap, keyPresses, params.thresholdClustering);
-            } else {
+            } else if (params.approach == Approach::DBSCAN) {
                 clusterDBSCAN(similarityMap, params.thresholdClustering, params.nMinKeysInCluster, keyPresses);
             }
 
@@ -1231,6 +1293,8 @@ bool renderClusters(TParameters & params, TKeyPressCollection & keyPresses, TSim
             }
             printf("clustering cost = %g\n", cost);
         }
+
+        ImGui::BeginChildFrame(ImGui::GetID("Hints"), ImGui::GetContentRegionAvail());
 
         int n = keyPresses.size();
         ImGui::Text(" id : cid : predicted : bind");
@@ -1264,8 +1328,28 @@ bool renderClusters(TParameters & params, TKeyPressCollection & keyPresses, TSim
                 ImGui::EndCombo();
             }
             ImGui::PopItemWidth();
+            ImGui::SameLine();
+            int w = 32;
+            auto cw = ImGui::CalcTextSize("a");
+            for (int j = std::max(0, i - w); j <= std::min(n, i + w); ++j) {
+                if (j == i && keyPresses[j].bind >= 0) {
+                    if (keyPresses[j].bind == 26) {
+                        ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", '.');
+                    } else {
+                        ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", keyPresses[j].bind + 'a');
+                    }
+                } else {
+                    ImGui::Text("%c", keyPresses[j].predicted);
+                }
+                ImGui::SameLine();
+                auto pos = ImGui::GetCursorScreenPos();
+                ImGui::SetCursorScreenPos({ pos.x - cw.x, pos.y });
+            }
+            ImGui::Text("%s", "");
             ImGui::PopID();
         }
+
+        ImGui::EndChildFrame();
     }
     ImGui::End();
     return false;
@@ -1277,9 +1361,11 @@ bool renderSolution(const TFreqMap & freqMap, TKeyPressCollection & keyPresses) 
     static std::string enc = "";
     static std::string decrypted = "";
 
+    ImGui::SetNextWindowPos(ImVec2(0.5f*g_windowSizeX, g_windowSizeY - 300.0f), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ImVec2(0.5f*g_windowSizeX, 300.0f), ImGuiCond_Once);
     if (ImGui::Begin("Solution")) {
         ImGui::SliderInt("Iterations", &nIters, 0, 1e5);
-        ImGui::SliderInt("Unique keys", &nUnique, 26, 42);
+        //ImGui::SliderInt("Unique keys", &nUnique, 26, 42);
         if (ImGui::Button("Calculate")) {
             int n = keyPresses.size();
             enc.resize(n);
@@ -1415,9 +1501,6 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
-    int windowSizeX = 1920;
-    int windowSizeY = 1200;
-
 #if __APPLE__
     // GL 3.2 Core + GLSL 150
     const char* glsl_version = "#version 150";
@@ -1440,7 +1523,7 @@ int main(int argc, char ** argv) {
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
-    SDL_Window* window = SDL_CreateWindow("Keytap", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
+    SDL_Window* window = SDL_CreateWindow("Keytap", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, g_windowSizeX, g_windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     SDL_GL_SetSwapInterval(1); // Enable vsync
 
@@ -1489,7 +1572,7 @@ int main(int argc, char ** argv) {
             };
         }
 
-        SDL_GetWindowSize(window, &windowSizeX, &windowSizeY);
+        SDL_GetWindowSize(window, &g_windowSizeX, &g_windowSizeY);
 
         auto tStart = std::chrono::high_resolution_clock::now();
 

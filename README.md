@@ -123,7 +123,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
       ./keytap2-gui recording.kbd n-gram.txt
 
-  <a href="https://i.imgur.com/yR3m5Bm.jpg" target="_blank">![keytap2-gui](https://i.imgur.com/yR3m5Bm.jpg)</a>
+  <a href="https://i.imgur.com/LRnTkPA.jpg" target="_blank">![keytap2-gui](https://i.imgur.com/LRnTkPA.jpg)</a>
 
   ---
 
