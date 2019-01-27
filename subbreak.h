@@ -185,8 +185,11 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
 
     int k = n;
     TCode curc = 0;
+
     while (k > 0) {
-        if (i1 >= len) return -1e100;
+        if (i1 >= len) {
+            return -1e100;
+        }
         auto c = txt[i1++];
         if (c > 0 && c <= 26) {
             curc <<= 5;
@@ -205,7 +208,7 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
         curc &= mask;
 
         while (true) {
-            if (i1 >= len) return cnt > 0.3*len ? res/cnt : -1e100;
+            if (i1 >= len) goto finish;
             auto c = txt[i1++];
             if (c > 0 && c <= 26) {
                 curc <<= 5;
@@ -220,7 +223,9 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
         ++cnt;
     }
 
+finish:
     return cnt > 0.3*len ? res/cnt : -1e100;
+    //return res/len;
 }
 
 TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
@@ -258,6 +263,64 @@ TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
     }
 
     return res;
+}
+
+TProb calcScoreForSpaces(const TFreqMap & freqMap, const std::string & txt) {
+    TProb res = 0.0;
+
+    auto len = txt.size();
+    //const auto & [n, fmap] = freqMap;
+    const auto & n    = std::get<0>(freqMap);
+    const auto & fmap = std::get<1>(freqMap);
+
+    int i1 = 0;
+    int cnt = 0;
+
+    int k = n;
+    TCode curc = 0;
+    TCode mask = (1 << 5*n) - 1;
+
+    while (k > 0) {
+        if (i1 >= len) {
+            return -1e100;
+        }
+        auto c = txt[i1++];
+        if (c > 0 && c <= 26) {
+            curc <<= 5;
+            curc += c;
+            curc &= mask;
+            --k;
+        } else {
+            k = n;
+            res += pMin;
+        }
+    }
+
+    res += fmap[curc];
+    ++cnt;
+    while (true) {
+        while (true) {
+            if (i1 >= len) goto finish;
+            auto c = txt[i1++];
+            if (c > 0 && c <= 26) {
+                curc <<= 5;
+                curc += c;
+                curc &= mask;
+                if (k == 0) break;
+                if (--k == 0) break;
+            } else {
+                k = n;
+                res += pMin;
+            }
+        }
+
+        res += fmap[curc];
+        ++cnt;
+    }
+
+finish:
+    //return cnt > 0.3*len ? res/cnt : -1e100;
+    return res/len;
 }
 
 auto calcScore = calcScore0;
@@ -336,6 +399,99 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
 
             translate(cura, enc, cure);
             auto curp = calcScore(freqMap, cure);
+            if (curp > iterp) {
+                iterp = curp;
+                itera = cura;
+                i = 0;
+            } else {
+                std::swap(cura[a0], cura[a1]);
+            }
+        }
+
+        if (iterp > bestp) {
+            besta = itera;
+            bestp = iterp;
+
+            if (bestp > bestbestp) {
+                bestbestp = bestp;
+                translate(besta, enc, beste);
+                printf("[+] Best score = %g\n", bestp);
+                printf("    Alphabet:  '");
+                for (int i = 'a'; i <= 'z'; ++i) {
+                    auto c = ::myCharToInt[i];
+                    printf("%c", i - c + besta[c]);
+                }
+                printf("'\n");
+                printText(beste);
+                printf("\n");
+            }
+            nIters = 0;
+        }
+    }
+
+    printText(beste, res);
+
+    return true;
+}
+
+bool guessSpaces(const TFreqMap & freqMap, const std::string & enc, std::string & res, int nMainIters = 1e9, const std::vector<int> & hint = {}) {
+    TAlphabet besta = getAlphabetRandom(0, hint);
+
+    auto lena = kN;
+
+    auto cure = enc;
+    auto beste = enc;
+    translate(besta, enc, cure);
+    auto bestp = calcScoreForSpaces(freqMap, cure);
+    printf("Initial prob: %g\n", bestp);
+
+    auto bestbestp = bestp;
+
+    int nIters = 0;
+    while (nMainIters--) {
+        if (++nIters > 10000) {
+            besta = getAlphabetRandom(0, hint);
+            translate(besta, enc, cure);
+            bestp = calcScoreForSpaces(freqMap, cure);
+            printf("reset\n");
+            nIters = 0;
+        }
+
+        auto itera = besta;
+		int nswaps = kN > 26 ? 3 : 0;
+        for (int i = 0; i < nswaps; ++i) {
+            int a0 = rand()%lena + 1;
+            int a1 = rand()%lena + 1;
+            while (a0 == a1 || a0 > 26 || a1 <= 26) {
+                a0 = rand()%lena + 1;
+                a1 = rand()%lena + 1;
+            }
+
+            if (hint.size() > 0 && (hint[a0] != -1 || hint[a1] != -1)) {
+            } else {
+                std::swap(itera[a0], itera[a1]);
+            }
+        }
+
+        translate(itera, enc, cure);
+        auto iterp = calcScoreForSpaces(freqMap, cure);
+        auto cura = itera;
+        for (int i = 0; i < 100; ++i) {
+            int a0 = rand()%26 + 1;
+            int a1 = rand()%26 + 1;
+            while (a0 == a1) {
+                a0 = rand()%26 + 1;
+                a1 = rand()%26 + 1;
+            }
+
+            if (hint.size() > 0 && (hint[a0] != -1 || hint[a1] != -1)) {
+                continue;
+            }
+
+            std::swap(cura[a0], cura[a1]);
+
+            translate(cura, enc, cure);
+            auto curp = calcScoreForSpaces(freqMap, cure);
             if (curp > iterp) {
                 iterp = curp;
                 itera = cura;

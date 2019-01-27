@@ -99,7 +99,7 @@ target_link_libraries(keytap2 PRIVATE Core)
 add_executable(keytap-gui keytap-gui.cpp)
 target_link_libraries(keytap-gui PRIVATE Core ImGui)
 
-add_executable(keytap2-gui keytap2-gui.cpp)
+add_executable(keytap2-gui keytap2-gui.cpp subbreak2.cpp)
 target_link_libraries(keytap2-gui PRIVATE Core ImGui)
 
 add_executable(play play.cpp)
