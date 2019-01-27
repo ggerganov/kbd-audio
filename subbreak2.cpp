@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdlib>
 #include <fstream>
+#include <chrono>
 
 namespace Cipher {
     inline float frand() { return ((float)rand())/RAND_MAX; }
