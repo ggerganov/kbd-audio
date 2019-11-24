@@ -57,7 +57,6 @@ int main(int argc, char ** argv) {
 
     captureSpec.freq = kSampleRate;
     captureSpec.format = AUDIO_F32SYS;
-    captureSpec.channels = 1;
     captureSpec.samples = kSamplesPerFrame;
     captureSpec.callback = cbPlayback;
     captureSpec.userdata = (void *)(&fout);
@@ -66,7 +65,7 @@ int main(int argc, char ** argv) {
     SDL_zero(obtainedSpec);
 
     printf("Attempt to open capture device %d : '%s' ...\n", captureId, SDL_GetAudioDeviceName(captureId, SDL_TRUE));
-    auto deviceIdIn = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(captureId, SDL_TRUE), SDL_TRUE, &captureSpec, &obtainedSpec, 0);
+    auto deviceIdIn = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(captureId, SDL_TRUE), SDL_TRUE, &captureSpec, &obtainedSpec, SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
     if (!deviceIdIn) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for capture: %s!\n", SDL_GetError());
         SDL_Quit();

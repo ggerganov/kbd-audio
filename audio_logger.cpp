@@ -34,6 +34,7 @@ struct AudioLogger::Data {
 
     int64_t sampleRate = kMaxSampleRate;
 
+    int32_t nChannels = 0;
     int32_t nFramesToRecord = 0;
     int32_t sampleSize_bytes = 4;
 
@@ -49,10 +50,8 @@ AudioLogger::AudioLogger() : data_(new AudioLogger::Data()) {}
 
 AudioLogger::~AudioLogger() {}
 
-bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback, int captureId) {
+bool AudioLogger::install(Parameters && parameters) {
     auto & data = getData();
-
-    data.sampleRate = sampleRate;
 
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
@@ -65,17 +64,17 @@ bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback, in
         printf("    - Capture device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_TRUE));
     }
 
-    if (captureId < 0 || captureId >= nDevices) {
-        printf("Invalid capture device id selected - %d\n", captureId);
+    if (parameters.captureId < 0 || parameters.captureId >= nDevices) {
+        printf("Invalid capture device id selected - %d\n", parameters.captureId);
         return false;
     }
 
     SDL_AudioSpec captureSpec;
     SDL_zero(captureSpec);
 
-    captureSpec.freq = data.sampleRate;
+    captureSpec.freq = parameters.sampleRate;
     captureSpec.format = AUDIO_F32SYS;
-    captureSpec.channels = 1;
+    captureSpec.channels = parameters.nChannels;
     captureSpec.samples = kSamplesPerFrame;
     captureSpec.callback = ::cbAudioReady;
     captureSpec.userdata = this;
@@ -83,8 +82,8 @@ bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback, in
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    printf("Attempt to open capture device %d : '%s' ...\n", captureId, SDL_GetAudioDeviceName(captureId, SDL_TRUE));
-    data.deviceIdIn = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(captureId, SDL_TRUE), SDL_TRUE, &captureSpec, &obtainedSpec, 0);
+    printf("Attempt to open capture device %d : '%s' ...\n", parameters.captureId, SDL_GetAudioDeviceName(parameters.captureId, SDL_TRUE));
+    data.deviceIdIn = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(parameters.captureId, SDL_TRUE), SDL_TRUE, &captureSpec, &obtainedSpec, SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
     if (!data.deviceIdIn) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for capture: %s!\n", SDL_GetError());
         SDL_Quit();
@@ -113,9 +112,16 @@ bool AudioLogger::install(int64_t sampleRate, AudioLogger::Callback callback, in
     printf("    Channels:   %d\n", obtainedSpec.channels);
     printf("    Samples:    %d\n", obtainedSpec.samples);
 
+    if (obtainedSpec.channels != parameters.nChannels && parameters.nChannels != 0) {
+        printf("Warning: obtained number of channels (%d) does not match requested (%d)\n",
+               obtainedSpec.channels, parameters.nChannels);
+    }
+
     SDL_PauseAudioDevice(data.deviceIdIn, 0);
 
-    data.callback = std::move(callback);
+    data.sampleRate = parameters.sampleRate;
+    data.callback = std::move(parameters.callback);
+    data.nChannels = obtainedSpec.channels;
 
     return true;
 }
@@ -139,8 +145,16 @@ bool AudioLogger::addFrame(const Sample * stream) {
 
     std::lock_guard<std::mutex> lock(data.mutex);
 
+    const float norm = 1.0/data.nChannels;
+
     auto & curFrame = data.buffer[data.bufferId];
-    std::copy(stream, stream + kSamplesPerFrame, curFrame.data());
+    for (int i = 0; i < kSamplesPerFrame; ++i) {
+        Sample x = 0;
+        for (int j = 0; j < data.nChannels; ++j) {
+            x += stream[i*data.nChannels + j];
+        }
+        curFrame[i] = x*norm;
+    }
     if (data.nFramesToRecord > 0) {
         data.record.push_back(curFrame);
         if (--data.nFramesToRecord == 0) {

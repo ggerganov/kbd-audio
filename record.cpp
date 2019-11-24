@@ -28,6 +28,7 @@ int main(int argc, char ** argv) {
 
     auto argm = parseCmdArguments(argc, argv);
     int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
+    int nChannels = argm["C"].empty() ? 0 : std::stoi(argm["C"]);
 
     auto tStart = std::chrono::high_resolution_clock::now();
     auto tEnd = std::chrono::high_resolution_clock::now();
@@ -58,7 +59,13 @@ int main(int argc, char ** argv) {
         keyPressed = -1;
     };
 
-    if (audioLogger.install(kSampleRate, cbAudio, captureId) == false) {
+    AudioLogger::Parameters parameters;
+    parameters.sampleRate = kSampleRate;
+    parameters.callback = std::move(cbAudio);
+    parameters.captureId = captureId;
+    parameters.nChannels = nChannels;
+
+    if (audioLogger.install(std::move(parameters)) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
         return -1;
     }

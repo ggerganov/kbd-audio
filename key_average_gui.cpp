@@ -262,7 +262,11 @@ int main(int, char**) {
         keyPressed = -1;
     };
 
-    if (audioLogger.install(kSampleRate, cbAudio) == false) {
+    AudioLogger::Parameters parameters;
+    parameters.sampleRate = kSampleRate;
+    parameters.callback = std::move(cbAudio);
+
+    if (audioLogger.install(std::move(parameters)) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
         return -1;
     }

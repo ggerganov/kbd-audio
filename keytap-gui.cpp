@@ -112,6 +112,7 @@ int main(int argc, char ** argv) {
 
     auto argm = parseCmdArguments(argc, argv);
     int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
+    int nChannels = argm["C"].empty() ? 0 : std::stoi(argm["C"]);
 
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
@@ -459,7 +460,13 @@ int main(int argc, char ** argv) {
     };
 
     g_init = [&]() {
-        if (audioLogger.install(kSampleRate, cbAudio, captureId) == false) {
+        AudioLogger::Parameters parameters;
+        parameters.sampleRate = kSampleRate;
+        parameters.callback = cbAudio;
+        parameters.captureId = captureId;
+        parameters.nChannels = nChannels;
+
+        if (audioLogger.install(std::move(parameters)) == false) {
             fprintf(stderr, "Failed to install audio logger\n");
             return -1;
         }

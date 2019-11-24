@@ -19,10 +19,17 @@ class AudioLogger {
         using Record = std::vector<Frame>;
         using Callback = std::function<void(const Record & frames)>;
 
+        struct Parameters {
+            int64_t sampleRate;
+            Callback callback;
+            int captureId = 0;
+            int nChannels = 0;
+        };
+
         AudioLogger();
         ~AudioLogger();
 
-        bool install(int64_t sampleRate, Callback callback, int captureId = 0);
+        bool install(Parameters && parameters);
         bool terminate();
         bool addFrame(const Sample * stream);
         bool record(float bufferSize_s);
