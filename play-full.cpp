@@ -34,7 +34,7 @@ int main(int argc, char ** argv) {
     }
 
     auto argm = parseCmdArguments(argc, argv);
-    int captureId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
+    int playbackId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
 
     std::ifstream fin(argv[1], std::ios::binary);
     if (fin.good() == false) {
@@ -66,8 +66,8 @@ int main(int argc, char ** argv) {
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    printf("Attempt to open playback device %d : '%s' ...\n", captureId, SDL_GetAudioDeviceName(captureId, SDL_FALSE));
-    auto deviceIdOut = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(captureId, SDL_FALSE), SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
+    printf("Attempt to open playback device %d : '%s' ...\n", playbackId, SDL_GetAudioDeviceName(playbackId, SDL_FALSE));
+    auto deviceIdOut = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(playbackId, SDL_FALSE), SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
     if (!deviceIdOut) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for playback: %s!\n", SDL_GetError());
         SDL_Quit();
