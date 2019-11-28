@@ -70,7 +70,7 @@ struct stWaveformView;
 using TParameters           = stParameters;
 
 using TSampleInput          = float;
-using TSample               = int32_t;
+using TSample               = int16_t;
 using TWaveform             = std::vector<TSample>;
 using TWaveformView         = stWaveformView;
 
@@ -119,17 +119,14 @@ bool readFromFile(const std::string & fname, TWaveform & res) {
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
             for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
-            //double asum = 0.0f;
-            //for (auto i = 0; i < buf.size(); ++i) asum += std::abs(buf[i]); asum /= buf.size(); asum *= 10.0;
-            //for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(2000.0*(buf[i]/asum));
+            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
         } else if (std::is_same<TSample, int32_t>::value) {
             std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
             res.resize(size/sizeof(TSampleInput));
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
             for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
+            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
         } else if (std::is_same<TSample, float>::value) {
             res.resize(size/sizeof(TSample));
             fin.read((char *)(res.data()), size);
@@ -217,8 +214,8 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
 
         static int nview = waveform.size();
         static int offset = (waveform.size() - nview)/2;
-        static float amin = -16000;
-        static float amax = 16000;
+        static float amin = std::numeric_limits<TSample>::min()/2;
+        static float amax = std::numeric_limits<TSample>::max()/2;
         static float dragOffset = 0.0f;
         static float scrollSize = 18.0f;
 
@@ -265,8 +262,8 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
         if (ImGui::BeginPopupContextWindow()) {
             ImGui::SliderInt("View  ", &nview, viewMin, viewMax);
             ImGui::DragInt  ("Offset", &offset, 0.01*nview, 0, waveform.size() - nview);
-            ImGui::SliderFloat("Amplitude Min", &amin, -32000, 0);
-            ImGui::SliderFloat("Amplitude Max", &amax, 0, 32000);
+            ImGui::SliderFloat("Amplitude Min", &amin, std::numeric_limits<TSample>::min(), 0);
+            ImGui::SliderFloat("Amplitude Max", &amax, 0, std::numeric_limits<TSample>::max());
             ImGui::EndPopup();
         }
 
@@ -349,7 +346,7 @@ void cbPlayback(void * userData, uint8_t * stream, int len) {
     PlaybackData * data = (PlaybackData *)(userData);
     if (data->playing == false) {
         int offset = 0;
-        int16_t a = 0;
+        TSample a = 0;
         while (len > 0) {
             memcpy(stream + offset*sizeof(a), &a, sizeof(a));
             len -= sizeof(a);
@@ -361,21 +358,21 @@ void cbPlayback(void * userData, uint8_t * stream, int len) {
     auto idx = data->idx;
     auto sidx = 0;
     for (; idx < end; ++idx) {
-        int16_t a = data->waveform.samples[idx];
+        TSample a = data->waveform.samples[idx];
         memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
         len -= sizeof(a);
         ++sidx;
 
         if (data->slowDown == 2) {
-            int16_t a2 = data->waveform.samples[idx + 1];
-            a = 0.5*(a + a2);
+            TSample a2 = data->waveform.samples[idx + 1];
+            a = 0.5*a + 0.5*a2;
             memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
             len -= sizeof(a);
             ++sidx;
         }
     }
     while (len > 0) {
-        int16_t a = 0;
+        TSample a = 0;
         memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
         len -= sizeof(a);
         ++idx;
@@ -399,7 +396,7 @@ bool prepareAudioOut(const TParameters & params) {
     SDL_zero(playbackSpec);
 
     playbackSpec.freq = params.sampleRate;
-    playbackSpec.format = AUDIO_S16;
+    playbackSpec.format = std::is_same<TSample, int16_t>::value ? AUDIO_S16 : AUDIO_S32;
     playbackSpec.channels = 1;
     playbackSpec.samples = PlaybackData::kSamples;
     playbackSpec.callback = cbPlayback;

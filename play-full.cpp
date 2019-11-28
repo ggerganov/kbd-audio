@@ -58,6 +58,7 @@ int main(int argc, char ** argv) {
 
     playbackSpec.freq = kSampleRate;
     playbackSpec.format = AUDIO_F32SYS;
+    playbackSpec.channels = 1;
     playbackSpec.samples = kSamplesPerFrame;
     playbackSpec.callback = cbPlayback;
     playbackSpec.userdata = (void *)(&fin);

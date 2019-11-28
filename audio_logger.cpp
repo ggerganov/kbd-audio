@@ -179,14 +179,12 @@ bool AudioLogger::record(float bufferSize_s) {
     std::lock_guard<std::mutex> lock(data.mutex);
 
     if (data.record.size() == 0) {
-        int fStart = data.bufferId - 2 + 1;
+        int fStart = data.bufferId - 1;
         if (fStart < 0) fStart += data.buffer.size();
-        for (size_t i = 0; i < 2 - 1; ++i) {
-            data.record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
-        }
+        data.record.push_back(data.buffer[fStart]);
     }
 
-    data.nFramesToRecord = 2*bufferSize_frames - 2;
+    data.nFramesToRecord = bufferSize_frames - 1;
 
     return true;
 }
@@ -201,14 +199,14 @@ bool AudioLogger::recordSym(float bufferSize_s) {
     std::lock_guard<std::mutex> lock(data.mutex);
 
     if (data.record.size() == 0) {
-        int fStart = data.bufferId - bufferSize_frames + 1;
+        int fStart = data.bufferId - bufferSize_frames/2;
         if (fStart < 0) fStart += data.buffer.size();
-        for (size_t i = 0; i < bufferSize_frames - 1; ++i) {
+        for (size_t i = 0; i < bufferSize_frames/2; ++i) {
             data.record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
         }
     }
 
-    data.nFramesToRecord = 2*bufferSize_frames - 2;
+    data.nFramesToRecord = bufferSize_frames/2 + 1;
 
     return true;
 }

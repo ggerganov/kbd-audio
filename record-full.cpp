@@ -58,6 +58,7 @@ int main(int argc, char ** argv) {
     captureSpec.freq = kSampleRate;
     captureSpec.format = AUDIO_F32SYS;
     captureSpec.samples = kSamplesPerFrame;
+    captureSpec.channels = 1;
     captureSpec.callback = cbPlayback;
     captureSpec.userdata = (void *)(&fout);
 

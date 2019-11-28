@@ -20,6 +20,7 @@
 int main(int argc, char ** argv) {
     printf("Usage: %s output.kbd [-cN]\n", argv[0]);
     printf("    -cN - select capture device N\n");
+    printf("    -CN - number N of capture channels N\n");
     printf("\n");
 
     if (argc < 2) {
