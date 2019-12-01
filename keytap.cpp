@@ -623,7 +623,7 @@ int main(int argc, char ** argv) {
 
         if (doRecord) {
             doRecord = false;
-            audioLogger.recordSym(0.50f);
+            audioLogger.recordSym(kPredictBufferSize_s);
         }
     };
 

@@ -25,7 +25,11 @@ struct AudioLogger::Data {
             frame.fill(0);
         }
 
-        record.clear();
+        for (auto & record : records) {
+            record.clear();
+        }
+
+        nFramesToRecord.fill(0);
     }
 
     SDL_AudioDeviceID deviceIdIn = 0;
@@ -36,13 +40,14 @@ struct AudioLogger::Data {
     int64_t sampleRate = kMaxSampleRate;
 
     int32_t nChannels = 0;
-    int32_t nFramesToRecord = 0;
     int32_t sampleSize_bytes = 4;
 
     int32_t bufferId = 0;
     std::array<Frame, getBufferSize_frames(kMaxSampleRate, kMaxBufferSize_s)> buffer;
 
-    Record record;
+    int32_t nRecords = 0;
+    std::array<int32_t, kMaxRecords>  nFramesToRecord;
+    std::array<Record, kMaxRecords> records;
 
     std::mutex mutex;
     std::atomic_bool isReady;
@@ -148,11 +153,10 @@ bool AudioLogger::addFrame(const Sample * stream) {
 		SDL_ClearQueuedAudio(data.deviceIdIn);
 	}
 
-    std::lock_guard<std::mutex> lock(data.mutex);
-
     const float norm = 1.0/data.nChannels;
 
     auto & curFrame = data.buffer[data.bufferId];
+
     for (int i = 0; i < kSamplesPerFrame; ++i) {
         Sample x = 0;
         for (int j = 0; j < data.nChannels; ++j) {
@@ -160,13 +164,29 @@ bool AudioLogger::addFrame(const Sample * stream) {
         }
         curFrame[i] = x*norm;
     }
-    if (data.nFramesToRecord > 0) {
-        data.record.push_back(curFrame);
-        if (--data.nFramesToRecord == 0) {
-            if (data.callback) data.callback(data.record);
-            data.record.clear();
+
+    std::lock_guard<std::mutex> lock(data.mutex);
+
+    for (int r = 0; r < data.nRecords; ++r) {
+        auto & record = data.records[r];
+        auto & nFramesToRecord = data.nFramesToRecord[r];
+
+        if (nFramesToRecord > 0) {
+            record.push_back(curFrame);
+            if (--nFramesToRecord == 0) {
+                if (data.callback) data.callback(record);
+                record.clear();
+
+                for (int k = r + 1; k < data.nRecords; ++k) {
+                    data.records[k - 1] = std::move(data.records[k]);
+                    data.nFramesToRecord[k - 1] = data.nFramesToRecord[k];
+                }
+                --data.nRecords;
+                --r;
+            }
         }
     }
+
     if (++data.bufferId >= (int) data.buffer.size()) {
         data.bufferId = 0;
     }
@@ -177,22 +197,36 @@ bool AudioLogger::addFrame(const Sample * stream) {
 bool AudioLogger::record(float bufferSize_s) {
     auto & data = getData();
 
-    if (bufferSize_s > kMaxBufferSize_s) return false;
+    if (bufferSize_s > kMaxBufferSize_s) {
+        fprintf(stderr, "warning :invalid record size requested - %g s. max allowedis %g s\n", bufferSize_s, kMaxBufferSize_s);
+        return false;
+    }
 
     auto bufferSize_frames = getBufferSize_frames(data.sampleRate, bufferSize_s);
 
     std::lock_guard<std::mutex> lock(data.mutex);
 
+    if (data.nRecords == kMaxRecords) {
+        fprintf(stderr, "warning : max number of simultaneous records %d reached\n", kMaxRecords);
+        return false;
+    }
+
+    auto & record = data.records[data.nRecords];
+
     int nPrev = 3;
-    if (data.record.size() == 0) {
+    if (record.size() == 0) {
         int fStart = data.bufferId - nPrev;
         if (fStart < 0) fStart += data.buffer.size();
         for (size_t i = 0; i < nPrev; ++i) {
-            data.record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
+            record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
         }
+    } else {
+        fprintf(stderr, "warning : new record requested before last has been processed. should never happen\n");
     }
 
-    data.nFramesToRecord = bufferSize_frames - nPrev;
+    data.nFramesToRecord[data.nRecords] = bufferSize_frames - nPrev;
+
+    ++data.nRecords;
 
     return true;
 }
@@ -200,21 +234,35 @@ bool AudioLogger::record(float bufferSize_s) {
 bool AudioLogger::recordSym(float bufferSize_s) {
     auto & data = getData();
 
-    if (bufferSize_s > kMaxBufferSize_s) return false;
+    if (bufferSize_s > kMaxBufferSize_s) {
+        fprintf(stderr, "warning :invalid record size requested - %g s. max allowedis %g s\n", bufferSize_s, kMaxBufferSize_s);
+        return false;
+    }
 
     auto bufferSize_frames = getBufferSize_frames(data.sampleRate, bufferSize_s);
 
+    if (data.nRecords == kMaxRecords) {
+        fprintf(stderr, "warning : max number of simultaneous records %d reached\n", kMaxRecords);
+        return false;
+    }
+
     std::lock_guard<std::mutex> lock(data.mutex);
 
-    if (data.record.size() == 0) {
+    auto & record = data.records[data.nRecords];
+
+    if (record.size() == 0) {
         int fStart = data.bufferId - bufferSize_frames/2;
         if (fStart < 0) fStart += data.buffer.size();
         for (size_t i = 0; i < bufferSize_frames/2; ++i) {
-            data.record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
+            record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
         }
+    } else {
+        fprintf(stderr, "warning : new record requested before last has been processed. should never happen\n");
     }
 
-    data.nFramesToRecord = bufferSize_frames/2 + 1;
+    data.nFramesToRecord[data.nRecords] = bufferSize_frames/2 + 1;
+
+    ++data.nRecords;
 
     return true;
 }

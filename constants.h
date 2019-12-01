@@ -11,6 +11,7 @@
 static constexpr int64_t kSamplesPerFrame = 512;
 static constexpr int64_t kMaxSampleRate = 96000;
 static constexpr float   kMaxBufferSize_s = 1.000f;
+static constexpr int32_t kMaxRecords = 16;
 
 static constexpr int32_t ceil_const(float num) {
     return (static_cast<float>(static_cast<int32_t>(num)) == num)
@@ -24,7 +25,7 @@ static constexpr int32_t getBufferSize_frames(int64_t sampleRate, float bufferSi
 }
 
 static constexpr int64_t kSampleRate = 16000;
-static constexpr float kTrainBufferSize_s = 0.120;
+static constexpr float kTrainBufferSize_s = 0.300;
 static constexpr float kPredictBufferSize_s = 2.1*kTrainBufferSize_s;
 static constexpr int32_t kTrainBufferSize_frames = getBufferSize_frames(kSampleRate, kTrainBufferSize_s);
 static constexpr int32_t kPredictBufferSize_frames = getBufferSize_frames(kSampleRate, kPredictBufferSize_s);

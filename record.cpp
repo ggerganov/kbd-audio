@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <chrono>
 #include <thread>
+#include <deque>
 #include <fstream>
 
 int main(int argc, char ** argv) {
@@ -35,7 +36,7 @@ int main(int argc, char ** argv) {
     auto tEnd = std::chrono::high_resolution_clock::now();
 
     size_t totalSize_bytes = 0;
-    int keyPressed = -1;
+    std::deque<int> keyPressedQueue;
     std::map<int, int> nTimes;
     printf("Recording %d frames per key press\n", kTrainBufferSize_frames);
 
@@ -45,6 +46,9 @@ int main(int argc, char ** argv) {
     AudioLogger audioLogger;
     AudioLogger::Callback cbAudio = [&](const auto & frames) {
         tEnd = std::chrono::high_resolution_clock::now();
+
+        int keyPressed = keyPressedQueue.front();
+        keyPressedQueue.pop_front();
 
         fout.write((char *)(&keyPressed), sizeof(keyPressed));
         for (const auto & frame : frames) {
@@ -80,9 +84,9 @@ int main(int argc, char ** argv) {
         while (true) {
             int key = getchar();
             tStart = std::chrono::high_resolution_clock::now();
-            if (keyPressed == -1) {
-                keyPressed = key;
-                audioLogger.record(kTrainBufferSize_s);
+            keyPressedQueue.push_back(key);
+            if (audioLogger.record(kTrainBufferSize_s) == false) {
+                fprintf(stderr, "error : failed to record\n");
             }
         }
         tcsetattr ( STDIN_FILENO, TCSANOW, &oldt );
