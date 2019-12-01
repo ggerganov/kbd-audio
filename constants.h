@@ -20,18 +20,18 @@ static constexpr int32_t ceil_const(float num) {
 
 // odd number of frames longer than bufferSize_s
 static constexpr int32_t getBufferSize_frames(int64_t sampleRate, float bufferSize_s) {
-    return ceil_const(float(bufferSize_s*sampleRate)/kSamplesPerFrame)/2 + 1;
+    return 2*(ceil_const(float(bufferSize_s*sampleRate)/kSamplesPerFrame)/2) + 1;
 }
 
-static constexpr int64_t kSampleRate = 24000;
-static constexpr float kTrainBufferSize_s = 0.175f;
-static constexpr float kPredictBufferSize_s = 0.200f;
+static constexpr int64_t kSampleRate = 16000;
+static constexpr float kTrainBufferSize_s = 0.120;
+static constexpr float kPredictBufferSize_s = 2.1*kTrainBufferSize_s;
 static constexpr int32_t kTrainBufferSize_frames = getBufferSize_frames(kSampleRate, kTrainBufferSize_s);
 static constexpr int32_t kPredictBufferSize_frames = getBufferSize_frames(kSampleRate, kPredictBufferSize_s);
 static constexpr int64_t kSamplesPerWaveform = kSamplesPerFrame*kTrainBufferSize_frames;
 
 static constexpr uint64_t kBkgrRingBufferSize = 4*1024;
-static constexpr int64_t kBkgrStep_samples = 1;
+static constexpr int64_t kBkgrStep_samples = 16;
 static constexpr int64_t kKeyDuration_samples = 0.005f*kSampleRate;
 
 static const std::array<int32_t, 256> kCharToInt = {

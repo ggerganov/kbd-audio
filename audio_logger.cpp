@@ -9,6 +9,7 @@
 #include <SDL_audio.h>
 
 #include <mutex>
+#include <atomic>
 #include <algorithm>
 
 namespace {
@@ -19,7 +20,7 @@ namespace {
 }
 
 struct AudioLogger::Data {
-    Data() {
+    Data() : isReady(false) {
         for (auto & frame : buffer) {
             frame.fill(0);
         }
@@ -44,6 +45,7 @@ struct AudioLogger::Data {
     Record record;
 
     std::mutex mutex;
+    std::atomic_bool isReady;
 };
 
 AudioLogger::AudioLogger() : data_(new AudioLogger::Data()) {}
@@ -122,6 +124,7 @@ bool AudioLogger::install(Parameters && parameters) {
     data.sampleRate = parameters.sampleRate;
     data.callback = std::move(parameters.callback);
     data.nChannels = obtainedSpec.channels;
+    data.isReady = true;
 
     return true;
 }
@@ -137,6 +140,8 @@ bool AudioLogger::terminate() {
 
 bool AudioLogger::addFrame(const Sample * stream) {
     auto & data = getData();
+
+    if (data.isReady == false) return false;
 
 	if ((int) SDL_GetQueuedAudioSize(data.deviceIdIn) > 32*sizeof(float)*kSamplesPerFrame) {
 		printf("Queue size: %d\n", SDL_GetQueuedAudioSize(data.deviceIdIn));
@@ -178,13 +183,16 @@ bool AudioLogger::record(float bufferSize_s) {
 
     std::lock_guard<std::mutex> lock(data.mutex);
 
+    int nPrev = 3;
     if (data.record.size() == 0) {
-        int fStart = data.bufferId - 1;
+        int fStart = data.bufferId - nPrev;
         if (fStart < 0) fStart += data.buffer.size();
-        data.record.push_back(data.buffer[fStart]);
+        for (size_t i = 0; i < nPrev; ++i) {
+            data.record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
+        }
     }
 
-    data.nFramesToRecord = bufferSize_frames - 1;
+    data.nFramesToRecord = bufferSize_frames - nPrev;
 
     return true;
 }

@@ -8,6 +8,7 @@
 #define IMGUI_IMPL_OPENGL_LOADER_GLEW
 #endif
 
+#include "common.h"
 #include "constants.h"
 
 #include "imgui.h"
@@ -75,6 +76,7 @@ using TWaveform             = std::vector<TSample>;
 using TWaveformView         = stWaveformView;
 
 struct stParameters {
+    int playbackId              = 0;
     int keyPressWidth_samples   = 256;
     int sampleRate              = kSampleRate;
     int offsetFromPeak          = keyPressWidth_samples/2;
@@ -392,6 +394,11 @@ bool prepareAudioOut(const TParameters & params) {
         printf("    - Playback device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_FALSE));
     }
 
+    if (params.playbackId < 0 || params.playbackId >= nDevices) {
+        printf("Invalid playback device id selected - %d\n", params.playbackId);
+        return false;
+    }
+
     SDL_AudioSpec playbackSpec;
     SDL_zero(playbackSpec);
 
@@ -405,7 +412,7 @@ bool prepareAudioOut(const TParameters & params) {
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    g_deviceIdOut = SDL_OpenAudioDevice(NULL, SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
+    g_deviceIdOut = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(params.playbackId, SDL_FALSE), SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
     if (!g_deviceIdOut) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for playback: %s!\n", SDL_GetError());
         SDL_Quit();
@@ -424,12 +431,17 @@ bool prepareAudioOut(const TParameters & params) {
 }
 
 int main(int argc, char ** argv) {
-    srand(time(0));
+    printf("Usage: %s input.kbd [-pN]\n", argv[0]);
+    printf("    -pN - select playback device N\n");
+    printf("\n");
 
     printf("Usage: %s record.kbd\n", argv[0]);
     if (argc < 2) {
         return -1;
     }
+
+    auto argm = parseCmdArguments(argc, argv);
+    int playbackId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
 
     TParameters params;
     TWaveform waveformInput;
@@ -438,6 +450,8 @@ int main(int argc, char ** argv) {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
+
+    params.playbackId = playbackId;
 
     g_doInit = [&]() {
         return prepareAudioOut(params);

@@ -280,7 +280,7 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
         offset = std::max(0, std::min((int) offset, (int) waveform.size() - nview));
 
         for (int i = 0; i < (int) trainKeys.size(); ++i) {
-            int pos = i*kSamplesPerFrame*5 + 2.5*kSamplesPerFrame;
+            int pos = i*kSamplesPerFrame*kTrainBufferSize_frames + 0.5*kTrainBufferSize_frames*kSamplesPerFrame;
             if (pos + params.offsetFromPeak + params.keyPressWidth_samples < offset) continue;
             if (pos + params.offsetFromPeak - params.keyPressWidth_samples >= offset + nview) break;
 
