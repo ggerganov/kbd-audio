@@ -1,4 +1,6 @@
-# kbd-audio [![Actions Status](https://github.com/ggerganov/kbd-audio/workflows/CI/badge.svg)](https://github.com/ggerganov/kbd-audio/actions)
+kbd-audio
+=====
+[![Actions Status](https://github.com/ggerganov/kbd-audio/workflows/CI/badge.svg)](https://github.com/ggerganov/kbd-audio/actions)
 
 This is a collection of command-line and GUI tools for capturing and analyzing audio data.
 
