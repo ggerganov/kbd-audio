@@ -64,6 +64,7 @@ extern "C" {
 int main(int argc, char ** argv) {
     printf("Usage: %s input.kbd [input2.kbd ...] [-cN] [-pF] [-tF]\n", argv[0]);
     printf("    -cN - select capture device N\n");
+    printf("    -CN - select number N of capture channels to use\n");
     printf("    -pF - prediction threshold: CC > F\n");
     printf("    -tF - background threshold: ampl > F*avg_background\n");
     printf("\n");
@@ -74,6 +75,7 @@ int main(int argc, char ** argv) {
 
     auto argm = parseCmdArguments(argc, argv);
     int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
+    int nChannels = argm["C"].empty() ? 0 : std::stoi(argm["C"]);
 
     std::map<int, std::ifstream> fins;
     for (int i = 0; i < argc - 1; ++i) {
@@ -312,7 +314,13 @@ int main(int argc, char ** argv) {
     };
 
     g_init = [&]() {
-        if (audioLogger.install(kSampleRate, cbAudio, captureId) == false) {
+        AudioLogger::Parameters parameters;
+        parameters.sampleRate = kSampleRate;
+        parameters.callback = std::move(cbAudio);
+        parameters.captureId = captureId;
+        parameters.nChannels = nChannels;
+
+        if (audioLogger.install(std::move(parameters)) == false) {
             fprintf(stderr, "Failed to install audio logger\n");
             return -1;
         }
@@ -615,7 +623,7 @@ int main(int argc, char ** argv) {
 
         if (doRecord) {
             doRecord = false;
-            audioLogger.recordSym(0.50f);
+            audioLogger.recordSym(kPredictBufferSize_s);
         }
     };
 

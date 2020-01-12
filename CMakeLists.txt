@@ -1,10 +1,33 @@
 cmake_minimum_required (VERSION 2.8)
 project (KBD-Audio)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS "on")
+
+# options
+
 option(BUILD_EXPERIMENTAL "Build experimental tools" OFF)
 option(USE_FINDSDL2 "Use the FindSDL2.cmake script" OFF)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS "on")
+option(KBD_AUDIO_SANITIZE_THREAD         "kbd-audio: enable thread sanitizer" OFF)
+option(KBD_AUDIO_SANITIZE_ADDRESS        "kbd-audio: enable address sanitizer" OFF)
+option(KBD_AUDIO_SANITIZE_UNDEFINED      "kbd-audio: enable undefined sanitizer" OFF)
+
+# sanitizers
+
+if (KBD_AUDIO_SANITIZE_THREAD)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread")
+endif()
+
+if (KBD_AUDIO_SANITIZE_ADDRESS)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+endif()
+
+if (KBD_AUDIO_SANITIZE_UNDEFINED)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined")
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 if (USE_FINDSDL2)

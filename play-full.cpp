@@ -67,7 +67,7 @@ int main(int argc, char ** argv) {
     SDL_zero(obtainedSpec);
 
     printf("Attempt to open playback device %d : '%s' ...\n", playbackId, SDL_GetAudioDeviceName(playbackId, SDL_FALSE));
-    auto deviceIdOut = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(playbackId, SDL_FALSE), SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
+    auto deviceIdOut = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(playbackId, SDL_FALSE), SDL_FALSE, &playbackSpec, &obtainedSpec, SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
     if (!deviceIdOut) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for playback: %s!\n", SDL_GetError());
         SDL_Quit();

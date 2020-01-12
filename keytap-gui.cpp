@@ -112,14 +112,15 @@ int main(int argc, char ** argv) {
 
     auto argm = parseCmdArguments(argc, argv);
     int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
+    int nChannels = argm["C"].empty() ? 0 : std::stoi(argm["C"]);
 
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
 
-    int windowSizeX = 600;
-    int windowSizeY = 600;
+    int windowSizeX = 800;
+    int windowSizeY = 900;
 
 #if __APPLE__
     // GL 3.2 Core + GLSL 150
@@ -292,12 +293,12 @@ int main(int argc, char ** argv) {
                 const auto & positionsToPredict = workData.positionsToPredict;
 
                 //int alignWindow = kSamplesPerFrame/2;
-                int alignWindow = 64;
+                int alignWindow = 0.10*kSamplesPerWaveform;
 
                 for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
                     auto curPos = positionsToPredict[ipos];
-                    int scmp0 = curPos - kSamplesPerFrame;
-                    int scmp1 = curPos + kSamplesPerFrame;
+                    int scmp0 = curPos - 0.25*kSamplesPerWaveform;
+                    int scmp1 = curPos + 0.25*kSamplesPerWaveform;
 
                     char res = -1;
                     TValueCC maxcc = -1.0f;
@@ -332,6 +333,7 @@ int main(int argc, char ** argv) {
                                 }
                             }
                             if (++predictedHistoryBegin >= predictedHistory.size()) predictedHistoryBegin = 0;
+                            std::fill(predictedAmpl.begin(), predictedAmpl.end(), 0);
                             for (int i = 0; i < kSamplesPerWaveform; ++i) {
                                 int idx = curPos + offs - kSamplesPerWaveform/2 + i;
                                 if (idx < 0 || idx >= (int) ampl.size()) continue;
@@ -418,7 +420,7 @@ int main(int argc, char ** argv) {
                         que.push_back(i);
 
                         int itest = i - k/2;
-                        if (itest >= 2*kSamplesPerFrame && itest < (nFrames - 2)*kSamplesPerFrame && que.front() == itest) {
+                        if (itest >= 0.25*kSamplesPerWaveform && (itest < kPredictBufferSize_frames*kSamplesPerFrame/2 + 0.25*kSamplesPerWaveform) && que.front() == itest) {
                             auto acur = _acc(frames, itest);
                             if (acur > thresholdBackground*rbAverage){
                                 positionsToPredict.push_back(itest);
@@ -459,7 +461,13 @@ int main(int argc, char ** argv) {
     };
 
     g_init = [&]() {
-        if (audioLogger.install(kSampleRate, cbAudio, captureId) == false) {
+        AudioLogger::Parameters parameters;
+        parameters.sampleRate = kSampleRate;
+        parameters.callback = cbAudio;
+        parameters.captureId = captureId;
+        parameters.nChannels = nChannels;
+
+        if (audioLogger.install(std::move(parameters)) == false) {
             fprintf(stderr, "Failed to install audio logger\n");
             return -1;
         }
@@ -640,7 +648,7 @@ int main(int argc, char ** argv) {
                     waveform = std::move(newWaveform);
                 }
 
-                int alignWindow = 64;
+                int alignWindow = 0.025*kSamplesPerWaveform;
                 printf("    - Calculating CC pairs\n");
                 printf("      Align window = %d\n", alignWindow);
 
@@ -653,8 +661,8 @@ int main(int argc, char ** argv) {
                 for (int alignToWaveform = 0; alignToWaveform < nWaveforms; ++alignToWaveform) {
                     ccs[alignToWaveform][alignToWaveform] = std::tuple<TValueCC, TOffset>(1.0f, 0);
 
-                    int is0 = centerSample - kSamplesPerFrame;
-                    int is1 = centerSample + kSamplesPerFrame;
+                    int is0 = centerSample - 0.25*kSamplesPerWaveform;
+                    int is1 = centerSample + 0.25*kSamplesPerWaveform;
 
                     const auto & waveform0 = history[alignToWaveform];
 
@@ -677,7 +685,7 @@ int main(int argc, char ** argv) {
                         auto cc     = std::get<0>(ccs[iwaveform][alignToWaveform]);
                         auto offset = std::get<1>(ccs[iwaveform][alignToWaveform]);
 
-                        if (std::abs(offset) > 50) continue;
+                        if (std::abs(offset) > 0.1*kSamplesPerWaveform) continue;
                         ++curntrain;
                         curccsum += cc*cc;
                         curosum += offset*offset;

@@ -4,6 +4,7 @@
  */
 
 #include "constants.h"
+#include "common.h"
 #include "audio_logger.h"
 
 #include "fftw3.h"
@@ -22,11 +23,20 @@
 #include <cstdlib>
 #include <chrono>
 
-int main(int, char**) {
+int main(int argc, char ** argv) {
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
+
+    auto argm = parseCmdArguments(argc, argv);
+    int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
+    int nChannels = argm["C"].empty() ? 0 : std::stoi(argm["C"]);
+
+    printf("Usage: %s output.kbd [-cN]\n", argv[0]);
+    printf("    -cN - select capture device N\n");
+    printf("    -CN - number N of capture channels N\n");
+    printf("\n");
 
     int windowSizeX = 1280;
     int windowSizeY = 800;
@@ -262,7 +272,13 @@ int main(int, char**) {
         keyPressed = -1;
     };
 
-    if (audioLogger.install(kSampleRate, cbAudio) == false) {
+    AudioLogger::Parameters parameters;
+    parameters.sampleRate = kSampleRate;
+    parameters.callback = std::move(cbAudio);
+    parameters.captureId = captureId;
+    parameters.nChannels = nChannels;
+
+    if (audioLogger.install(std::move(parameters)) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
         return -1;
     }

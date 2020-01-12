@@ -8,6 +8,7 @@
 #define IMGUI_IMPL_OPENGL_LOADER_GLEW
 #endif
 
+#include "common.h"
 #include "constants.h"
 
 #include "imgui.h"
@@ -70,11 +71,12 @@ struct stWaveformView;
 using TParameters           = stParameters;
 
 using TSampleInput          = float;
-using TSample               = int32_t;
+using TSample               = int16_t;
 using TWaveform             = std::vector<TSample>;
 using TWaveformView         = stWaveformView;
 
 struct stParameters {
+    int playbackId              = 0;
     int keyPressWidth_samples   = 256;
     int sampleRate              = kSampleRate;
     int offsetFromPeak          = keyPressWidth_samples/2;
@@ -119,17 +121,14 @@ bool readFromFile(const std::string & fname, TWaveform & res) {
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
             for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
-            //double asum = 0.0f;
-            //for (auto i = 0; i < buf.size(); ++i) asum += std::abs(buf[i]); asum /= buf.size(); asum *= 10.0;
-            //for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(2000.0*(buf[i]/asum));
+            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
         } else if (std::is_same<TSample, int32_t>::value) {
             std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
             res.resize(size/sizeof(TSampleInput));
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
             for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
+            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
         } else if (std::is_same<TSample, float>::value) {
             res.resize(size/sizeof(TSample));
             fin.read((char *)(res.data()), size);
@@ -217,8 +216,8 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
 
         static int nview = waveform.size();
         static int offset = (waveform.size() - nview)/2;
-        static float amin = -16000;
-        static float amax = 16000;
+        static float amin = std::numeric_limits<TSample>::min()/2;
+        static float amax = std::numeric_limits<TSample>::max()/2;
         static float dragOffset = 0.0f;
         static float scrollSize = 18.0f;
 
@@ -265,8 +264,8 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
         if (ImGui::BeginPopupContextWindow()) {
             ImGui::SliderInt("View  ", &nview, viewMin, viewMax);
             ImGui::DragInt  ("Offset", &offset, 0.01*nview, 0, waveform.size() - nview);
-            ImGui::SliderFloat("Amplitude Min", &amin, -32000, 0);
-            ImGui::SliderFloat("Amplitude Max", &amax, 0, 32000);
+            ImGui::SliderFloat("Amplitude Min", &amin, std::numeric_limits<TSample>::min(), 0);
+            ImGui::SliderFloat("Amplitude Max", &amax, 0, std::numeric_limits<TSample>::max());
             ImGui::EndPopup();
         }
 
@@ -349,7 +348,7 @@ void cbPlayback(void * userData, uint8_t * stream, int len) {
     PlaybackData * data = (PlaybackData *)(userData);
     if (data->playing == false) {
         int offset = 0;
-        int16_t a = 0;
+        TSample a = 0;
         while (len > 0) {
             memcpy(stream + offset*sizeof(a), &a, sizeof(a));
             len -= sizeof(a);
@@ -361,21 +360,21 @@ void cbPlayback(void * userData, uint8_t * stream, int len) {
     auto idx = data->idx;
     auto sidx = 0;
     for (; idx < end; ++idx) {
-        int16_t a = data->waveform.samples[idx];
+        TSample a = data->waveform.samples[idx];
         memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
         len -= sizeof(a);
         ++sidx;
 
         if (data->slowDown == 2) {
-            int16_t a2 = data->waveform.samples[idx + 1];
-            a = 0.5*(a + a2);
+            TSample a2 = data->waveform.samples[idx + 1];
+            a = 0.5*a + 0.5*a2;
             memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
             len -= sizeof(a);
             ++sidx;
         }
     }
     while (len > 0) {
-        int16_t a = 0;
+        TSample a = 0;
         memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
         len -= sizeof(a);
         ++idx;
@@ -395,11 +394,16 @@ bool prepareAudioOut(const TParameters & params) {
         printf("    - Playback device #%d: '%s'\n", i, SDL_GetAudioDeviceName(i, SDL_FALSE));
     }
 
+    if (params.playbackId < 0 || params.playbackId >= nDevices) {
+        printf("Invalid playback device id selected - %d\n", params.playbackId);
+        return false;
+    }
+
     SDL_AudioSpec playbackSpec;
     SDL_zero(playbackSpec);
 
     playbackSpec.freq = params.sampleRate;
-    playbackSpec.format = AUDIO_S16;
+    playbackSpec.format = std::is_same<TSample, int16_t>::value ? AUDIO_S16 : AUDIO_S32;
     playbackSpec.channels = 1;
     playbackSpec.samples = PlaybackData::kSamples;
     playbackSpec.callback = cbPlayback;
@@ -408,7 +412,7 @@ bool prepareAudioOut(const TParameters & params) {
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    g_deviceIdOut = SDL_OpenAudioDevice(NULL, SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
+    g_deviceIdOut = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(params.playbackId, SDL_FALSE), SDL_FALSE, &playbackSpec, &obtainedSpec, 0);
     if (!g_deviceIdOut) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't open an audio device for playback: %s!\n", SDL_GetError());
         SDL_Quit();
@@ -427,12 +431,17 @@ bool prepareAudioOut(const TParameters & params) {
 }
 
 int main(int argc, char ** argv) {
-    srand(time(0));
+    printf("Usage: %s input.kbd [-pN]\n", argv[0]);
+    printf("    -pN - select playback device N\n");
+    printf("\n");
 
     printf("Usage: %s record.kbd\n", argv[0]);
     if (argc < 2) {
         return -1;
     }
+
+    auto argm = parseCmdArguments(argc, argv);
+    int playbackId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
 
     TParameters params;
     TWaveform waveformInput;
@@ -441,6 +450,8 @@ int main(int argc, char ** argv) {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
+
+    params.playbackId = playbackId;
 
     g_doInit = [&]() {
         return prepareAudioOut(params);
