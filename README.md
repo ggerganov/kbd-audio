@@ -1,6 +1,4 @@
-# kbd-audio [![Build Status](https://travis-ci.org/ggerganov/kbd-audio.svg?branch=master)](https://travis-ci.org/ggerganov/kbd-audio?branch=master)
-
-## Description
+# kbd-audio [![Actions Status](https://github.com/ggerganov/kbd-audio/workflows/CI/badge.svg)](https://github.com/ggerganov/kbd-audio/actions)
 
 This is a collection of command-line and GUI tools for capturing and analyzing audio data.
 
