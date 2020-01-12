@@ -2,7 +2,7 @@ language: c++
 
 cache: apt
 
-dist: xenial
+dist: trusty
 
 sudo: required
 
@@ -20,7 +20,7 @@ before_install:
       sudo apt-get install -qq build-essential xorg-dev libglu1-mesa-dev libglew-dev libglm-dev;
       sudo apt-get install -qq cmake;
       sudo apt-get install -qq libegl1-mesa-dev libgles2-mesa-dev;
-      sudo apt-get install -qq libsdl2-dev;
+      sudo apt-get install libsdl2-dev;
       sudo apt-get install -qq libfftw3-dev;
     fi
 
