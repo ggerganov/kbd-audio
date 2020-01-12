@@ -27,13 +27,13 @@ The **keytap2** tool is another interesting tool for recovering text from audio.
 Dependencies:
 
  - **SDL2** - used to capture audio and to open GUI windows [libsdl](https://www.libsdl.org)
-       
+
        [Ubuntu]
        $ sudo apt install libsdl2-dev
-       
+
        [Mac OS with brew]
-       $ brew install sdl2  
-       
+       $ brew install sdl2
+
  - **FFTW3** *(optional)* - some of the helper tools perform Fourier transformations [fftw](http://www.fftw.org)
 
 **Linux and Mac OS**
@@ -95,7 +95,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Record audio only while typing. Useful for collecting training data for **keytap**
 
-      ./record output.kbd [-cN]
+      ./record output.kbd [-cN] [-CN]
 
   ---
 
@@ -111,7 +111,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Detect pressed keys via microphone audio capture in real-time. Uses training data captured via the **record** tool.
 
-      ./keytap input0.kbd [input1.kbd] [input2.kbd] ... [-cN] [-pF] [-tF]
+      ./keytap input0.kbd [input1.kbd] [input2.kbd] ... [-cN] [-CN] [-pF] [-tF]
 
   ---
 
@@ -119,7 +119,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Detect pressed keys via microphone audio capture in real-time. Uses training data captured via the **record** tool. GUI version.
 
-      ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ... [-cN]
+      ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ... [-cN] [-CN]
 
   [**Live demo *(WebAssembly threads required)* **](https://ggerganov.github.io/jekyll/update/2018/11/24/keytap.html)
 
@@ -141,7 +141,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Visualize waveforms recorded with the **record-full** tool. Can also playback the audio data.
 
-      ./view-full-gui input.kbd
+      ./view-full-gui input.kbd [-pN]
 
   <a href="https://i.imgur.com/scjTaXw.png" target="_blank">![view-full-gui](https://i.imgur.com/scjTaXw.png)</a>
 
@@ -151,7 +151,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   Visualize training data recorded with the **record** tool. Can also playback the audio data.
 
-      ./view-gui input.kbd
+      ./view-gui input.kbd [-pN]
 
   <a href="https://i.imgur.com/2binGaZ.png" target="_blank">![view-full-gui](https://i.imgur.com/2binGaZ.png)</a>
 

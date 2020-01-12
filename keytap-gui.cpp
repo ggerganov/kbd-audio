@@ -100,8 +100,9 @@ extern "C" {
 int main(int argc, char ** argv) {
 	printf("hardware_concurrency = %d\n", (int) std::thread::hardware_concurrency());
 
-    printf("Usage: %s input.kbd [input2.kbd ...] [-cN]\n", argv[0]);
+    printf("Usage: %s input.kbd [input2.kbd ...] [-cN] [-CN]\n", argv[0]);
     printf("    -cN - select capture device N\n");
+    printf("    -CN - select number N of capture channels to use\n");
     printf("\n");
 
     if (argc < 2) {
