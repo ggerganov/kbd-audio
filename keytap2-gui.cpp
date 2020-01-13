@@ -3,6 +3,7 @@
  *  \author Georgi Gerganov
  */
 
+#include "constants.h"
 #include "subbreak.h"
 #include "subbreak2.h"
 
@@ -83,7 +84,7 @@ std::string getApproachStr(Approach approach) {
 
 struct stParameters {
     int keyPressWidth_samples   = 256;
-    int sampleRate              = 24000;
+    int sampleRate              = kSampleRate;
     int offsetFromPeak          = keyPressWidth_samples/2;
     int alignWindow             = 256;
     float thresholdClustering   = 0.5f;

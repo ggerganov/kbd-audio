@@ -316,7 +316,7 @@ int main(int argc, char ** argv) {
     g_init = [&]() {
         AudioLogger::Parameters parameters;
         parameters.sampleRate = kSampleRate;
-        parameters.callback = std::move(cbAudio);
+        parameters.callback = cbAudio;
         parameters.captureId = captureId;
         parameters.nChannels = nChannels;
 
