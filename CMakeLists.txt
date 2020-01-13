@@ -172,4 +172,7 @@ if (BUILD_EXPERIMENTAL)
 
     add_executable(non-exact-subbreak non-exact-subbreak.cpp subbreak2.cpp)
     target_link_libraries(non-exact-subbreak PRIVATE Core)
+
+    add_executable(non-exact-subbreak2 non-exact-subbreak2.cpp subbreak2.cpp)
+    target_link_libraries(non-exact-subbreak2 PRIVATE Core)
 endif()

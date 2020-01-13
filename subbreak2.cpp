@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <chrono>
+#include <cassert>
 
 template <typename T>
 void shuffle(T & t, int start = -1, int end = -1, const std::vector<int> & hint = {}) {
@@ -412,6 +413,50 @@ namespace Cipher {
 
         return true;
     }
+
+	bool generateSimilarityMap(const TParameters & params, const std::string & text, TSimilarityMap & ccMap) {
+		int n = text.size();
+		ccMap.clear();
+
+		std::vector<float> waveformAccuracy(n);
+
+		for (int i = 0; i < n; ++i) {
+			float pError = frand();
+			if (pError < params.waveformDetectionErrorP) {
+				waveformAccuracy[i] = 1.0 - params.waveformDetectionErrorMin - frand()*(params.waveformDetectionErrorSig);
+			} else {
+				waveformAccuracy[i] = 1.0 - params.waveformDeviationMin - frand()*(params.waveformDeviationSig);
+			}
+
+			waveformAccuracy[i] += (1.0 - frand())*params.similarityNoiseSig;
+			waveformAccuracy[i] = std::max(0.0f, waveformAccuracy[i]);
+			waveformAccuracy[i] = std::min(1.0f, waveformAccuracy[i]);
+		}
+
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < n; ++j) {
+				if (i == j) {
+					ccMap[i][j] = 1.0;
+
+					continue;
+				}
+
+				if (text[i] != text[j]) {
+					float sim = params.similarityMismatchAvg + (1.0 - frand())*params.similarityMismatchSig;
+
+					ccMap[i][j] = sim;
+					ccMap[j][i] = sim;
+				} else {
+					float sim = waveformAccuracy[i]*waveformAccuracy[j];
+
+					ccMap[i][j] = sim;
+					ccMap[j][i] = sim;
+				}
+			}
+		}
+
+		return true;
+	}
 
     bool generateClusters(const TParameters & params, int N, TClusters & clusters, const std::vector<int> & hint) {
         clusters.clear();
@@ -1081,7 +1126,7 @@ namespace Cipher {
         int nIters = 0;
         int nMainIters = params.nSubbreakIterations;
         while (nMainIters--) {
-            if (++nIters > 1000) {
+            if (++nIters > 100) {
                 getRandomCLMap(params, clusters, besta, hint);
                 bestp = calcScore0(params, freqMap, clusters, besta);
                 printf("reset\n");

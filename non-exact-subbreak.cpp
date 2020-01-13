@@ -40,6 +40,24 @@ for sear3ches made through apple prod6u4cts such as the Safa=ri browser a0nd Sir
 
     plain = R"(The length of the forewings is about 8.7 mm. The ground colour of the forewings is whitish, strigulated (finely streaked) and suffused with pale orange)";
 
+    //plain = R"(
+    //As far as services go, only two steady contributors of revenue
+    //streams keep swelling without Apple having to charge
+    //subscription fees. One is the money paid by Google parent Alphabet
+    //for searches made through Apple products such as the Safari browser and Siri
+    //)";
+
+    //std::string x;
+    //for (int i = 0; i < (int) plain.size(); ++i) {
+    //    while (rand()%1000 < 250) {
+    //        x += rand()%10 + '1';
+    //    }
+    //    x += plain[i];
+    //}
+
+    //printf("x = '%s'\n", x.c_str());
+    //plain = x;
+
     Cipher::TClusters enc;
     Cipher::encryptExact(params, plain, enc);
 

@@ -47,6 +47,8 @@ namespace Cipher {
         float waveformDetectionErrorMin = 0.0f;
         float waveformDetectionErrorSig = 0.0f;
         float similarityNoiseSig = 0.0f;
+        float similarityMismatchAvg = 0.0f;
+        float similarityMismatchSig = 0.0f;
     };
 
     struct TFreqMap {
@@ -59,6 +61,7 @@ namespace Cipher {
     bool loadFreqMap(const char * fname, TFreqMap & res);
 
     bool encryptExact(const TParameters & params, const std::string & text, TClusters & clusters);
+    bool generateSimilarityMap(const TParameters & params, const std::string & text, TSimilarityMap & ccMap);
 
     bool generateClusters(const TParameters & params, int N, TClusters & clusters, const std::vector<int> & hint);
     bool printClusterGoodness(const std::string & text, const TClusters & clusters);
