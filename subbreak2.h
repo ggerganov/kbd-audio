@@ -41,14 +41,14 @@ namespace Cipher {
         float wLanguageModel = 1.0f;
 
         // simulation parameters
-        float waveformDeviationMin = 0.0f;
-        float waveformDeviationSig = 0.0f;
-        float waveformDetectionErrorP = 0.0f;
-        float waveformDetectionErrorMin = 0.0f;
-        float waveformDetectionErrorSig = 0.0f;
-        float similarityNoiseSig = 0.0f;
-        float similarityMismatchAvg = 0.0f;
-        float similarityMismatchSig = 0.0f;
+        float waveformDeviationMin = 0.1f;
+        float waveformDeviationSig = 0.2f;
+        float waveformDetectionErrorP = 0.10f;
+        float waveformDetectionErrorMin = 0.5f;
+        float waveformDetectionErrorSig = 0.4f;
+        float similarityNoiseSig = 0.1f;
+        float similarityMismatchAvg = 0.3f;
+        float similarityMismatchSig = 0.2f;
     };
 
     struct TFreqMap {

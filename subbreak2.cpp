@@ -428,7 +428,7 @@ namespace Cipher {
 				waveformAccuracy[i] = 1.0 - params.waveformDeviationMin - frand()*(params.waveformDeviationSig);
 			}
 
-			waveformAccuracy[i] += (1.0 - frand())*params.similarityNoiseSig;
+			waveformAccuracy[i] += 2.0f*(0.5f - frand())*params.similarityNoiseSig;
 			waveformAccuracy[i] = std::max(0.0f, waveformAccuracy[i]);
 			waveformAccuracy[i] = std::min(1.0f, waveformAccuracy[i]);
 		}
@@ -442,7 +442,7 @@ namespace Cipher {
 				}
 
 				if (text[i] != text[j]) {
-					float sim = params.similarityMismatchAvg + (1.0 - frand())*params.similarityMismatchSig;
+					float sim = params.similarityMismatchAvg + 2.0f*(0.5f - frand())*params.similarityMismatchSig;
 
 					ccMap[i][j] = sim;
 					ccMap[j][i] = sim;
@@ -1121,7 +1121,7 @@ namespace Cipher {
         float bestp = calcScore0(params, freqMap, clusters, besta);
         printf("Initial prob: %g\n", bestp);
 
-        auto bestbestp = bestp;
+        static auto bestbestp = bestp;
 
         int nIters = 0;
         int nMainIters = params.nSubbreakIterations;
