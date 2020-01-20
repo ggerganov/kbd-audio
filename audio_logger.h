@@ -24,6 +24,16 @@ class AudioLogger {
             Callback callback;
             int captureId = 0;
             int nChannels = 0;
+
+            enum EFilter {
+                None = 0,
+                FirstOrderHighPass,
+                SecondOrderButterworthHighPass,
+            };
+
+            EFilter filter = SecondOrderButterworthHighPass;
+
+            float freqCutoff = 1000.0;
         };
 
         AudioLogger();

@@ -12,7 +12,93 @@
 #include <atomic>
 #include <algorithm>
 
+#ifndef pi
+#define  pi 3.1415926535897932384626433832795
+#endif
+
+#ifndef sqrt2
+#define sqrt2 (2.0 * 0.707106781186547524401)
+#endif
+
+#ifndef sqrt2over2
+#define  sqrt2over2  0.707106781186547524401
+#endif
+
 namespace {
+
+    // DSP filter
+    // ref : https://github.com/dimtass/DSP-Cpp-filters
+
+    struct TFilterCoefficients {
+        float a0;
+        float a1;
+        float a2;
+        float b1;
+        float b2;
+        float c0;
+        float d0;
+
+        float xnz1;
+        float xnz2;
+        float ynz1;
+        float ynz2;
+    };
+
+    TFilterCoefficients calculateCoefficientsFirstOrderHighPass(int fc, int fs) {
+        TFilterCoefficients res;
+
+        float th = 2.0 * pi * fc / fs;
+        float g = cos(th) / (1.0 + sin(th));
+        res.a0 = (1.0 + g) / 2.0;
+        res.a1 = -((1.0 + g) / 2.0);
+        res.a2 = 0.0;
+        res.b1 = -g;
+        res.b2 = 0.0;
+
+        return res;
+    }
+
+    TFilterCoefficients calculateCoefficientsSecondOrderButterworthHighPass(int fc, int fs) {
+        TFilterCoefficients res;
+
+        float c = tan(pi*fc / fs);
+        res.a0 = 1.0 / (1.0 + sqrt2*c + pow(c, 2.0));
+        res.a1 = -2.0 * res.a0;
+        res.a2 = res.a0;
+        res.b1 = 2.0 * res.a0*(pow(c, 2.0) - 1.0);
+        res.b2 = res.a0 * (1.0 - sqrt2*c + pow(c, 2.0));
+
+        return res;
+    }
+
+    AudioLogger::Sample filterFirstOrderHighPass(TFilterCoefficients & coefficients, AudioLogger::Sample sample) {
+        AudioLogger::Sample xn = sample;
+        AudioLogger::Sample yn =
+            coefficients.a0*xn + coefficients.a1*coefficients.xnz1 + coefficients.a2*coefficients.xnz2 -
+            coefficients.b1*coefficients.ynz1 - coefficients.b2*coefficients.xnz2;
+
+        coefficients.xnz2 = coefficients.xnz1;
+        coefficients.xnz1 = xn;
+        coefficients.xnz2 = coefficients.ynz1;
+        coefficients.ynz1 = yn;
+
+        return yn;
+    }
+
+    AudioLogger::Sample filterSecondOrderButterworthHighPass(TFilterCoefficients & coefficients, AudioLogger::Sample sample) {
+        AudioLogger::Sample xn = sample;
+        AudioLogger::Sample yn =
+            coefficients.a0*xn + coefficients.a1*coefficients.xnz1 + coefficients.a2*coefficients.xnz2 -
+            coefficients.b1*coefficients.ynz1 - coefficients.b2*coefficients.xnz2;
+
+        coefficients.xnz2 = coefficients.xnz1;
+        coefficients.xnz1 = xn;
+        coefficients.xnz2 = coefficients.ynz1;
+        coefficients.ynz1 = yn;
+
+        return yn;
+    }
+
     void cbAudioReady(void * userData, uint8_t * stream, int32_t /*nbytes*/) {
         AudioLogger * logger = (AudioLogger *)(userData);
         logger->addFrame((AudioLogger::Sample *)(stream));
@@ -48,6 +134,9 @@ struct AudioLogger::Data {
     int32_t nRecords = 0;
     std::array<int32_t, kMaxRecords>  nFramesToRecord;
     std::array<Record, kMaxRecords> records;
+
+    Parameters parameters;
+    TFilterCoefficients filterCoefficients;
 
     std::mutex mutex;
     std::atomic_bool isReady;
@@ -131,6 +220,25 @@ bool AudioLogger::install(Parameters && parameters) {
     data.nChannels = obtainedSpec.channels;
     data.isReady = true;
 
+    switch (parameters.FirstOrderHighPass) {
+        case AudioLogger::Parameters::EFilter::None:
+            {
+            }
+            break;
+        case AudioLogger::Parameters::EFilter::FirstOrderHighPass:
+            {
+                data.filterCoefficients = ::calculateCoefficientsFirstOrderHighPass(parameters.freqCutoff, data.sampleRate);
+            }
+            break;
+        case AudioLogger::Parameters::EFilter::SecondOrderButterworthHighPass:
+            {
+                data.filterCoefficients = ::calculateCoefficientsSecondOrderButterworthHighPass(parameters.freqCutoff, data.sampleRate);
+            }
+            break;
+    };
+
+    data.parameters = parameters;
+
     return true;
 }
 
@@ -163,6 +271,27 @@ bool AudioLogger::addFrame(const Sample * stream) {
             x += stream[i*data.nChannels + j];
         }
         curFrame[i] = x*norm;
+    }
+
+    switch (data.parameters.FirstOrderHighPass) {
+        case AudioLogger::Parameters::EFilter::None:
+            {
+            }
+            break;
+        case AudioLogger::Parameters::EFilter::FirstOrderHighPass:
+            {
+                for (auto & s : curFrame) {
+                    s = ::filterFirstOrderHighPass(data.filterCoefficients, s);
+                }
+            }
+            break;
+        case AudioLogger::Parameters::EFilter::SecondOrderButterworthHighPass:
+            {
+                for (auto & s : curFrame) {
+                    s = ::filterSecondOrderButterworthHighPass(data.filterCoefficients, s);
+                }
+            }
+            break;
     }
 
     std::lock_guard<std::mutex> lock(data.mutex);

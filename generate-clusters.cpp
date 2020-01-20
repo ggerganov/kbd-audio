@@ -155,16 +155,8 @@ float calcPClusters(
             } else {
                 res += logMapInv.at(j).at(i);
             }
-
-            //if (clusters[i] == clusters[j]) {
-            //    res += ccMap.at(j).at(i);
-            //} else {
-            //    res += 1.0f - ccMap.at(j).at(i);
-            //}
         }
     }
-
-    //res /= (n*(n-1))/2;
 
     return res;
 }
