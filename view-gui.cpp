@@ -203,8 +203,8 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
 
         static int nview = waveform.size();
         static int offset = (waveform.size() - nview)/2;
-        static float amin = std::numeric_limits<TSample>::min()/2;
-        static float amax = std::numeric_limits<TSample>::max()/2;
+        static float amin = std::numeric_limits<TSample>::min();
+        static float amax = std::numeric_limits<TSample>::max();
         static float dragOffset = 0.0f;
         static float scrollSize = 18.0f;
 
