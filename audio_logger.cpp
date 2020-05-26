@@ -121,12 +121,7 @@ struct AudioLogger::Data {
     SDL_AudioDeviceID deviceIdIn = 0;
     //SDL_AudioDeviceID deviceIdOut = 0;
 
-    Callback callback = nullptr;
-
-    int64_t sampleRate = kMaxSampleRate;
-
-    int32_t nChannels = 0;
-    int32_t sampleSize_bytes = 4;
+    int32_t sampleSize_bytes = -1;
 
     int32_t bufferId = 0;
     std::array<Frame, getBufferSize_frames(kMaxSampleRate, kMaxBufferSize_s)> buffer;
@@ -149,6 +144,26 @@ AudioLogger::~AudioLogger() {}
 bool AudioLogger::install(Parameters && parameters) {
     auto & data = getData();
 
+    if (parameters.captureId < 0) {
+        fprintf(stderr, "error : invalid captureId = %d\n", parameters.captureId);
+        return false;
+    }
+
+    if (parameters.nChannels < 0) {
+        fprintf(stderr, "error : invalid nChannels = %d\n", parameters.nChannels);
+        return false;
+    }
+
+    if (parameters.sampleRate <= 0) {
+        fprintf(stderr, "error : invalid sampleRate = %ld\n", parameters.sampleRate);
+        return false;
+    }
+
+    if (parameters.freqCutoff_Hz <= 0) {
+        fprintf(stderr, "error : invalid freqCutoff_Hz = %g\n", parameters.freqCutoff_Hz);
+        return false;
+    }
+
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
         return false;
@@ -161,7 +176,7 @@ bool AudioLogger::install(Parameters && parameters) {
     }
 
     if (parameters.captureId < 0 || parameters.captureId >= nDevices) {
-        printf("Invalid capture device id selected - %d\n", parameters.captureId);
+        fprintf(stderr, "error : invalid capture device id selected - %d\n", parameters.captureId);
         return false;
     }
 
@@ -186,19 +201,21 @@ bool AudioLogger::install(Parameters && parameters) {
         return false;
     }
 
-    data.sampleSize_bytes = 4;
     switch (obtainedSpec.format) {
         case AUDIO_U8:
         case AUDIO_S8:
-            data.sampleSize_bytes = 1;
-            break;
         case AUDIO_U16SYS:
         case AUDIO_S16SYS:
-            data.sampleSize_bytes = 2;
-            break;
         case AUDIO_S32SYS:
+            {
+                fprintf(stderr, "error : unsupported sample format %d\n", obtainedSpec.format);
+                return false;
+            }
+            break;
         case AUDIO_F32SYS:
-            data.sampleSize_bytes = 4;
+            {
+                data.sampleSize_bytes = 4;
+            }
             break;
     }
 
@@ -215,10 +232,7 @@ bool AudioLogger::install(Parameters && parameters) {
 
     SDL_PauseAudioDevice(data.deviceIdIn, 0);
 
-    data.sampleRate = parameters.sampleRate;
-    data.callback = std::move(parameters.callback);
-    data.nChannels = obtainedSpec.channels;
-    data.isReady = true;
+    parameters.nChannels = obtainedSpec.channels;
 
     switch (parameters.FirstOrderHighPass) {
         case AudioLogger::Parameters::EFilter::None:
@@ -227,17 +241,18 @@ bool AudioLogger::install(Parameters && parameters) {
             break;
         case AudioLogger::Parameters::EFilter::FirstOrderHighPass:
             {
-                data.filterCoefficients = ::calculateCoefficientsFirstOrderHighPass(parameters.freqCutoff, data.sampleRate);
+                data.filterCoefficients = ::calculateCoefficientsFirstOrderHighPass(parameters.freqCutoff_Hz, parameters.sampleRate);
             }
             break;
         case AudioLogger::Parameters::EFilter::SecondOrderButterworthHighPass:
             {
-                data.filterCoefficients = ::calculateCoefficientsSecondOrderButterworthHighPass(parameters.freqCutoff, data.sampleRate);
+                data.filterCoefficients = ::calculateCoefficientsSecondOrderButterworthHighPass(parameters.freqCutoff_Hz, parameters.sampleRate);
             }
             break;
     };
 
     data.parameters = parameters;
+    data.isReady = true;
 
     return true;
 }
@@ -261,14 +276,14 @@ bool AudioLogger::addFrame(const Sample * stream) {
 		SDL_ClearQueuedAudio(data.deviceIdIn);
 	}
 
-    const float norm = 1.0/data.nChannels;
+    const float norm = 1.0/data.parameters.nChannels;
 
     auto & curFrame = data.buffer[data.bufferId];
 
     for (int i = 0; i < kSamplesPerFrame; ++i) {
         Sample x = 0;
-        for (int j = 0; j < data.nChannels; ++j) {
-            x += stream[i*data.nChannels + j];
+        for (int j = 0; j < data.parameters.nChannels; ++j) {
+            x += stream[i*data.parameters.nChannels + j];
         }
         curFrame[i] = x*norm;
     }
@@ -303,7 +318,7 @@ bool AudioLogger::addFrame(const Sample * stream) {
         if (nFramesToRecord > 0) {
             record.push_back(curFrame);
             if (--nFramesToRecord == 0) {
-                if (data.callback) data.callback(record);
+                if (data.parameters.callback) data.parameters.callback(record);
                 record.clear();
 
                 for (int k = r + 1; k < data.nRecords; ++k) {
@@ -323,15 +338,25 @@ bool AudioLogger::addFrame(const Sample * stream) {
     return true;
 }
 
-bool AudioLogger::record(float bufferSize_s) {
+bool AudioLogger::record(float bufferSize_s, int nPrevFrames) {
     auto & data = getData();
 
-    if (bufferSize_s > kMaxBufferSize_s) {
-        fprintf(stderr, "warning :invalid record size requested - %g s. max allowedis %g s\n", bufferSize_s, kMaxBufferSize_s);
+    if (bufferSize_s <= 0) {
+        fprintf(stderr, "error : invalid bufferSize_s = %g\n", bufferSize_s);
         return false;
     }
 
-    auto bufferSize_frames = getBufferSize_frames(data.sampleRate, bufferSize_s);
+    if (bufferSize_s > kMaxBufferSize_s) {
+        fprintf(stderr, "error : invalid record size requested - %g s. max allowed is %g s\n", bufferSize_s, kMaxBufferSize_s);
+        return false;
+    }
+
+    auto bufferSize_frames = getBufferSize_frames(data.parameters.sampleRate, bufferSize_s);
+
+    if (nPrevFrames >= bufferSize_frames) {
+        fprintf(stderr, "warning : invalid previous frames in record requested - %d. max allowed is %d s\n", nPrevFrames, bufferSize_frames - 1);
+        return false;
+    }
 
     std::lock_guard<std::mutex> lock(data.mutex);
 
@@ -342,18 +367,17 @@ bool AudioLogger::record(float bufferSize_s) {
 
     auto & record = data.records[data.nRecords];
 
-    int nPrev = 3;
     if (record.size() == 0) {
-        int fStart = data.bufferId - nPrev;
+        int fStart = data.bufferId - nPrevFrames;
         if (fStart < 0) fStart += data.buffer.size();
-        for (size_t i = 0; i < nPrev; ++i) {
+        for (size_t i = 0; i < nPrevFrames; ++i) {
             record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
         }
     } else {
         fprintf(stderr, "warning : new record requested before last has been processed. should never happen\n");
     }
 
-    data.nFramesToRecord[data.nRecords] = bufferSize_frames - nPrev;
+    data.nFramesToRecord[data.nRecords] = bufferSize_frames - nPrevFrames;
 
     ++data.nRecords;
 
@@ -363,12 +387,17 @@ bool AudioLogger::record(float bufferSize_s) {
 bool AudioLogger::recordSym(float bufferSize_s) {
     auto & data = getData();
 
-    if (bufferSize_s > kMaxBufferSize_s) {
-        fprintf(stderr, "warning :invalid record size requested - %g s. max allowedis %g s\n", bufferSize_s, kMaxBufferSize_s);
+    if (bufferSize_s <= 0) {
+        fprintf(stderr, "error : invalid bufferSize_s = %g\n", bufferSize_s);
         return false;
     }
 
-    auto bufferSize_frames = getBufferSize_frames(data.sampleRate, bufferSize_s);
+    if (bufferSize_s > kMaxBufferSize_s) {
+        fprintf(stderr, "error : invalid record size requested - %g s. max allowed is %g s\n", bufferSize_s, kMaxBufferSize_s);
+        return false;
+    }
+
+    auto bufferSize_frames = getBufferSize_frames(data.parameters.sampleRate, bufferSize_s);
 
     if (data.nRecords == kMaxRecords) {
         fprintf(stderr, "warning : max number of simultaneous records %d reached\n", kMaxRecords);

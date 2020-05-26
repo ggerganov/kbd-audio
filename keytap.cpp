@@ -315,10 +315,11 @@ int main(int argc, char ** argv) {
 
     g_init = [&]() {
         AudioLogger::Parameters parameters;
-        parameters.sampleRate = kSampleRate;
         parameters.callback = cbAudio;
         parameters.captureId = captureId;
         parameters.nChannels = nChannels;
+        parameters.sampleRate = kSampleRate;
+        parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
         if (audioLogger.install(std::move(parameters)) == false) {
             fprintf(stderr, "Failed to install audio logger\n");
@@ -334,7 +335,7 @@ int main(int argc, char ** argv) {
         if (keyPressed == -1 && isReadyToPredict == false) {
             g_predictedKey = -1;
             keyPressed = key;
-            audioLogger.record(kTrainBufferSize_s);
+            audioLogger.record(kTrainBufferSize_s, 3);
         }
     };
 

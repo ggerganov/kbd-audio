@@ -20,10 +20,23 @@ class AudioLogger {
         using Callback = std::function<void(const Record & frames)>;
 
         struct Parameters {
-            int64_t sampleRate;
             Callback callback;
-            int captureId = 0;
-            int nChannels = 0;
+
+            int32_t captureId = -1;
+            int32_t nChannels = -1;
+
+            int64_t sampleRate = -1;
+
+            // Sample Type
+
+            // todo : support for other sample types
+            enum ESampleType {
+                F32SYS,
+            };
+
+            ESampleType sampleType = F32SYS;
+
+            // Filter
 
             enum EFilter {
                 None = 0,
@@ -33,7 +46,7 @@ class AudioLogger {
 
             EFilter filter = SecondOrderButterworthHighPass;
 
-            float freqCutoff = 1000.0;
+            float freqCutoff_Hz = -1.0f;
         };
 
         AudioLogger();
@@ -42,7 +55,7 @@ class AudioLogger {
         bool install(Parameters && parameters);
         bool terminate();
         bool addFrame(const Sample * stream);
-        bool record(float bufferSize_s);
+        bool record(float bufferSize_s, int nPrevFrames);
         bool recordSym(float bufferSize_s);
 
         bool pause();

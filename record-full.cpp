@@ -39,9 +39,7 @@ int main(int argc, char ** argv) {
     AudioLogger::Callback cbAudio = [&](const auto & frames) {
         doRecord = true;
 
-        int nSkip = 3;
         for (const auto & frame : frames) {
-            if (nSkip-- > 0) continue;
             totalSize_bytes += sizeof(frame[0])*frame.size();
             fout.write((char *)(frame.data()), sizeof(frame[0])*frame.size());
             fout.flush();
@@ -51,10 +49,11 @@ int main(int argc, char ** argv) {
     };
 
     AudioLogger::Parameters parameters;
-    parameters.sampleRate = kSampleRate;
     parameters.callback = std::move(cbAudio);
     parameters.captureId = captureId;
     parameters.nChannels = nChannels;
+    parameters.sampleRate = kSampleRate;
+    parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
     if (audioLogger.install(std::move(parameters)) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
@@ -64,7 +63,7 @@ int main(int argc, char ** argv) {
     while (true) {
         if (doRecord) {
             doRecord = false;
-            audioLogger.record(0.5f);
+            audioLogger.record(0.5f, 0);
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }

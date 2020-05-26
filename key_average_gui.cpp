@@ -273,10 +273,11 @@ int main(int argc, char ** argv) {
     };
 
     AudioLogger::Parameters parameters;
-    parameters.sampleRate = kSampleRate;
     parameters.callback = std::move(cbAudio);
     parameters.captureId = captureId;
     parameters.nChannels = nChannels;
+    parameters.sampleRate = kSampleRate;
+    parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
     if (audioLogger.install(std::move(parameters)) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
@@ -296,7 +297,7 @@ int main(int argc, char ** argv) {
                         //auto t1 = std::chrono::high_resolution_clock::now();
                         //printf("Event: %d\n", (int) std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
                         keyPressed = event.key.keysym.sym;
-                        audioLogger.record(kTrainBufferSize_s);
+                        audioLogger.record(kTrainBufferSize_s, 3);
                     }
                     break;
                 case SDL_QUIT:

@@ -35,6 +35,8 @@ static constexpr uint64_t kBkgrRingBufferSize = 4*1024;
 static constexpr int64_t kBkgrStep_samples = 16;
 static constexpr int64_t kKeyDuration_samples = 0.005f*kSampleRate;
 
+static constexpr float kFreqCutoff_Hz = 1000.0f;
+
 static const std::array<int32_t, 256> kCharToInt = {
     /* { 0,   */   0 /* } */,
     /* { 1,   */   0 /* } */,

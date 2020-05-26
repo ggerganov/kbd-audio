@@ -463,10 +463,11 @@ int main(int argc, char ** argv) {
 
     g_init = [&]() {
         AudioLogger::Parameters parameters;
-        parameters.sampleRate = kSampleRate;
         parameters.callback = cbAudio;
         parameters.captureId = captureId;
         parameters.nChannels = nChannels;
+        parameters.sampleRate = kSampleRate;
+        parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
         if (audioLogger.install(std::move(parameters)) == false) {
             fprintf(stderr, "Failed to install audio logger\n");
@@ -482,7 +483,7 @@ int main(int argc, char ** argv) {
         if (keyPressed == -1 && isReadyToPredict == false) {
             predictedKey = -1;
             keyPressed = key;
-            audioLogger.record(kTrainBufferSize_s);
+            audioLogger.record(kTrainBufferSize_s, 3);
         }
     };
 
@@ -529,9 +530,9 @@ int main(int argc, char ** argv) {
                 static AudioLogger::Record record;
                 keyPressed = 32;
                 int nRead = kPredictBufferSize_frames;
-                if (record.size() > 5) {
-                    record.erase(record.begin(), record.end() - 5);
-                    nRead -= 5;
+                if (record.size() > 3) {
+                    record.erase(record.begin(), record.end() - 3);
+                    nRead -= 3;
                 }
                 for (int i = 0; i < nRead; ++i) {
                     frecord.read((char *)(frame.data()), sizeof(AudioLogger::Sample)*frame.size());
