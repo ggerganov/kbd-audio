@@ -90,8 +90,8 @@ int main(int argc, char ** argv) {
         {
             int bufferSize_frames = 1;
             fins[i].read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
-            if (bufferSize_frames != kTrainBufferSize_frames) {
-                printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kTrainBufferSize_frames);
+            if (bufferSize_frames != kBufferSizeTrain_frames) {
+                printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kBufferSizeTrain_frames);
                 return -1;
             }
         }
@@ -112,7 +112,7 @@ int main(int argc, char ** argv) {
 
     float amplMin = 0.0f;
     float amplMax = 0.0f;
-    float thresholdCC = argm["p"].empty() ? 0.5f : std::stof(argm["p"]);
+    float thresholdCC = argm["p"].empty() ? 0.35f : std::stof(argm["p"]);
     float thresholdBackground = argm["t"].empty() ? 10.0f : std::stof(argm["t"]);
 
     // ring buffer
@@ -127,7 +127,7 @@ int main(int argc, char ** argv) {
     size_t totalSize_bytes = 0;
     std::ofstream foutTrain("train_default.kbd", std::ios::binary);
     {
-        int x = kTrainBufferSize_frames;
+        int x = kBufferSizeTrain_frames;
         foutTrain.write((char *)(&x), sizeof(x));
     }
 
@@ -223,9 +223,9 @@ int main(int argc, char ** argv) {
             return;
         }
 
-        if (frames.size() != kTrainBufferSize_frames && isReadyToPredict == false) {
+        if (frames.size() != kBufferSizeTrain_frames && isReadyToPredict == false) {
             printf("Unexpected number of frames - %d, expected - %d. Should never happen\n",
-                   (int) frames.size(), (int) kTrainBufferSize_frames);
+                   (int) frames.size(), (int) kBufferSizeTrain_frames);
             return;
         }
 
@@ -274,7 +274,7 @@ int main(int argc, char ** argv) {
                         que.push_back(i);
 
                         int itest = i - k/2;
-                        if (itest >= 2*kSamplesPerFrame && itest < (nFrames - 2)*kSamplesPerFrame && que.front() == itest) {
+                        if (itest >= (0.5*kSamplesPerWaveformTrain - kSamplesPerFrame) && itest < (0.5*kSamplesPerWaveformTrain + kSamplesPerFrame) && que.front() == itest) {
                             auto acur = _acc(frames, itest);
                             if (acur > thresholdBackground*rbAverage){
                                 positionsToPredict.push_back(itest);
@@ -335,7 +335,7 @@ int main(int argc, char ** argv) {
         if (keyPressed == -1 && isReadyToPredict == false) {
             g_predictedKey = -1;
             keyPressed = key;
-            audioLogger.record(kTrainBufferSize_s, 3);
+            audioLogger.record(kBufferSizeTrain_s, 3);
         }
     };
 
@@ -357,7 +357,7 @@ int main(int argc, char ** argv) {
                 } else {
                     printf("%c", keyPressed);
                     fflush(stdout);
-                    for (int i = 0; i < kTrainBufferSize_frames; ++i) {
+                    for (int i = 0; i < kBufferSizeTrain_frames; ++i) {
                         fins[curFile].read((char *)(frame.data()), sizeof(AudioLogger::Sample)*frame.size());
                         record.push_back(frame);
                     }
@@ -376,7 +376,7 @@ int main(int argc, char ** argv) {
                 auto & history = keySoundHistoryAmpl[key];
 
                 int nWaveforms = history.size();
-                int nFramesPerWaveform = kTrainBufferSize_frames;
+                int nFramesPerWaveform = kBufferSizeTrain_frames;
 
                 printf("    - Training key '%c'\n", key);
                 printf("    - History size = %d key waveforms\n", nWaveforms);
@@ -401,7 +401,7 @@ int main(int argc, char ** argv) {
 
                     const auto & waveform = history[iwaveform];
 
-                    for (int icur = 0; icur < kSamplesPerWaveform; ++icur) {
+                    for (int icur = 0; icur < kSamplesPerWaveformTrain; ++icur) {
                         double acur = std::abs(waveform[icur]);
                         double acur2 = acur*acur;
 
@@ -441,7 +441,7 @@ int main(int argc, char ** argv) {
                 const auto & peakUsed = peakMax;
                 printf("    - Using 'max' estimation\n");
 
-                int centerSample = kSamplesPerWaveform/2;
+                int centerSample = kSamplesPerWaveformTrain/2;
 
                 printf("    - Centering waveforms at sample %d\n", centerSample);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
@@ -449,12 +449,12 @@ int main(int argc, char ** argv) {
                     //printf("        Offset for waveform %-4d = %-4d\n", iwaveform, offset);
 
                     auto newWaveform = TKeyWaveform();
-                    newWaveform.resize(kSamplesPerWaveform);
+                    newWaveform.resize(kSamplesPerWaveformTrain);
                     auto & waveform = history[iwaveform];
-                    for (int icur = 0; icur < kSamplesPerWaveform; ++icur) {
+                    for (int icur = 0; icur < kSamplesPerWaveformTrain; ++icur) {
                         int iorg = icur + offset;
 
-                        if (iorg >= 0 && iorg < kSamplesPerWaveform) {
+                        if (iorg >= 0 && iorg < kSamplesPerWaveformTrain) {
                             newWaveform[icur] = waveform[iorg];
                         } else {
                             newWaveform[icur] = 0.0f;
@@ -532,11 +532,11 @@ int main(int argc, char ** argv) {
                     auto offset = std::get<1>(ccs[iwaveform][bestw]);
 
                     auto newWaveform = TKeyWaveform();
-                    newWaveform.resize(kSamplesPerWaveform);
-                    for (int icur = 0; icur < kSamplesPerWaveform; ++icur) {
+                    newWaveform.resize(kSamplesPerWaveformTrain);
+                    for (int icur = 0; icur < kSamplesPerWaveformTrain; ++icur) {
                         int iorg = icur + offset;
 
-                        if (iorg >= 0 && iorg < kSamplesPerWaveform) {
+                        if (iorg >= 0 && iorg < kSamplesPerWaveformTrain) {
                             newWaveform[icur] = waveform1[iorg];
                         } else {
                             newWaveform[icur] = 0.0f;
@@ -554,7 +554,7 @@ int main(int argc, char ** argv) {
                 double ccsum = 0.0f;
                 double norm = 0.0f;
                 auto & avgWaveform = keySoundAverageAmpl[key];
-                avgWaveform.resize(kSamplesPerWaveform);
+                avgWaveform.resize(kSamplesPerWaveformTrain);
                 std::fill(avgWaveform.begin(), avgWaveform.end(), 0.0f);
                 for (int iwaveform = 0; iwaveform < nWaveforms; ++iwaveform) {
                     //auto [cc, offset] = ccs[iwaveform][bestw];
@@ -566,13 +566,13 @@ int main(int argc, char ** argv) {
                     ccsum += cc*cc;
                     norm += cc*cc;
                     auto & waveform = history[iwaveform];
-                    for (int is = 0; is < kSamplesPerWaveform; ++is) {
+                    for (int is = 0; is < kSamplesPerWaveformTrain; ++is) {
                         avgWaveform[is] += cc*cc*waveform[is];
                     }
                 }
 
                 norm = 1.0f/(norm);
-                for (int is = 0; is < kSamplesPerWaveform; ++is) {
+                for (int is = 0; is < kSamplesPerWaveformTrain; ++is) {
                     avgWaveform[is] *= norm;
                     if (avgWaveform[is] > amplMax) amplMax = avgWaveform[is];
                     if (avgWaveform[is] < amplMin) amplMin = avgWaveform[is];
@@ -624,7 +624,7 @@ int main(int argc, char ** argv) {
 
         if (doRecord) {
             doRecord = false;
-            audioLogger.recordSym(kPredictBufferSize_s);
+            audioLogger.record(kBufferSizeTrain_s, getBufferSize_frames(kSampleRate, kBufferSizeTrain_s) - 1);
         }
     };
 

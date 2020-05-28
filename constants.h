@@ -25,11 +25,10 @@ static constexpr int32_t getBufferSize_frames(int64_t sampleRate, float bufferSi
 }
 
 static constexpr int64_t kSampleRate = 16000;
-static constexpr float kTrainBufferSize_s = 0.300;
-static constexpr float kPredictBufferSize_s = 2.1*kTrainBufferSize_s;
-static constexpr int32_t kTrainBufferSize_frames = getBufferSize_frames(kSampleRate, kTrainBufferSize_s);
-static constexpr int32_t kPredictBufferSize_frames = getBufferSize_frames(kSampleRate, kPredictBufferSize_s);
-static constexpr int64_t kSamplesPerWaveform = kSamplesPerFrame*kTrainBufferSize_frames;
+
+static constexpr float kBufferSizeTrain_s = 0.300;
+static constexpr int32_t kBufferSizeTrain_frames = getBufferSize_frames(kSampleRate, kBufferSizeTrain_s);
+static constexpr int64_t kSamplesPerWaveformTrain = kSamplesPerFrame*kBufferSizeTrain_frames;
 
 static constexpr uint64_t kBkgrRingBufferSize = 4*1024;
 static constexpr int64_t kBkgrStep_samples = 16;

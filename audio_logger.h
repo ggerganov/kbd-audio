@@ -55,14 +55,16 @@ class AudioLogger {
         bool install(Parameters && parameters);
         bool terminate();
         bool addFrame(const Sample * stream);
-        bool record(float bufferSize_s, int nPrevFrames);
-        bool recordSym(float bufferSize_s);
+        bool record(float bufferSize_s, int32_t nPrevFrames);
 
         bool pause();
         bool resume();
+
+        bool isValidBufferSize(float bufferSize_s) const;
 
     private:
         struct Data;
         std::unique_ptr<Data> data_;
         Data & getData() { return *data_; }
+        const Data & getData() const { return *data_; }
 };

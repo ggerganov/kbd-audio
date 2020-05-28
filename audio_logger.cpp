@@ -338,16 +338,10 @@ bool AudioLogger::addFrame(const Sample * stream) {
     return true;
 }
 
-bool AudioLogger::record(float bufferSize_s, int nPrevFrames) {
+bool AudioLogger::record(float bufferSize_s, int32_t nPrevFrames) {
     auto & data = getData();
 
-    if (bufferSize_s <= 0) {
-        fprintf(stderr, "error : invalid bufferSize_s = %g\n", bufferSize_s);
-        return false;
-    }
-
-    if (bufferSize_s > kMaxBufferSize_s) {
-        fprintf(stderr, "error : invalid record size requested - %g s. max allowed is %g s\n", bufferSize_s, kMaxBufferSize_s);
+    if (isValidBufferSize(bufferSize_s) == false) {
         return false;
     }
 
@@ -384,9 +378,19 @@ bool AudioLogger::record(float bufferSize_s, int nPrevFrames) {
     return true;
 }
 
-bool AudioLogger::recordSym(float bufferSize_s) {
+bool AudioLogger::pause() {
     auto & data = getData();
+    SDL_PauseAudioDevice(data.deviceIdIn, 1);
+    return true;
+}
 
+bool AudioLogger::resume() {
+    auto & data = getData();
+    SDL_PauseAudioDevice(data.deviceIdIn, 0);
+    return true;
+}
+
+bool AudioLogger::isValidBufferSize(float bufferSize_s) const {
     if (bufferSize_s <= 0) {
         fprintf(stderr, "error : invalid bufferSize_s = %g\n", bufferSize_s);
         return false;
@@ -397,42 +401,5 @@ bool AudioLogger::recordSym(float bufferSize_s) {
         return false;
     }
 
-    auto bufferSize_frames = getBufferSize_frames(data.parameters.sampleRate, bufferSize_s);
-
-    if (data.nRecords == kMaxRecords) {
-        fprintf(stderr, "warning : max number of simultaneous records %d reached\n", kMaxRecords);
-        return false;
-    }
-
-    std::lock_guard<std::mutex> lock(data.mutex);
-
-    auto & record = data.records[data.nRecords];
-
-    if (record.size() == 0) {
-        int fStart = data.bufferId - bufferSize_frames/2;
-        if (fStart < 0) fStart += data.buffer.size();
-        for (size_t i = 0; i < bufferSize_frames/2; ++i) {
-            record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
-        }
-    } else {
-        fprintf(stderr, "warning : new record requested before last has been processed. should never happen\n");
-    }
-
-    data.nFramesToRecord[data.nRecords] = bufferSize_frames/2 + 1;
-
-    ++data.nRecords;
-
-    return true;
-}
-
-bool AudioLogger::pause() {
-    auto & data = getData();
-    SDL_PauseAudioDevice(data.deviceIdIn, 1);
-    return true;
-}
-
-bool AudioLogger::resume() {
-    auto & data = getData();
-    SDL_PauseAudioDevice(data.deviceIdIn, 0);
     return true;
 }
