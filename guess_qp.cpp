@@ -65,7 +65,7 @@ int main(int, char**) {
     constexpr uint64_t kSampleRate = 48000;
 #endif
 
-    constexpr uint64_t kBufferSize_frames = 2*getBufferSize_frames(kSampleRate, kBufferSize_s) - 1;
+    constexpr uint64_t kBufferSize_frames = getBufferSize_frames(kSampleRate, kBufferSize_s);
 
     using ValueCC = float;
     using Offset = int;
@@ -185,8 +185,11 @@ int main(int, char**) {
 
     g_init = [&]() {
         AudioLogger::Parameters parameters;
-        parameters.sampleRate = kSampleRate;
         parameters.callback = std::move(cbAudio);
+        parameters.captureId = 0;
+        parameters.nChannels = 1;
+        parameters.sampleRate = kSampleRate;
+        parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
         if (audioLogger.install(std::move(parameters)) == false) {
             fprintf(stderr, "Failed to install audio logger\n");
@@ -202,7 +205,7 @@ int main(int, char**) {
         if (keyPressed == -1) {
             g_predictedKey = -1;
             keyPressed = key;
-            audioLogger.record(kBufferSize_s);
+            audioLogger.record(kBufferSize_s, 3);
         }
     };
 

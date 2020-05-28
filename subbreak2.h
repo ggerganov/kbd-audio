@@ -39,6 +39,16 @@ namespace Cipher {
         // language model
         float wEnglishFreq = 10.0f;
         float wLanguageModel = 1.0f;
+
+        // simulation parameters
+        float waveformDeviationMin = 0.1f;
+        float waveformDeviationSig = 0.2f;
+        float waveformDetectionErrorP = 0.10f;
+        float waveformDetectionErrorMin = 0.5f;
+        float waveformDetectionErrorSig = 0.4f;
+        float similarityNoiseSig = 0.1f;
+        float similarityMismatchAvg = 0.3f;
+        float similarityMismatchSig = 0.2f;
     };
 
     struct TFreqMap {
@@ -50,12 +60,14 @@ namespace Cipher {
     TCode calcCode(const char * data, int n);
     bool loadFreqMap(const char * fname, TFreqMap & res);
 
+    bool encryptExact(const TParameters & params, const std::string & text, TClusters & clusters);
+    bool generateSimilarityMap(const TParameters & params, const std::string & text, TSimilarityMap & ccMap);
+
     bool generateClusters(const TParameters & params, int N, TClusters & clusters, const std::vector<int> & hint);
     bool printClusterGoodness(const std::string & text, const TClusters & clusters);
 
     float costF(const TSimilarityMap & ccMap, const TClusters & clusters);
     float costFUpdate(const TSimilarityMap & ccMap, const TClusters & clusters, int i, int cid, float c0);
-    TProb calcScore0(const TFreqMap & freqMap, const TClusters & txt, const TClusterToLetterMap & clMap);
 
     bool doSimulatedAnnealing3(
         const TParameters & params,
@@ -88,4 +100,7 @@ namespace Cipher {
         TClusterToLetterMap & clMap,
         const std::vector<int> & hint = {}
         );
+
+    void printText(const TClusters & t);
+    void printText(const TClusters & t, const TClusterToLetterMap & clMap);
 }

@@ -9,6 +9,22 @@
 #include <cstdlib>
 #include <fstream>
 #include <chrono>
+#include <cassert>
+
+template <typename T>
+void shuffle(T & t, int start = -1, int end = -1, const std::vector<int> & hint = {}) {
+    if (start == -1) start = 0;
+    if (end == -1) end = t.size();
+
+    for (int i = end - 1; i > start; --i) {
+        int i0 = i;
+        int i1 = rand()%(i - start + 1)+start;
+        if (hint.size() > 0 && (hint[i0] != -1 || hint[i1] != -1)) {
+            continue;
+        }
+        std::swap(t[i0], t[i1]);
+    }
+}
 
 namespace Cipher {
     inline float frand() { return ((float)rand())/RAND_MAX; }
@@ -357,7 +373,7 @@ namespace Cipher {
         }
         printf("    Total n-grams loaded = %g\n", (double) nTotal);
 
-        res.pmin = std::log(100.01/nTotal);
+        res.pmin = std::log(10000000.01/nTotal);
         printf("    P-min = %g\n", res.pmin);
         for (auto & p : prob) {
             if (p >= 0.5) p = res.pmin;
@@ -365,6 +381,82 @@ namespace Cipher {
 
         return true;
     }
+
+    bool encryptExact(const TParameters & params, const std::string & text, TClusters & clusters) {
+        auto myCharToLetter = kCharToLetter;
+
+		int k = 26;
+        {
+            for (auto & p : text) {
+                if (myCharToLetter[p] == 0) {
+                    myCharToLetter[p] = ++k;
+                }
+            }
+            printf("[encryptExact] Unique symbols = %d\n", k);
+        }
+
+		std::vector<TCluster> alphabetTransformation(k);
+		for (int i = 0; i < alphabetTransformation.size(); ++i) {
+			alphabetTransformation[i] = i;
+		}
+
+		shuffle(alphabetTransformation);
+
+		clusters.resize(text.size());
+
+		for (int i = 0; i < (int) text.size(); ++i) {
+			assert(myCharToLetter[text[i]] > 0);
+			clusters[i] = alphabetTransformation[myCharToLetter[text[i]] - 1] + 1;
+			printf("%d - %d\n", i, clusters[i]);
+			assert(clusters[i] > 0 && clusters[i] <= k);
+		}
+
+        return true;
+    }
+
+	bool generateSimilarityMap(const TParameters & params, const std::string & text, TSimilarityMap & ccMap) {
+		int n = text.size();
+		ccMap.clear();
+
+		std::vector<float> waveformAccuracy(n);
+
+		for (int i = 0; i < n; ++i) {
+			float pError = frand();
+			if (pError < params.waveformDetectionErrorP) {
+				waveformAccuracy[i] = 1.0 - params.waveformDetectionErrorMin - frand()*(params.waveformDetectionErrorSig);
+			} else {
+				waveformAccuracy[i] = 1.0 - params.waveformDeviationMin - frand()*(params.waveformDeviationSig);
+			}
+
+			waveformAccuracy[i] += 2.0f*(0.5f - frand())*params.similarityNoiseSig;
+			waveformAccuracy[i] = std::max(0.0f, waveformAccuracy[i]);
+			waveformAccuracy[i] = std::min(1.0f, waveformAccuracy[i]);
+		}
+
+		for (int i = 0; i < n; ++i) {
+			for (int j = 0; j < n; ++j) {
+				if (i == j) {
+					ccMap[i][j] = 1.0;
+
+					continue;
+				}
+
+				if (text[i] != text[j]) {
+					float sim = params.similarityMismatchAvg + 2.0f*(0.5f - frand())*params.similarityMismatchSig;
+
+					ccMap[i][j] = sim;
+					ccMap[j][i] = sim;
+				} else {
+					float sim = waveformAccuracy[i]*waveformAccuracy[j];
+
+					ccMap[i][j] = sim;
+					ccMap[j][i] = sim;
+				}
+			}
+		}
+
+		return true;
+	}
 
     bool generateClusters(const TParameters & params, int N, TClusters & clusters, const std::vector<int> & hint) {
         clusters.clear();
@@ -476,8 +568,7 @@ namespace Cipher {
 
         while (k > 0) {
             if (i1 >= n) return -1e100;
-            auto c = plain[i1];
-            ++i1;
+            auto c = plain[i1++];
             if (c > 0 && c <= 26) {
                 curc <<= 5;
                 curc += c;
@@ -493,8 +584,7 @@ namespace Cipher {
 
             while (true) {
                 if (i1 >= n) return res/n - params.wEnglishFreq*letFreqCost;
-                auto c = plain[i1];
-                ++i1;
+                auto c = plain[i1++];
                 if (c > 0 && c <= 26) {
                     curc <<= 5;
                     curc += c;
@@ -974,28 +1064,41 @@ namespace Cipher {
         const TParameters & params,
         const TClusters & clusters,
         TClusterToLetterMap & clMap,
-        const std::vector<int> & hint) {
+        [[maybe_unused]] const std::vector<int> & hint) {
 
         clMap.clear();
-        std::map<TLetter, bool> used;
-        std::map<TCluster, bool> fixed;
-        for (int i = 0; i < (int) hint.size(); ++i) {
-            if (hint[i] < 0) continue;
-            //if (used[hint[i]]) continue;
-            if (fixed[clusters[i]]) continue;
 
-            clMap[clusters[i]] = hint[i];
-            used[hint[i]] = true;
-            fixed[clusters[i]] = true;
-            printf("Fixed %d\n", clusters[i]);
+        std::vector<int> t(params.maxClusters, 0);
+        for (int i = 0; i < 27; ++i) {
+            t[i] = i;
         }
 
-        {
-            for (int i = 0; i < params.maxClusters; ++i) {
-                if (fixed[i]) continue;
-                clMap[i] = rand()%27;
-            }
+        shuffle(t);
+
+        for (int i = 0; i < params.maxClusters; ++i) {
+            clMap[i] = t[i];
         }
+
+        //std::map<TLetter, bool> used;
+        //std::map<TCluster, bool> fixed;
+
+        //for (int i = 0; i < (int) hint.size(); ++i) {
+        //    if (hint[i] < 0) continue;
+        //    //if (used[hint[i]]) continue;
+        //    if (fixed[clusters[i]]) continue;
+
+        //    clMap[clusters[i]] = hint[i];
+        //    used[hint[i]] = true;
+        //    fixed[clusters[i]] = true;
+        //    printf("Fixed %d\n", clusters[i]);
+        //}
+
+        //{
+        //    for (int i = 0; i < params.maxClusters; ++i) {
+        //        if (fixed[i]) continue;
+        //        clMap[i] = rand()%27;
+        //    }
+        //}
     }
 
     bool subbreak(
@@ -1018,12 +1121,12 @@ namespace Cipher {
         float bestp = calcScore0(params, freqMap, clusters, besta);
         printf("Initial prob: %g\n", bestp);
 
-        auto bestbestp = bestp;
+        static auto bestbestp = bestp;
 
         int nIters = 0;
         int nMainIters = params.nSubbreakIterations;
         while (nMainIters--) {
-            if (++nIters > 10000) {
+            if (++nIters > 100) {
                 getRandomCLMap(params, clusters, besta, hint);
                 bestp = calcScore0(params, freqMap, clusters, besta);
                 printf("reset\n");
@@ -1051,12 +1154,17 @@ namespace Cipher {
             auto cura = itera;
             for (int i = 0; i < 100; ++i) {
                 int a0 = rand()%params.maxClusters;
-                while (fixed[a0]) {
+                int a1 = rand()%params.maxClusters;
+                while (a0 == a1) {
                     a0 = rand()%params.maxClusters;
+                    a1 = rand()%params.maxClusters;
                 }
 
-                int olda = cura[a0];
-                cura[a0] = rand()%27;
+                if (hint.size() > 0 && (hint[a0] != -1 || hint[a1] != -1)) {
+                    continue;
+                }
+
+                std::swap(cura[a0], cura[a1]);
 
                 auto curp = calcScore0(params, freqMap, clusters, cura);
                 if (curp > iterp) {
@@ -1064,7 +1172,7 @@ namespace Cipher {
                     itera = cura;
                     i = 0;
                 } else {
-                    cura[a0] = olda;
+					std::swap(cura[a0], cura[a1]);
                 }
             }
 
@@ -1075,6 +1183,10 @@ namespace Cipher {
                 if (bestp > bestbestp) {
                     bestbestp = bestp;
                     printf("[+] Best score = %g\n", bestp);
+                    //for (int i = 0; i < N; ++i) {
+                    //    printf("besta[%d] - %d\n", clusters[i], besta[clusters[i]]);
+                    //}
+
                     for (int i = 0; i < N; ++i) {
                         if (besta[clusters[i]] > 0 && besta[clusters[i]] <= 26) {
                             printf("%c", 'a'+besta[clusters[i]]-1);
@@ -1091,5 +1203,20 @@ namespace Cipher {
         clMap = besta;
 
         return true;
+    }
+
+    void printText(const TClusters & t) {
+        for (auto & c : t) {
+            if (c >= 1 && c <= 26) printf("%c", 'a' + c - 1); else printf(".");
+        }
+        printf("\n");
+    }
+
+    void printText(const TClusters & t, const TClusterToLetterMap & clMap) {
+        for (auto & cc : t) {
+			auto c = clMap.at(cc);
+            if (c >= 1 && c <= 26) printf("%c", 'a' + c - 1); else printf(".");
+        }
+        printf("\n");
     }
 }

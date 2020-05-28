@@ -27,6 +27,9 @@ int main(int argc, const char ** argv) {
 
     bool doRecord = true;
 
+    int nFrames = getBufferSize_frames(kSampleRate, kBufferSize_s);
+    int nFrames2 = std::max(1, nFrames/2);
+
     AudioLogger audioLogger;
     AudioLogger::Callback cbAudio = [&](const auto & frames) {
         doRecord = true;
@@ -69,8 +72,11 @@ int main(int argc, const char ** argv) {
     };
 
     AudioLogger::Parameters parameters;
-    parameters.sampleRate = kSampleRate;
     parameters.callback = std::move(cbAudio);
+    parameters.captureId = 0;
+    parameters.nChannels = 1;
+    parameters.sampleRate = kSampleRate;
+    parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
     if (audioLogger.install(std::move(parameters)) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
@@ -80,7 +86,7 @@ int main(int argc, const char ** argv) {
     while (true) {
         if (doRecord) {
             doRecord = false;
-            audioLogger.record(kBufferSize_s);
+            audioLogger.record(kBufferSize_s, nFrames2/2);
         } else {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }

@@ -169,4 +169,13 @@ if (BUILD_EXPERIMENTAL)
 
     add_executable(subbreak subbreak.cpp)
     target_link_libraries(subbreak PRIVATE Core)
+
+    add_executable(non-exact-subbreak non-exact-subbreak.cpp subbreak2.cpp)
+    target_link_libraries(non-exact-subbreak PRIVATE Core)
+
+    add_executable(non-exact-subbreak2 non-exact-subbreak2.cpp subbreak2.cpp)
+    target_link_libraries(non-exact-subbreak2 PRIVATE Core)
+
+    add_executable(generate-clusters generate-clusters.cpp subbreak2.cpp)
+    target_link_libraries(generate-clusters PRIVATE Core)
 endif()

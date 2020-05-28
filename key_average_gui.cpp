@@ -96,7 +96,7 @@ int main(int argc, char ** argv) {
     fftwf_plan fftPlan = fftwf_plan_dft_1d(kSamplesPerFrame, fftIn, fftOut, FFTW_FORWARD, FFTW_ESTIMATE);
 
     using TKey = int;
-    using TKeyWaveform = std::array<AudioLogger::Frame, kTrainBufferSize_frames>;
+    using TKeyWaveform = std::array<AudioLogger::Frame, kBufferSizeTrain_frames>;
 
     TKey keyPressed = -1;
     std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
@@ -273,10 +273,11 @@ int main(int argc, char ** argv) {
     };
 
     AudioLogger::Parameters parameters;
-    parameters.sampleRate = kSampleRate;
     parameters.callback = std::move(cbAudio);
     parameters.captureId = captureId;
     parameters.nChannels = nChannels;
+    parameters.sampleRate = kSampleRate;
+    parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
     if (audioLogger.install(std::move(parameters)) == false) {
         fprintf(stderr, "Failed to install audio logger\n");
@@ -296,7 +297,7 @@ int main(int argc, char ** argv) {
                         //auto t1 = std::chrono::high_resolution_clock::now();
                         //printf("Event: %d\n", (int) std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
                         keyPressed = event.key.keysym.sym;
-                        audioLogger.record(kTrainBufferSize_s);
+                        audioLogger.record(kBufferSizeTrain_s, 3);
                     }
                     break;
                 case SDL_QUIT:
@@ -315,7 +316,7 @@ int main(int argc, char ** argv) {
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
         ImGui::SetNextWindowSize(ImVec2(windowSizeX, windowSizeY), ImGuiCond_Once);
         ImGui::Begin("Average Key Waveform");
-        ImGui::Text("Frames in buffer: %d\n", (int) kTrainBufferSize_frames);
+        ImGui::Text("Frames in buffer: %d\n", (int) kBufferSizeTrain_frames);
         {
             std::lock_guard<std::mutex> lock(mutex);
 

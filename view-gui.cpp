@@ -77,8 +77,8 @@ bool readFromFile(const TParameters & params, const std::string & fname, TWavefo
 
     int32_t bufferSize_frames = 1;
     fin.read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
-    if (bufferSize_frames != kTrainBufferSize_frames) {
-        printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kTrainBufferSize_frames);
+    if (bufferSize_frames != kBufferSizeTrain_frames) {
+        printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kBufferSizeTrain_frames);
         return false;
     }
 
@@ -203,8 +203,8 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
 
         static int nview = waveform.size();
         static int offset = (waveform.size() - nview)/2;
-        static float amin = std::numeric_limits<TSample>::min()/2;
-        static float amax = std::numeric_limits<TSample>::max()/2;
+        static float amin = std::numeric_limits<TSample>::min();
+        static float amax = std::numeric_limits<TSample>::max();
         static float dragOffset = 0.0f;
         static float scrollSize = 18.0f;
 
@@ -280,7 +280,7 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
         offset = std::max(0, std::min((int) offset, (int) waveform.size() - nview));
 
         for (int i = 0; i < (int) trainKeys.size(); ++i) {
-            int pos = i*kSamplesPerFrame*kTrainBufferSize_frames + 0.5*kTrainBufferSize_frames*kSamplesPerFrame;
+            int pos = i*kSamplesPerFrame*kBufferSizeTrain_frames + 0.5*kBufferSizeTrain_frames*kSamplesPerFrame;
             if (pos + params.offsetFromPeak + params.keyPressWidth_samples < offset) continue;
             if (pos + params.offsetFromPeak - params.keyPressWidth_samples >= offset + nview) break;
 
