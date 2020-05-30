@@ -142,52 +142,6 @@ bool loadKeyPresses(const char * fname, const TWaveformView & waveform, TKeyPres
     return true;
 }
 
-bool readFromFile(const std::string & fname, TWaveform & res) {
-    std::ifstream fin(fname, std::ios::binary | std::ios::ate);
-    if (fin.good() == false) {
-        return false;
-    }
-
-    {
-        std::streamsize size = fin.tellg();
-        fin.seekg(0, std::ios::beg);
-
-        static_assert(std::is_same<TSampleInput, float>::value, "TSampleInput not recognised");
-        static_assert(
-            std::is_same<TSample, float>::value
-            || std::is_same<TSample, int16_t>::value
-            || std::is_same<TSample, int32_t>::value
-                      , "TSampleInput not recognised");
-
-        if (std::is_same<TSample, int16_t>::value) {
-            std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
-            res.resize(size/sizeof(TSampleInput));
-            fin.read((char *)(buf.data()), size);
-            double amax = 0.0f;
-            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < (int) buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
-            //double asum = 0.0f;
-            //for (auto i = 0; i < buf.size(); ++i) asum += std::abs(buf[i]); asum /= buf.size(); asum *= 10.0;
-            //for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(2000.0*(buf[i]/asum));
-        } else if (std::is_same<TSample, int32_t>::value) {
-            std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
-            res.resize(size/sizeof(TSampleInput));
-            fin.read((char *)(buf.data()), size);
-            double amax = 0.0f;
-            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < (int) buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
-        } else if (std::is_same<TSample, float>::value) {
-            res.resize(size/sizeof(TSample));
-            fin.read((char *)(res.data()), size);
-        } else {
-        }
-    }
-
-    fin.close();
-
-    return true;
-}
-
 bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveformLowRes, int nWindow) {
     waveformLowRes.resize(waveform.n);
 
@@ -639,6 +593,7 @@ float plotWaveformInverse(void * data, int i) {
 
 struct PlaybackData {
     static const int kSamples = 1024;
+    bool playing = false;
     int slowDown = 1;
     int64_t idx = 0;
     int64_t offset = 0;
@@ -659,8 +614,8 @@ bool renderKeyPresses(TParameters & params, const char * fnameInput, const TWave
 
         static int nview = waveform.size();
         static int offset = (waveform.size() - nview)/2;
-        static float amin = -16000;
-        static float amax = 16000;
+        static float amin = std::numeric_limits<TSample>::min();
+        static float amax = std::numeric_limits<TSample>::max();
         static float dragOffset = 0.0f;
         static float scrollSize = 18.0f;
 
@@ -847,12 +802,20 @@ bool renderKeyPresses(TParameters & params, const char * fnameInput, const TWave
 
         ImGui::Checkbox("x0.5", &playHalfSpeed);
         ImGui::SameLine();
-        if (ImGui::Button("Play") || ImGui::IsKeyPressed(44)) { // space
-            g_playbackData.slowDown = playHalfSpeed ? 2 : 1;
-            g_playbackData.idx = 0;
-            g_playbackData.offset = offset;
-            g_playbackData.waveform = getView(waveform, offset, std::min((int) (10*params.sampleRate), nview));
-            SDL_PauseAudioDevice(g_deviceIdOut, 0);
+        if (g_playbackData.playing) {
+            if (ImGui::Button("Stop") || ImGui::IsKeyPressed(44)) { // space
+                g_playbackData.playing = false;
+                g_playbackData.idx = g_playbackData.waveform.n - PlaybackData::kSamples;
+            }
+        } else {
+            if (ImGui::Button("Play") || ImGui::IsKeyPressed(44)) { // space
+                g_playbackData.playing = true;
+                g_playbackData.slowDown = playHalfSpeed ? 2 : 1;
+                g_playbackData.idx = 0;
+                g_playbackData.offset = offset;
+                g_playbackData.waveform = getView(waveform, offset, std::min((int) (10*params.sampleRate), nview));
+                SDL_PauseAudioDevice(g_deviceIdOut, 0);
+            }
         }
 
         if (g_playbackData.idx > g_playbackData.waveform.n) {
@@ -953,40 +916,42 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
         auto drawList = ImGui::GetWindowDrawList();
 
         int hoveredId = -1;
-        ImGui::InvisibleButton("SimilarityMapIB", { n*bsize, n*bsize });
-        for (int i = 0; i < n; ++i) {
-            for (int j = 0; j < n; ++j) {
-                float col = similarityMap[i][j].cc;
-                ImVec2 p0 = {savePos.x + j*bsize, savePos.y + i*bsize};
-                ImVec2 p1 = {savePos.x + (j + 1)*bsize - 1.0f, savePos.y + (i + 1)*bsize - 1.0f};
-                if (similarityMap[i][j].cc > threshold) {
-                    drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, col}));
-                }
-                if (ImGui::IsMouseHoveringRect(p0, {p1.x + 1.0f, p1.y + 1.0f})) {
-                    if (i == j) hoveredId = i;
-                    if (ImGui::IsMouseDown(0) == false) {
-                        ImGui::BeginTooltip();
-                        ImGui::Text("[%3d, %3d]\n", keyPresses[i].cid, keyPresses[j].cid);
-                        ImGui::Text("[%3d, %3d] = %5.4g\n", i, j, similarityMap[i][j].cc);
-                        for (int k = 0; k < n; ++k) {
-                            if (similarityMap[i][k].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", i, k, (int) similarityMap[i][k].offset);
+        if (n > 0) {
+            ImGui::InvisibleButton("SimilarityMapIB", { n*bsize, n*bsize });
+            for (int i = 0; i < n; ++i) {
+                for (int j = 0; j < n; ++j) {
+                    float col = similarityMap[i][j].cc;
+                    ImVec2 p0 = {savePos.x + j*bsize, savePos.y + i*bsize};
+                    ImVec2 p1 = {savePos.x + (j + 1)*bsize - 1.0f, savePos.y + (i + 1)*bsize - 1.0f};
+                    if (similarityMap[i][j].cc > threshold) {
+                        drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, col}));
+                    }
+                    if (ImGui::IsMouseHoveringRect(p0, {p1.x + 1.0f, p1.y + 1.0f})) {
+                        if (i == j) hoveredId = i;
+                        if (ImGui::IsMouseDown(0) == false) {
+                            ImGui::BeginTooltip();
+                            ImGui::Text("[%3d, %3d]\n", keyPresses[i].cid, keyPresses[j].cid);
+                            ImGui::Text("[%3d, %3d] = %5.4g\n", i, j, similarityMap[i][j].cc);
+                            for (int k = 0; k < n; ++k) {
+                                if (similarityMap[i][k].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", i, k, (int) similarityMap[i][k].offset);
+                            }
+                            ImGui::Separator();
+                            for (int k = 0; k < n; ++k) {
+                                if (similarityMap[k][i].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", k, i, (int) similarityMap[k][i].offset);
+                            }
+                            ImGui::EndTooltip();
                         }
-                        ImGui::Separator();
-                        for (int k = 0; k < n; ++k) {
-                            if (similarityMap[k][i].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", k, i, (int) similarityMap[k][i].offset);
-                        }
-                        ImGui::EndTooltip();
                     }
                 }
             }
-        }
 
-        if (hoveredId >= 0) {
-            for (int i = 0; i < n; ++i) {
-                if (keyPresses[i].cid == keyPresses[hoveredId].cid) {
-                    ImVec2 p0 = {savePos.x + i*bsize, savePos.y + i*bsize};
-                    ImVec2 p1 = {savePos.x + (i + 1)*bsize - 1.0f, savePos.y + (i + 1)*bsize - 1.0f};
-                    drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 1.0f}));
+            if (hoveredId >= 0) {
+                for (int i = 0; i < n; ++i) {
+                    if (keyPresses[i].cid == keyPresses[hoveredId].cid) {
+                        ImVec2 p0 = {savePos.x + i*bsize, savePos.y + i*bsize};
+                        ImVec2 p1 = {savePos.x + (i + 1)*bsize - 1.0f, savePos.y + (i + 1)*bsize - 1.0f};
+                        drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 0.0f, 0.0f, 1.0f}));
+                    }
                 }
             }
         }
@@ -1248,25 +1213,35 @@ bool renderSolution(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
 
 void cbPlayback(void * userData, uint8_t * stream, int len) {
     PlaybackData * data = (PlaybackData *)(userData);
+    if (data->playing == false) {
+        int offset = 0;
+        TSample a = 0;
+        while (len > 0) {
+            memcpy(stream + offset*sizeof(a), &a, sizeof(a));
+            len -= sizeof(a);
+            ++offset;
+        }
+        return;
+    }
     auto end = std::min(data->idx + PlaybackData::kSamples/data->slowDown, data->waveform.n);
     auto idx = data->idx;
     auto sidx = 0;
     for (; idx < end; ++idx) {
-        int16_t a = data->waveform.samples[idx];
+        TSample a = data->waveform.samples[idx];
         memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
         len -= sizeof(a);
         ++sidx;
 
         if (data->slowDown == 2) {
-            int16_t a2 = data->waveform.samples[idx + 1];
-            a = 0.5*(a + a2);
+            TSample a2 = data->waveform.samples[idx + 1];
+            a = 0.5*a + 0.5*a2;
             memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
             len -= sizeof(a);
             ++sidx;
         }
     }
     while (len > 0) {
-        int16_t a = 0;
+        TSample a = 0;
         memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
         len -= sizeof(a);
         ++idx;
@@ -1290,7 +1265,7 @@ bool prepareAudioOut(const TParameters & params) {
     SDL_zero(playbackSpec);
 
     playbackSpec.freq = params.sampleRate;
-    playbackSpec.format = AUDIO_S16;
+    playbackSpec.format = std::is_same<TSample, int16_t>::value ? AUDIO_S16 : AUDIO_S32;
     playbackSpec.channels = 1;
     playbackSpec.samples = PlaybackData::kSamples;
     playbackSpec.callback = cbPlayback;
@@ -1346,7 +1321,7 @@ int main(int argc, char ** argv) {
     }
 
     printf("[+] Loading recording from '%s'\n", argv[1]);
-    if (readFromFile(argv[1], waveformInput) == false) {
+    if (readFromFile<TSampleF>(argv[1], waveformInput) == false) {
         printf("Specified file '%s' does not exist\n", argv[1]);
         return -1;
     }

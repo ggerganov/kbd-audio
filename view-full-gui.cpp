@@ -83,49 +83,6 @@ struct stParameters {
     float thresholdClustering   = 0.5f;
 };
 
-bool readFromFile(const std::string & fname, TWaveform & res) {
-    std::ifstream fin(fname, std::ios::binary | std::ios::ate);
-    if (fin.good() == false) {
-        return false;
-    }
-
-    {
-        std::streamsize size = fin.tellg();
-        fin.seekg(0, std::ios::beg);
-
-        static_assert(std::is_same<TSampleInput, float>::value, "TSampleInput not recognised");
-        static_assert(
-            std::is_same<TSample, float>::value
-            || std::is_same<TSample, int16_t>::value
-            || std::is_same<TSample, int32_t>::value
-                      , "TSampleInput not recognised");
-
-        if (std::is_same<TSample, int16_t>::value) {
-            std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
-            res.resize(size/sizeof(TSampleInput));
-            fin.read((char *)(buf.data()), size);
-            double amax = 0.0f;
-            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < (int) buf.size(); ++i) res[i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
-        } else if (std::is_same<TSample, int32_t>::value) {
-            std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
-            res.resize(size/sizeof(TSampleInput));
-            fin.read((char *)(buf.data()), size);
-            double amax = 0.0f;
-            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < (int) buf.size(); ++i) res[i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
-        } else if (std::is_same<TSample, float>::value) {
-            res.resize(size/sizeof(TSample));
-            fin.read((char *)(res.data()), size);
-        } else {
-        }
-    }
-
-    fin.close();
-
-    return true;
-}
-
 bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveformLowRes, int nWindow) {
     waveformLowRes.resize(waveform.n);
 
@@ -443,7 +400,7 @@ int main(int argc, char ** argv) {
     };
 
     printf("[+] Loading recording from '%s'\n", argv[1]);
-    if (readFromFile(argv[1], waveformInput) == false) {
+    if (readFromFile<TSampleF>(argv[1], waveformInput) == false) {
         printf("Specified file '%s' does not exist\n", argv[1]);
         return -1;
     }

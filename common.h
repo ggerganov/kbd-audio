@@ -32,16 +32,17 @@ stWaveformView<T> getView(const TWaveformT<T> & waveform, int64_t idx, int64_t l
     return { waveform.data() + idx, len };
 }
 
-using TConfidence = float;
-using TValueCC = double;
-using TOffset = int64_t;
+using TConfidence   = float;
+using TValueCC      = double;
+using TOffset       = int64_t;
 
-using TSampleF = float;
-using TSampleI16 = int16_t;
-using TSampleI32 = int32_t;
+using TSampleF      = float;
+using TSampleI16    = int16_t;
+using TSampleI32    = int32_t;
 
-using TKey = int;
+using TKey              = int32_t;
 using TKeyConfidenceMap = std::map<TKey, TConfidence>;
+using TTrainKeys        = std::vector<TKey>;
 
 // - i16 samples
 
@@ -66,6 +67,12 @@ template <typename T>
 float toSeconds(T t0, T t1) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1000.0f;
 }
+
+template <typename TSampleInput, typename TSample>
+bool readFromFile(const std::string & fname, TWaveformT<TSample> & res);
+
+template <typename TSampleInput, typename TSample>
+bool readFromFile(const std::string & fname, TWaveformT<TSample> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames);
 
 //
 // calcSum

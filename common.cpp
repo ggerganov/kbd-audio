@@ -3,11 +3,40 @@
  */
 
 #include "common.h"
+#include "constants.h"
 
 #include <cstring>
 #include <cmath>
 #include <thread>
 #include <mutex>
+#include <fstream>
+
+namespace {
+template <typename TSampleInput, typename TSample>
+    bool readWaveform(std::ifstream & fin, TWaveformT<TSample> & res, int32_t offset, std::streamsize size) {
+        if (std::is_same<TSample, int16_t>::value) {
+            std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
+            res.resize(offset + size/sizeof(TSampleInput));
+            fin.read((char *)(buf.data()), size);
+            double amax = 0.0f;
+            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
+            for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
+        } else if (std::is_same<TSample, int32_t>::value) {
+            std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
+            res.resize(offset + size/sizeof(TSampleInput));
+            fin.read((char *)(buf.data()), size);
+            double amax = 0.0f;
+            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
+            for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
+        } else if (std::is_same<TSample, float>::value) {
+            res.resize(offset + size/sizeof(TSample));
+            fin.read((char *)(res.data() + offset), size);
+        } else {
+            return false;
+        }
+        return true;
+    }
+}
 
 std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
     int last = argc;
@@ -22,6 +51,82 @@ std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
 
     return res;
 }
+
+template <typename TSampleInput, typename TSample>
+bool readFromFile(const std::string & fname, TWaveformT<TSample> & res) {
+    std::ifstream fin(fname, std::ios::binary | std::ios::ate);
+    if (fin.good() == false) {
+        return false;
+    }
+
+    {
+        std::streamsize size = fin.tellg();
+        fin.seekg(0, std::ios::beg);
+
+        static_assert(std::is_same<TSampleInput, float>::value, "TSampleInput not recognised");
+        static_assert(
+            std::is_same<TSample, float>::value
+            || std::is_same<TSample, int16_t>::value
+            || std::is_same<TSample, int32_t>::value
+                      , "TSampleInput not recognised");
+
+        if (readWaveform<TSampleInput>(fin, res, 0, size) == false) {
+            return false;
+        }
+    }
+
+    fin.close();
+
+    return true;
+}
+
+template bool readFromFile<TSampleF, TSampleI16>(const std::string & fname, TWaveformT<TSampleI16> & res);
+template bool readFromFile<TSampleF, TSampleI32>(const std::string & fname, TWaveformT<TSampleI32> & res);
+
+template <typename TSampleInput, typename TSample>
+bool readFromFile(const std::string & fname, TWaveformT<TSample> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames) {
+    trainKeys.clear();
+
+    std::ifstream fin(fname, std::ios::binary);
+    if (fin.good() == false) {
+        return false;
+    }
+
+    bufferSize_frames = 1;
+    fin.read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
+
+    {
+        static_assert(std::is_same<TSampleInput, float>::value, "TSampleInput not recognised");
+        static_assert(
+            std::is_same<TSample, float>::value
+            || std::is_same<TSample, int16_t>::value
+            || std::is_same<TSample, int32_t>::value
+                      , "TSampleInput not recognised");
+
+        int32_t offset = 0;
+        std::streamsize size = bufferSize_frames*kSamplesPerFrame*sizeof(TSampleInput);
+        while (true) {
+            TKey keyPressed = 0;
+            fin.read((char *)(&keyPressed), sizeof(keyPressed));
+            if (fin.eof()) break;
+            trainKeys.push_back(keyPressed);
+
+            if (readWaveform<TSampleInput>(fin, res, offset, size) == false) {
+                return false;
+            }
+
+            offset += size/sizeof(TSampleInput);
+            if (fin.eof()) break;
+        }
+    }
+
+    fin.close();
+
+    return true;
+}
+
+template bool readFromFile<TSampleF, TSampleI16>(const std::string & fname, TWaveformT<TSampleI16> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames);
+template bool readFromFile<TSampleF, TSampleI32>(const std::string & fname, TWaveformT<TSampleI32> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames);
 
 //
 // calcCC
