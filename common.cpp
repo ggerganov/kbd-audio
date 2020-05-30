@@ -10,6 +10,7 @@
 #include <thread>
 #include <mutex>
 #include <fstream>
+#include <deque>
 
 namespace {
 template <typename TSampleInput, typename TSample>
@@ -349,3 +350,146 @@ template std::tuple<TValueCC, TOffset> findBestCC<TSampleI16>(
     const TWaveformViewT<TSampleI16> & waveform0,
     const TWaveformViewT<TSampleI16> & waveform1,
     int64_t alignWindow);
+
+//
+// calculateSimilarityMap
+//
+
+template<typename T>
+bool calculateSimilartyMap(
+        const int32_t keyPressWidth_samples,
+        const int32_t alignWindow_samples,
+        const int32_t offsetFromPeak_samples,
+        TKeyPressCollectionT<T> & keyPresses,
+        TSimilarityMap & res) {
+    res.clear();
+    int nPresses = keyPresses.size();
+
+    int w = keyPressWidth_samples;
+    int a = alignWindow_samples;
+
+    res.resize(nPresses);
+    for (auto & x : res) x.resize(nPresses);
+
+    for (int i = 0; i < nPresses; ++i) {
+        res[i][i].cc = 1.0f;
+        res[i][i].offset = 0;
+
+        auto & waveform0 = keyPresses[i].waveform;
+        auto & pos0      = keyPresses[i].pos;
+        auto & avgcc     = keyPresses[i].ccAvg;
+
+        auto samples0 = waveform0.samples;
+        //auto n0       = waveform0.n;
+
+        for (int j = 0; j < nPresses; ++j) {
+            if (i == j) continue;
+
+            auto waveform1 = keyPresses[j].waveform;
+            auto pos1      = keyPresses[j].pos;
+
+            auto samples1 = waveform1.samples;
+            auto ret = findBestCC(TWaveformViewT<T> { samples0 + pos0 + offsetFromPeak_samples,     2*w },
+                                  TWaveformViewT<T> { samples1 + pos1 + offsetFromPeak_samples - a, 2*w + 2*a }, a);
+            auto bestcc     = std::get<0>(ret);
+            auto bestoffset = std::get<1>(ret);
+
+            res[i][j].cc = bestcc;
+            res[i][j].offset = bestoffset;
+
+            avgcc += bestcc;
+        }
+        avgcc /= (nPresses - 1);
+    }
+
+    return true;
+}
+
+template bool calculateSimilartyMap<TSampleI16>(
+        const int32_t keyPressWidth_samples,
+        const int32_t alignWindow_samples,
+        const int32_t offsetFromPeak_samples,
+        TKeyPressCollectionT<TSampleI16> & keyPresses,
+        TSimilarityMap & res);
+
+//
+// findKeyPresses
+//
+
+template<typename T>
+bool findKeyPresses(
+        const TWaveformViewT<T> & waveform,
+        TKeyPressCollectionT<T> & res,
+        TWaveformT<T> & waveformThreshold,
+        double thresholdBackground,
+        int historySize) {
+    res.clear();
+    waveformThreshold.resize(waveform.n);
+
+    int rbBegin = 0;
+    double rbAverage = 0.0;
+    std::vector<double> rbSamples(8*historySize, 0.0);
+
+    int k = historySize;
+    std::deque<int64_t> que(k);
+
+    auto samples = waveform.samples;
+    auto n       = waveform.n;
+
+    TWaveformT<T> waveformAbs(n);
+    for (int64_t i = 0; i < n; ++i) {
+        waveformAbs[i] = std::abs(samples[i]);
+    }
+
+    for (int64_t i = 0; i < n; ++i) {
+        {
+            int64_t ii = i - k/2;
+            if (ii >= 0) {
+                rbAverage *= rbSamples.size();
+                rbAverage -= rbSamples[rbBegin];
+                double acur = waveformAbs[i];
+                rbSamples[rbBegin] = acur;
+                rbAverage += acur;
+                rbAverage /= rbSamples.size();
+                if (++rbBegin >= (int) rbSamples.size()) {
+                    rbBegin = 0;
+                }
+            }
+        }
+
+        if (i < k) {
+            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
+                que.pop_back();
+            }
+            que.push_back(i);
+        } else {
+            while((!que.empty()) && que.front() <= i - k) {
+                que.pop_front();
+            }
+
+            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
+                que.pop_back();
+            }
+
+            que.push_back(i);
+
+            int64_t itest = i - k/2;
+            if (itest >= 2*k && itest < n - 2*k && que.front() == itest) {
+                double acur = waveformAbs[itest];
+                if (acur > thresholdBackground*rbAverage){
+                    res.emplace_back(TKeyPressDataT<T> { std::move(waveform), itest, 0.0, -1, -1, '?' });
+                }
+            }
+            waveformThreshold[itest] = waveformAbs[que.front()];
+        }
+    }
+
+    return true;
+}
+
+template bool findKeyPresses<TSampleI16>(
+        const TWaveformViewT<TSampleI16> & waveform,
+        TKeyPressCollectionT<TSampleI16> & res,
+        TWaveformT<TSampleI16> & waveformThreshold,
+        double thresholdBackground,
+        int historySize);

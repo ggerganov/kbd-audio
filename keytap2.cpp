@@ -26,75 +26,6 @@ using TWaveformView         = TWaveformViewI16;
 using TKeyPressData         = TKeyPressDataI16;
 using TKeyPressCollection   = TKeyPressCollectionI16;
 
-bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res) {
-    res.clear();
-
-    int rbBegin = 0;
-    double rbAverage = 0.0;
-    std::array<double, 4*4*1024> rbSamples;
-    rbSamples.fill(0.0);
-
-    int k = 4*1024;
-    double thresholdBackground = 10.0;
-    std::deque<int64_t> que(k);
-
-    auto samples = waveform.samples;
-    auto n       = waveform.n;
-
-    TWaveform waveformAbs(n);
-    for (int64_t i = 0; i < n; ++i) {
-        waveformAbs[i] = std::abs(samples[i]);
-    }
-
-    for (int64_t i = 0; i < n; ++i) {
-        {
-            int64_t ii = i - k/2;
-            if (ii >= 0) {
-                rbAverage *= rbSamples.size();
-                rbAverage -= rbSamples[rbBegin];
-                double acur = waveformAbs[i];
-                rbSamples[rbBegin] = acur;
-                rbAverage += acur;
-                rbAverage /= rbSamples.size();
-                if (++rbBegin >= (int) rbSamples.size()) {
-                    rbBegin = 0;
-                }
-            }
-        }
-
-        if (i < k) {
-            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
-                que.pop_back();
-            }
-            que.push_back(i);
-        } else {
-            while((!que.empty()) && que.front() <= i - k) {
-                que.pop_front();
-            }
-
-            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
-                que.pop_back();
-            }
-
-            que.push_back(i);
-
-            int64_t itest = i - k/2;
-            if (itest >= 2*k && itest < n - 2*k && que.front() == itest) {
-                double acur = waveformAbs[itest];
-                if (acur > thresholdBackground*rbAverage){
-                    res.emplace_back(TKeyPressData { std::move(waveform), itest, 0.0, -1, -1, '?' });
-                }
-            }
-        }
-    }
-
-    return true;
-}
-
-bool findKeyPresses(const TWaveform & waveform, TKeyPressCollection & res) {
-    return findKeyPresses(getView(waveform, 0), res);
-}
-
 bool dumpKeyPresses(const std::string & fname, const TKeyPressCollection & data) {
     std::ofstream fout(fname);
     for (auto & k : data) {
@@ -442,10 +373,11 @@ int main(int argc, char ** argv) {
     printf("    Recording length:        %g seconds\n", (float)(waveformInput.size())/sampleRate);
 
     TKeyPressCollection keyPresses;
+    TWaveform waveformThreshold;
     {
         auto tStart = std::chrono::high_resolution_clock::now();
         printf("[+] Searching for key presses\n");
-        if (findKeyPresses(waveformInput, keyPresses) == false) {
+        if (findKeyPresses(getView(waveformInput, 0), keyPresses, waveformThreshold, 10.0, 6*1024) == false) {
             printf("Failed to detect keypresses\n");
             return -2;
         }

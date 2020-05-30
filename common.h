@@ -156,46 +156,16 @@ bool calculateSimilartyMap(
         const int32_t alignWindow_samples,
         const int32_t offsetFromPeak_samples,
         TKeyPressCollectionT<T> & keyPresses,
-        TSimilarityMap & res) {
-    res.clear();
-    int nPresses = keyPresses.size();
+        TSimilarityMap & res);
 
-    int w = keyPressWidth_samples;
-    int a = alignWindow_samples;
+//
+// findKeyPresses
+//
 
-    res.resize(nPresses);
-    for (auto & x : res) x.resize(nPresses);
-
-    for (int i = 0; i < nPresses; ++i) {
-        res[i][i].cc = 1.0f;
-        res[i][i].offset = 0;
-
-        auto & waveform0 = keyPresses[i].waveform;
-        auto & pos0      = keyPresses[i].pos;
-        auto & avgcc     = keyPresses[i].ccAvg;
-
-        auto samples0 = waveform0.samples;
-        //auto n0       = waveform0.n;
-
-        for (int j = 0; j < nPresses; ++j) {
-            if (i == j) continue;
-
-            auto waveform1 = keyPresses[j].waveform;
-            auto pos1      = keyPresses[j].pos;
-
-            auto samples1 = waveform1.samples;
-            auto ret = findBestCC(TWaveformViewT<T> { samples0 + pos0 + offsetFromPeak_samples,     2*w },
-                                  TWaveformViewT<T> { samples1 + pos1 + offsetFromPeak_samples - a, 2*w + 2*a }, a);
-            auto bestcc     = std::get<0>(ret);
-            auto bestoffset = std::get<1>(ret);
-
-            res[i][j].cc = bestcc;
-            res[i][j].offset = bestoffset;
-
-            avgcc += bestcc;
-        }
-        avgcc /= (nPresses - 1);
-    }
-
-    return true;
-}
+template<typename T>
+bool findKeyPresses(
+        const TWaveformViewT<T> & waveform,
+        TKeyPressCollectionT<T> & res,
+        TWaveformT<T> & waveformThreshold,
+        double thresholdBackground,
+        int historySize);
