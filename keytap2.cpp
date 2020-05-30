@@ -20,42 +20,50 @@
 #define MY_DEBUG
 
 using TSampleInput          = TSampleF;
-using TSample               = TSampleI32;
-using TWaveform             = TWaveformI32;
-using TWaveformView         = TWaveformViewI32;
-using TKeyPressData         = TKeyPressDataI32;
-using TKeyPressCollection   = TKeyPressCollectionI32;
+using TSample               = TSampleI16;
+using TWaveform             = TWaveformI16;
+using TWaveformView         = TWaveformViewI16;
+using TKeyPressData         = TKeyPressDataI16;
+using TKeyPressCollection   = TKeyPressCollectionI16;
 
 bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res) {
     res.clear();
 
     int rbBegin = 0;
     double rbAverage = 0.0;
-    std::array<double, 4*1024> rbSamples;
+    std::array<double, 4*4*1024> rbSamples;
     rbSamples.fill(0.0);
 
-    int k = 1024;
+    int k = 4*1024;
     double thresholdBackground = 10.0;
-
     std::deque<int64_t> que(k);
+
     auto samples = waveform.samples;
     auto n       = waveform.n;
 
+    TWaveform waveformAbs(n);
+    for (int64_t i = 0; i < n; ++i) {
+        waveformAbs[i] = std::abs(samples[i]);
+    }
+
     for (int64_t i = 0; i < n; ++i) {
         {
-            rbAverage *= rbSamples.size();
-            rbAverage -= rbSamples[rbBegin];
-            double acur = std::abs(samples[i]);
-            rbSamples[rbBegin] = acur;
-            rbAverage += acur;
-            rbAverage /= rbSamples.size();
-            if (++rbBegin >= (int) rbSamples.size()) {
-                rbBegin = 0;
+            int64_t ii = i - k/2;
+            if (ii >= 0) {
+                rbAverage *= rbSamples.size();
+                rbAverage -= rbSamples[rbBegin];
+                double acur = waveformAbs[i];
+                rbSamples[rbBegin] = acur;
+                rbAverage += acur;
+                rbAverage /= rbSamples.size();
+                if (++rbBegin >= (int) rbSamples.size()) {
+                    rbBegin = 0;
+                }
             }
         }
 
         if (i < k) {
-            while((!que.empty()) && samples[i] >= samples[que.back()]) {
+            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
                 que.pop_back();
             }
             que.push_back(i);
@@ -64,7 +72,7 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res) {
                 que.pop_front();
             }
 
-            while((!que.empty()) && samples[i] >= samples[que.back()]) {
+            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
                 que.pop_back();
             }
 
@@ -72,7 +80,7 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res) {
 
             int64_t itest = i - k/2;
             if (itest >= 2*k && itest < n - 2*k && que.front() == itest) {
-                double acur = samples[itest];
+                double acur = waveformAbs[itest];
                 if (acur > thresholdBackground*rbAverage){
                     res.emplace_back(TKeyPressData { std::move(waveform), itest, 0.0, -1, -1, '?' });
                 }

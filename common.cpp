@@ -14,21 +14,14 @@
 namespace {
 template <typename TSampleInput, typename TSample>
     bool readWaveform(std::ifstream & fin, TWaveformT<TSample> & res, int32_t offset, std::streamsize size) {
-        if (std::is_same<TSample, int16_t>::value) {
+        if (std::is_same<TSample, TSampleI16>::value) {
             std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
             res.resize(offset + size/sizeof(TSampleInput));
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
             for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
-        } else if (std::is_same<TSample, int32_t>::value) {
-            std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
-            res.resize(offset + size/sizeof(TSampleInput));
-            fin.read((char *)(buf.data()), size);
-            double amax = 0.0f;
-            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
-        } else if (std::is_same<TSample, float>::value) {
+            for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<TSampleI16>::max()*(buf[i]/amax));
+        } else if (std::is_same<TSample, TSampleF>::value) {
             res.resize(offset + size/sizeof(TSample));
             fin.read((char *)(res.data() + offset), size);
         } else {
@@ -63,12 +56,9 @@ bool readFromFile(const std::string & fname, TWaveformT<TSample> & res) {
         std::streamsize size = fin.tellg();
         fin.seekg(0, std::ios::beg);
 
-        static_assert(std::is_same<TSampleInput, float>::value, "TSampleInput not recognised");
-        static_assert(
-            std::is_same<TSample, float>::value
-            || std::is_same<TSample, int16_t>::value
-            || std::is_same<TSample, int32_t>::value
-                      , "TSampleInput not recognised");
+        static_assert(std::is_same<TSampleInput, TSampleF>::value, "TSampleInput not supported");
+        static_assert(std::is_same<TSample, TSampleF>::value ||
+                      std::is_same<TSample, TSampleI16>::value, "TSample not supported");
 
         if (readWaveform<TSampleInput>(fin, res, 0, size) == false) {
             return false;
@@ -81,7 +71,6 @@ bool readFromFile(const std::string & fname, TWaveformT<TSample> & res) {
 }
 
 template bool readFromFile<TSampleF, TSampleI16>(const std::string & fname, TWaveformT<TSampleI16> & res);
-template bool readFromFile<TSampleF, TSampleI32>(const std::string & fname, TWaveformT<TSampleI32> & res);
 
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames) {
@@ -96,12 +85,9 @@ bool readFromFile(const std::string & fname, TWaveformT<TSample> & res, TTrainKe
     fin.read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
 
     {
-        static_assert(std::is_same<TSampleInput, float>::value, "TSampleInput not recognised");
-        static_assert(
-            std::is_same<TSample, float>::value
-            || std::is_same<TSample, int16_t>::value
-            || std::is_same<TSample, int32_t>::value
-                      , "TSampleInput not recognised");
+        static_assert(std::is_same<TSampleInput, TSampleF>::value, "TSampleInput not supported");
+        static_assert(std::is_same<TSample, TSampleF>::value ||
+                      std::is_same<TSample, TSampleI16>::value, "TSample not supported");
 
         int32_t offset = 0;
         std::streamsize size = bufferSize_frames*kSamplesPerFrame*sizeof(TSampleInput);
@@ -126,7 +112,6 @@ bool readFromFile(const std::string & fname, TWaveformT<TSample> & res, TTrainKe
 }
 
 template bool readFromFile<TSampleF, TSampleI16>(const std::string & fname, TWaveformT<TSampleI16> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames);
-template bool readFromFile<TSampleF, TSampleI32>(const std::string & fname, TWaveformT<TSampleI32> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames);
 
 //
 // calcCC
@@ -149,11 +134,10 @@ std::tuple<int64_t, int64_t> calcSum(const TWaveformViewT<T> & waveform) {
     int64_t sum = 0;
     int64_t sum2 = 0;
 
-    //auto [samples, n] = waveform;
     auto samples = waveform.samples;
     auto n       = waveform.n;
 
-    for (int64_t is = 0; is < n; ++is) {
+    for (int is = 0; is < n; ++is) {
         auto a0 = samples[is];
         sum += a0;
         sum2 += a0*a0;
@@ -164,7 +148,7 @@ std::tuple<int64_t, int64_t> calcSum(const TWaveformViewT<T> & waveform) {
 
 // calcSum : specializations
 
-template std::tuple<int64_t, int64_t> calcSum<TSampleI32>(const TWaveformViewT<TSampleI32> & waveform);
+template std::tuple<int64_t, int64_t> calcSum<TSampleI16>(const TWaveformViewT<TSampleI16> & waveform);
 
 //
 // calcCC
@@ -219,11 +203,9 @@ TValueCC calcCC(
     int64_t sum12 = 0;
     int64_t sum01 = 0;
 
-    //auto [samples0, n0] = waveform0;
     auto samples0 = waveform0.samples;
     auto n0       = waveform0.n;
 
-    //auto [samples1, n1] = waveform1;
     auto samples1 = waveform1.samples;
     auto n1       = waveform1.n;
 
@@ -255,9 +237,9 @@ TValueCC calcCC(
 
 // calcCC : specializations
 
-template TValueCC calcCC<TSampleI32>(
-    const TWaveformViewT<TSampleI32> & waveform0,
-    const TWaveformViewT<TSampleI32> & waveform1,
+template TValueCC calcCC<TSampleI16>(
+    const TWaveformViewT<TSampleI16> & waveform0,
+    const TWaveformViewT<TSampleI16> & waveform1,
     int64_t sum0, int64_t sum02);
 
 //
@@ -273,7 +255,6 @@ std::tuple<TValueCC, TOffset> findBestCC(
     TValueCC bestcc = -1.0f;
 
     int is00 = waveform0.size()/2 - (is1 - is0)/2;
-    //auto [sum0, sum02] = calcSum(waveform0, is00, is00 + is1 - is0);
     auto ret = calcSum(waveform0, is00, is00 + is1 - is0);
     auto sum0  = std::get<0>(ret);
     auto sum02 = std::get<1>(ret);
@@ -335,11 +316,9 @@ std::tuple<TValueCC, TOffset> findBestCC(
     TValueCC bestcc = -1.0;
     TOffset besto = -1;
 
-    //auto [samples0, n0] = waveform0;
     //auto samples0 = waveform0.samples;
     auto n0       = waveform0.n;
 
-    //auto [samples1, n1] = waveform1;
     auto samples1 = waveform1.samples;
 
 #ifdef MY_DEBUG
@@ -349,7 +328,6 @@ std::tuple<TValueCC, TOffset> findBestCC(
     }
 #endif
 
-    //auto [sum0, sum02] = calcSum(waveform0);
     auto ret = calcSum(waveform0);
     auto sum0  = std::get<0>(ret);
     auto sum02 = std::get<1>(ret);
@@ -367,8 +345,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
 
 // findBestCC : specializations
 
-template std::tuple<TValueCC, TOffset> findBestCC<TSampleI32>(
-    const TWaveformViewT<TSampleI32> & waveform0,
-    const TWaveformViewT<TSampleI32> & waveform1,
+template std::tuple<TValueCC, TOffset> findBestCC<TSampleI16>(
+    const TWaveformViewT<TSampleI16> & waveform0,
+    const TWaveformViewT<TSampleI16> & waveform1,
     int64_t alignWindow);
-

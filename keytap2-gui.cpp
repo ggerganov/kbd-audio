@@ -38,11 +38,11 @@ struct stParameters;
 using TParameters           = stParameters;
 
 using TSampleInput          = TSampleF;
-using TSample               = TSampleI32;
-using TWaveform             = TWaveformI32;
-using TWaveformView         = TWaveformViewI32;
-using TKeyPressData         = TKeyPressDataI32;
-using TKeyPressCollection   = TKeyPressCollectionI32;
+using TSample               = TSampleI16;
+using TWaveform             = TWaveformI16;
+using TWaveformView         = TWaveformViewI16;
+using TKeyPressData         = TKeyPressDataI16;
+using TKeyPressCollection   = TKeyPressCollectionI16;
 
 enum Approach {
     ClusterG = 0,

@@ -30,7 +30,6 @@ using TClusterId    = int32_t;
 
 using TSampleF      = float;
 using TSampleI16    = int16_t;
-using TSampleI32    = int32_t;
 
 using TKey              = int32_t;
 using TKeyPressPosition = int64_t;
@@ -42,15 +41,10 @@ using TSimilarityMap = std::vector<std::vector<TMatch>>;
 
 // - i16 samples
 
-using TWaveformI16          = TWaveformT<TSampleI16>;
-using TWaveformViewI16      = TWaveformViewT<TSampleI16>;
-
-// - i32 samples
-
-using TWaveformI32              = TWaveformT<TSampleI32>;
-using TWaveformViewI32          = TWaveformViewT<TSampleI32>;
-using TKeyPressDataI32          = TKeyPressDataT<TSampleI32>;
-using TKeyPressCollectionI32    = TKeyPressCollectionT<TSampleI32>;
+using TWaveformI16              = TWaveformT<TSampleI16>;
+using TWaveformViewI16          = TWaveformViewT<TSampleI16>;
+using TKeyPressDataI16          = TKeyPressDataT<TSampleI16>;
+using TKeyPressCollectionI16    = TKeyPressCollectionT<TSampleI16>;
 
 // - float samples
 
