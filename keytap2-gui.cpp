@@ -85,34 +85,6 @@ struct stParameters {
     Cipher::TParameters cipher;
 };
 
-bool saveKeyPresses(const char * fname, const TKeyPressCollection & keyPresses) {
-    std::ofstream fout(fname, std::ios::binary);
-    int n = keyPresses.size();
-    fout.write((char *)(&n), sizeof(n));
-    for (int i = 0; i < n; ++i) {
-        fout.write((char *)(&keyPresses[i].pos), sizeof(keyPresses[i].pos));
-    }
-    fout.close();
-
-    return true;
-}
-
-bool loadKeyPresses(const char * fname, const TWaveformView & waveform, TKeyPressCollection & keyPresses) {
-    keyPresses.clear();
-
-    std::ifstream fin(fname, std::ios::binary);
-    int n = 0;
-    fin.read((char *)(&n), sizeof(n));
-    keyPresses.resize(n);
-    for (int i = 0; i < n; ++i) {
-        keyPresses[i].waveform = waveform;
-        fin.read((char *)(&keyPresses[i].pos), sizeof(keyPresses[i].pos));
-    }
-    fin.close();
-
-    return true;
-}
-
 bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveformLowRes, int nWindow) {
     waveformLowRes.resize(waveform.n);
 
@@ -154,15 +126,6 @@ bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveform
 
 bool generateLowResWaveform(const TWaveform & waveform, TWaveform & waveformLowRes, int nWindow) {
     return generateLowResWaveform(getView(waveform, 0), waveformLowRes, nWindow);
-}
-
-bool dumpKeyPresses(const std::string & fname, const TKeyPressCollection & data) {
-    std::ofstream fout(fname);
-    for (auto & k : data) {
-        fout << k.pos << " 1" << std::endl;
-    }
-    fout.close();
-    return true;
 }
 
 bool clusterDBSCAN(const TSimilarityMap & sim, TValueCC epsCC, int minPts, TKeyPressCollection & keyPresses) {

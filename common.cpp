@@ -493,3 +493,49 @@ template bool findKeyPresses<TSampleI16>(
         TWaveformT<TSampleI16> & waveformThreshold,
         double thresholdBackground,
         int historySize);
+
+template<typename T>
+bool saveKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & keyPresses) {
+    std::ofstream fout(fname, std::ios::binary);
+    int n = keyPresses.size();
+    fout.write((char *)(&n), sizeof(n));
+    for (int i = 0; i < n; ++i) {
+        fout.write((char *)(&keyPresses[i].pos), sizeof(keyPresses[i].pos));
+    }
+    fout.close();
+
+    return true;
+}
+
+template bool saveKeyPresses<TSampleI16>(const std::string & fname, const TKeyPressCollectionT<TSampleI16> & keyPresses);
+
+template<typename T>
+bool loadKeyPresses(const std::string & fname, const TWaveformViewT<T> & waveform, TKeyPressCollectionT<T> & keyPresses) {
+    keyPresses.clear();
+
+    std::ifstream fin(fname, std::ios::binary);
+    int n = 0;
+    fin.read((char *)(&n), sizeof(n));
+    keyPresses.resize(n);
+    for (int i = 0; i < n; ++i) {
+        keyPresses[i].waveform = waveform;
+        fin.read((char *)(&keyPresses[i].pos), sizeof(keyPresses[i].pos));
+    }
+    fin.close();
+
+    return true;
+}
+
+template bool loadKeyPresses<TSampleI16>(const std::string & fname, const TWaveformViewT<TSampleI16> & waveform, TKeyPressCollectionT<TSampleI16> & keyPresses);
+
+template<typename T>
+bool dumpKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & data) {
+    std::ofstream fout(fname);
+    for (auto & k : data) {
+        fout << k.pos << " 1" << std::endl;
+    }
+    fout.close();
+    return true;
+}
+
+template bool dumpKeyPresses<TSampleI16>(const std::string & fname, const TKeyPressCollectionT<TSampleI16> & data);

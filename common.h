@@ -169,3 +169,12 @@ bool findKeyPresses(
         TWaveformT<T> & waveformThreshold,
         double thresholdBackground,
         int historySize);
+
+template<typename T>
+bool saveKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & keyPresses);
+
+template<typename T>
+bool loadKeyPresses(const std::string & fname, const TWaveformViewT<T> & waveform, TKeyPressCollectionT<T> & keyPresses);
+
+template<typename T>
+bool dumpKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & data);

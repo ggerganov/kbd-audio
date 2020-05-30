@@ -21,15 +21,6 @@ using TWaveformView         = TWaveformViewI16;
 using TKeyPressData         = TKeyPressDataI16;
 using TKeyPressCollection   = TKeyPressCollectionI16;
 
-bool dumpKeyPresses(const std::string & fname, const TKeyPressCollection & data) {
-    std::ofstream fout(fname);
-    for (auto & k : data) {
-        fout << k.pos << " 1" << std::endl;
-    }
-    fout.close();
-    return true;
-}
-
 bool clusterDBSCAN(const TSimilarityMap & sim, TValueCC epsCC, int minPts, TKeyPressCollection & keyPresses) {
     int n = keyPresses.size();
     for (int i = 0; i < n; ++i) {
