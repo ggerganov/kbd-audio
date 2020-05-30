@@ -9,6 +9,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <chrono>
 
 // types
 
@@ -60,6 +61,11 @@ using TKeyHistoryF = std::vector<TKeyWaveformF>;
 // helpers
 
 std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv);
+
+template <typename T>
+float toSeconds(T t0, T t1) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1000.0f;
+}
 
 //
 // calcSum

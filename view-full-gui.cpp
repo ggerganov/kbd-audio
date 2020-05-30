@@ -83,11 +83,6 @@ struct stParameters {
     float thresholdClustering   = 0.5f;
 };
 
-template <typename T>
-float toSeconds(T t0, T t1) {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1024.0f;
-}
-
 bool readFromFile(const std::string & fname, TWaveform & res) {
     std::ifstream fin(fname, std::ios::binary | std::ios::ate);
     if (fin.good() == false) {

@@ -31,11 +31,6 @@ using TKeyPressPosition     = int64_t;
 using TKeyPressData         = std::tuple<TWaveformView, TKeyPressPosition, TClusterId, TValueCC>;
 using TKeyPressCollection   = std::vector<TKeyPressData>;
 
-template <typename T>
-float toSeconds(T t0, T t1) {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1024.0f;
-}
-
 inline float frand() { return ((float)rand())/RAND_MAX; }
 
 bool readFromFile(const std::string & fname, TWaveform & res) {

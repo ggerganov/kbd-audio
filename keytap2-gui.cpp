@@ -114,11 +114,6 @@ struct stKeyPressCollection : public std::vector<TKeyPressData> {
     int nClusters = 0;
 };
 
-template <typename T>
-float toSeconds(T t0, T t1) {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1024.0f;
-}
-
 bool saveKeyPresses(const char * fname, const TKeyPressCollection & keyPresses) {
     std::ofstream fout(fname, std::ios::binary);
     int n = keyPresses.size();

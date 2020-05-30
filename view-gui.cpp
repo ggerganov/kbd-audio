@@ -52,11 +52,6 @@ struct stParameters {
     float thresholdClustering   = 0.5f;
 };
 
-template <typename T>
-float toSeconds(T t0, T t1) {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1024.0f;
-}
-
 bool readFromFile(const TParameters & , const std::string & fname, TWaveform & res, TTrainKeys & trainKeys) {
     trainKeys.clear();
 
