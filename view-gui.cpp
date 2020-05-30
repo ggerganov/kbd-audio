@@ -4,7 +4,6 @@
  */
 
 #include "common.h"
-#include "common-gui.h"
 #include "constants.h"
 
 #include "imgui.h"
@@ -208,8 +207,9 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
             }
         }
 
-        if (g_playbackData.idx > g_playbackData.waveform.n) {
+        if (g_playbackData.idx >= g_playbackData.waveform.n) {
             g_playbackData.playing = false;
+            SDL_ClearQueuedAudio(g_deviceIdOut);
             SDL_PauseAudioDevice(g_deviceIdOut, 1);
         }
 

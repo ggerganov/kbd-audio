@@ -5,7 +5,6 @@
 
 #include "constants.h"
 #include "common.h"
-#include "common-gui.h"
 #include "subbreak.h"
 #include "subbreak2.h"
 
@@ -577,7 +576,9 @@ bool renderKeyPresses(TParameters & params, const char * fnameInput, const TWave
             }
         }
 
-        if (g_playbackData.idx > g_playbackData.waveform.n) {
+        if (g_playbackData.idx >= g_playbackData.waveform.n) {
+            g_playbackData.playing = false;
+            SDL_ClearQueuedAudio(g_deviceIdOut);
             SDL_PauseAudioDevice(g_deviceIdOut, 1);
         }
 

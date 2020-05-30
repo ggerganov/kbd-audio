@@ -194,3 +194,11 @@ bool dumpKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & d
 
 template<typename T>
 void cbPlayback(void * userData, uint8_t * stream, int len);
+
+template<typename T>
+bool generateLowResWaveform(const TWaveformViewT<T> & waveform, TWaveformT<T> & waveformLowRes, int nWindow);
+
+template<typename T>
+bool generateLowResWaveform(const TWaveformT<T> & waveform, TWaveformT<T> & waveformLowRes, int nWindow) {
+    return generateLowResWaveform(getView(waveform, 0), waveformLowRes, nWindow);
+}

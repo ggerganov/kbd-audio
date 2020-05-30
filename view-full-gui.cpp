@@ -9,7 +9,6 @@
 #endif
 
 #include "common.h"
-#include "common-gui.h"
 #include "constants.h"
 
 #include "imgui.h"
