@@ -362,12 +362,12 @@ bool calculateSimilartyMap(
         const int32_t offsetFromPeak_samples,
         TKeyPressCollectionT<T> & keyPresses,
         TSimilarityMap & res) {
-    res.clear();
     int nPresses = keyPresses.size();
 
     int w = keyPressWidth_samples;
     int a = alignWindow_samples;
 
+    res.clear();
     res.resize(nPresses);
     for (auto & x : res) x.resize(nPresses);
 

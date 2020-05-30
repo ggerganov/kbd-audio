@@ -739,7 +739,6 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
     ImGui::SetNextWindowPos(ImVec2(0, 350.0f), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(0.5f*g_windowSizeX, g_windowSizeY - 350.0f), ImGuiCond_Once);
     if (ImGui::Begin("Similarity")) {
-        int n = similarityMap.size();
         auto wsize = ImGui::GetContentRegionAvail();
 
         static float bsize = 4.0f;
@@ -748,6 +747,8 @@ bool renderSimilarity(TParameters & params, TKeyPressCollection & keyPresses, TS
         if (ImGui::Button("Calculate") || ImGui::IsKeyPressed(6)) { // c
             calculateSimilartyMap(params.keyPressWidth_samples, params.alignWindow_samples, params.offsetFromPeak_samples, keyPresses, similarityMap);
         }
+
+        int n = similarityMap.size();
         ImGui::SameLine();
         ImGui::SliderFloat("Size", &bsize, 1.5f, 24.0f);
         ImGui::SameLine();
