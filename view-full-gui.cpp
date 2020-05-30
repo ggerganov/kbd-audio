@@ -70,8 +70,8 @@ struct stWaveformView;
 
 using TParameters           = stParameters;
 
-using TSampleInput          = float;
-using TSample               = int16_t;
+using TSampleInput          = TSampleF;
+using TSample               = TSampleI16;
 using TWaveform             = std::vector<TSample>;
 using TWaveformView         = stWaveformView;
 

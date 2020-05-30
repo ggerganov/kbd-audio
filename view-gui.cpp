@@ -38,8 +38,8 @@ struct stWaveformView;
 using TKey                  = int32_t;
 using TParameters           = stParameters;
 
-using TSampleInput          = float;
-using TSample               = int16_t;
+using TSampleInput          = TSampleF;
+using TSample               = TSampleI16;
 using TTrainKeys            = std::vector<TKey>;
 using TWaveform             = std::vector<TSample>;
 using TWaveformView         = stWaveformView;

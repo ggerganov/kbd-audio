@@ -6,6 +6,7 @@
 #pragma once
 
 #include "constants.h"
+#include "common.h"
 
 #include <memory>
 #include <array>
@@ -14,7 +15,8 @@
 
 class AudioLogger {
     public:
-        using Sample = float;
+        using Sample = TSampleF;
+
         using Frame = std::array<Sample, kSamplesPerFrame>;
         using Record = std::vector<Frame>;
         using Callback = std::function<void(const Record & frames)>;

@@ -216,8 +216,8 @@ int main(int argc, char ** argv) {
     TKey keyPressed = -1;
     TKeyConfidenceMap keyConfidence;
     TKeyConfidenceMap keyConfidenceDisplay;
-    std::map<TKey, TKeyHistory> keySoundHistoryAmpl;
-    std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
+    std::map<TKey, TKeyHistoryF> keySoundHistoryAmpl;
+    std::map<TKey, TKeyWaveformF> keySoundAverageAmpl;
 
     int ntest = 0;
 
@@ -231,7 +231,7 @@ int main(int argc, char ** argv) {
     int curFile = 0;
 
     int predictedKey = -1;
-    TKeyWaveform predictedAmpl(kSamplesPerWaveformTrain, 0);
+    TKeyWaveformF predictedAmpl(kSamplesPerWaveformTrain, 0);
     int predictedHistoryBegin = 0;
     std::array<std::vector<int>, 24> predictedHistory;
     predictedHistory.fill({});
@@ -263,7 +263,7 @@ int main(int argc, char ** argv) {
     AudioLogger audioLogger;
 
     struct WorkData {
-        TKeyWaveform ampl;
+        TKeyWaveformF ampl;
         std::vector<int> positionsToPredict;
     };
 
@@ -450,7 +450,7 @@ int main(int argc, char ** argv) {
             doRecord = true;
         } else {
             auto & history = keySoundHistoryAmpl[keyPressed];
-            history.push_back(TKeyWaveform());
+            history.push_back(TKeyWaveformF());
             auto & ampl = history.back();
             ampl.resize(nFrames*kSamplesPerFrame);
             for (int k = 0; k < nFrames; ++k) {
@@ -634,7 +634,7 @@ int main(int argc, char ** argv) {
                     int offset = peakUsed[iwaveform] - centerSample;
                     //printf("        Offset for waveform %-4d = %-4d\n", iwaveform, offset);
 
-                    auto newWaveform = TKeyWaveform();
+                    auto newWaveform = TKeyWaveformF();
                     newWaveform.resize(kSamplesPerWaveformTrain);
                     auto & waveform = history[iwaveform];
                     for (int icur = 0; icur < kSamplesPerWaveformTrain; ++icur) {
@@ -721,7 +721,7 @@ int main(int argc, char ** argv) {
                     //auto cc     = std::get<0>(ccs[iwaveform][bestw]);
                     auto offset = std::get<1>(ccs[iwaveform][bestw]);
 
-                    auto newWaveform = TKeyWaveform();
+                    auto newWaveform = TKeyWaveformF();
                     newWaveform.resize(kSamplesPerWaveformTrain);
                     for (int icur = 0; icur < kSamplesPerWaveformTrain; ++icur) {
                         int iorg = icur + offset;

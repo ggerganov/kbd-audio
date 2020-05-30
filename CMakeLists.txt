@@ -80,6 +80,7 @@ include_directories(imgui/examples/libs/gl3w)
 include_directories(${SDL2_INCLUDE_DIRS})
 
 add_library(Core STATIC
+    common.cpp
     audio_logger.cpp
     )
 
