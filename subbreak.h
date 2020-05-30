@@ -85,7 +85,7 @@ bool loadFreqMap(const char * fname, TFreqMap & res) {
         if (len == 0) {
             len = gram.size();
             fmap.resize(1 << (5*len), 1.0);
-        } else if (len != gram.size()) {
+        } else if (len != (int) gram.size()) {
             printf("Error: loaded n-grams with vaying lengths\n");
             return false;
         }
@@ -109,7 +109,7 @@ bool loadFreqMap(const char * fname, TFreqMap & res) {
     return true;
 }
 
-TAlphabet getAlphabetRandom(int seed = 0, const std::vector<int> & hint = {}) {
+TAlphabet getAlphabetRandom(const std::vector<int> & hint = {}) {
     TAlphabet res;
 
     if (hint.size() == 0) {
@@ -149,7 +149,7 @@ bool encrypt(const std::string & plain, TAlphabet & alphabet, std::string & enc)
         printf("[+] Unique symbols = %d\n", k);
     }
 
-    alphabet = getAlphabetRandom(0);
+    alphabet = getAlphabetRandom();
 
     enc = plain;
     int n = plain.length();
@@ -175,7 +175,7 @@ bool translate(const TAlphabet & alphabet, const std::string & src, std::string 
 TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
     TProb res = 0.0;
 
-    auto len = txt.size();
+    int len = txt.size();
     //const auto & [n, fmap] = freqMap;
     const auto & n    = std::get<0>(freqMap);
     const auto & fmap = std::get<1>(freqMap);
@@ -231,7 +231,7 @@ finish:
 TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
     TProb res = 0.0;
 
-    auto len = txt.size();
+    int len = txt.size();
     //const auto & [n, fmap] = freqMap;
     const auto & n    = std::get<0>(freqMap);
     const auto & fmap = std::get<1>(freqMap);
@@ -268,7 +268,7 @@ TProb calcScore1(const TFreqMap & freqMap, const std::string & txt) {
 TProb calcScoreForSpaces(const TFreqMap & freqMap, const std::string & txt) {
     TProb res = 0.0;
 
-    auto len = txt.size();
+    int len = txt.size();
     //const auto & [n, fmap] = freqMap;
     const auto & n    = std::get<0>(freqMap);
     const auto & fmap = std::get<1>(freqMap);
@@ -342,7 +342,7 @@ void printText(const std::string & t, std::string & res) {
 }
 
 bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & res, int nMainIters = 1e9, const std::vector<int> & hint = {}) {
-    TAlphabet besta = getAlphabetRandom(0, hint);
+    TAlphabet besta = getAlphabetRandom(hint);
 
     auto lena = kN;
 
@@ -357,7 +357,7 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
     int nIters = 0;
     while (nMainIters--) {
         if (++nIters > 10000) {
-            besta = getAlphabetRandom(0, hint);
+            besta = getAlphabetRandom(hint);
             translate(besta, enc, cure);
             bestp = calcScore(freqMap, cure);
             printf("reset\n");
@@ -435,7 +435,7 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
 }
 
 bool guessSpaces(const TFreqMap & freqMap, const std::string & enc, std::string & res, int nMainIters = 1e9, const std::vector<int> & hint = {}) {
-    TAlphabet besta = getAlphabetRandom(0, hint);
+    TAlphabet besta = getAlphabetRandom(hint);
 
     auto lena = kN;
 
@@ -450,7 +450,7 @@ bool guessSpaces(const TFreqMap & freqMap, const std::string & enc, std::string 
     int nIters = 0;
     while (nMainIters--) {
         if (++nIters > 10000) {
-            besta = getAlphabetRandom(0, hint);
+            besta = getAlphabetRandom(hint);
             translate(besta, enc, cure);
             bestp = calcScoreForSpaces(freqMap, cure);
             printf("reset\n");

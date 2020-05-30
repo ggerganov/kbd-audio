@@ -120,15 +120,15 @@ bool readFromFile(const std::string & fname, TWaveform & res) {
             res.resize(size/sizeof(TSampleInput));
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
-            for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
+            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
+            for (auto i = 0; i < (int) buf.size(); ++i) res[i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
         } else if (std::is_same<TSample, int32_t>::value) {
             std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
             res.resize(size/sizeof(TSampleInput));
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
-            for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
+            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
+            for (auto i = 0; i < (int) buf.size(); ++i) res[i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
         } else if (std::is_same<TSample, float>::value) {
             res.resize(size/sizeof(TSample));
             fin.read((char *)(res.data()), size);
@@ -188,12 +188,12 @@ bool generateLowResWaveform(const TWaveform & waveform, TWaveform & waveformLowR
 float plotWaveform(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return waveform->samples[i];
-};
+}
 
 float plotWaveformInverse(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return -waveform->samples[i];
-};
+}
 
 struct PlaybackData {
     static const int kSamples = 1024;
@@ -207,7 +207,7 @@ struct PlaybackData {
 SDL_AudioDeviceID g_deviceIdOut = 0;
 PlaybackData g_playbackData;
 
-bool renderWaveform(TParameters & params, const TWaveform & waveform) {
+bool renderWaveform(TParameters & , const TWaveform & waveform) {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, g_windowSizeY));
     if (ImGui::Begin("Waveform", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {

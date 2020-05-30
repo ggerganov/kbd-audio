@@ -3,6 +3,8 @@
  *  \author Georgi Gerganov
  */
 
+#include "common.h"
+
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -17,20 +19,16 @@
 
 #define MY_DEBUG
 
-using TSum                  = int64_t;
-using TSum2                 = int64_t;
-using TCC                   = double;
-using TOffset               = int64_t;
-using TMatch                = std::tuple<TCC, TOffset>;
+using TMatch                = std::tuple<TValueCC, TOffset>;
 using TSimilarityMap        = std::vector<std::vector<TMatch>>;
 
 using TClusterId            = int32_t;
-using TSampleInput          = float;
-using TSample               = int32_t;
+using TSampleInput          = TSampleF;
+using TSample               = TSampleI32;
 using TWaveform             = std::vector<TSample>;
 using TWaveformView         = std::tuple<const TSample *, int64_t>;
 using TKeyPressPosition     = int64_t;
-using TKeyPressData         = std::tuple<TWaveformView, TKeyPressPosition, TClusterId, TCC>;
+using TKeyPressData         = std::tuple<TWaveformView, TKeyPressPosition, TClusterId, TValueCC>;
 using TKeyPressCollection   = std::vector<TKeyPressData>;
 
 template <typename T>
@@ -66,8 +64,8 @@ bool readFromFile(const std::string & fname, TWaveform & res) {
             res.resize(size/sizeof(TSampleInput));
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
-            for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
+            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
+            for (auto i = 0; i < (int) buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
             //double asum = 0.0f;
             //for (auto i = 0; i < buf.size(); ++i) asum += std::abs(buf[i]); asum /= buf.size(); asum *= 10.0;
             //for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(2000.0*(buf[i]/asum));
@@ -76,8 +74,8 @@ bool readFromFile(const std::string & fname, TWaveform & res) {
             res.resize(size/sizeof(TSampleInput));
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
-            for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
+            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
+            for (auto i = 0; i < (int) buf.size(); ++i) res[i] = std::round(32000.0*(buf[i]/amax));
         } else if (std::is_same<TSample, float>::value) {
             res.resize(size/sizeof(TSample));
             fin.read((char *)(res.data()), size);
@@ -114,7 +112,7 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res) {
             rbSamples[rbBegin] = acur;
             rbAverage += acur;
             rbAverage /= rbSamples.size();
-            if (++rbBegin >= rbSamples.size()) {
+            if (++rbBegin >= (int) rbSamples.size()) {
                 rbBegin = 0;
             }
         }
@@ -163,9 +161,9 @@ bool dumpKeyPresses(const std::string & fname, const TKeyPressCollection & data)
     return true;
 }
 
-std::tuple<TSum, TSum2> calcSum(const TWaveformView & waveform) {
-    TSum sum = 0.0f;
-    TSum2 sum2 = 0.0f;
+std::tuple<int64_t, int64_t> calcSum(const TWaveformView & waveform) {
+    int64_t sum = 0;
+    int64_t sum2 = 0;
     //auto [samples, n] = waveform;
     auto samples = std::get<0>(waveform);
     auto n       = std::get<1>(waveform);
@@ -176,18 +174,18 @@ std::tuple<TSum, TSum2> calcSum(const TWaveformView & waveform) {
         sum2 += a0*a0;
     }
 
-    return std::tuple<TSum, TSum2>(sum, sum2);
+    return std::tuple<int64_t, int64_t>(sum, sum2);
 }
 
-TCC calcCC(
+TValueCC calcCC(
     const TWaveformView & waveform0,
     const TWaveformView & waveform1,
-    TSum sum0, TSum2 sum02) {
-    TCC cc = -1.0f;
+    int64_t sum0, int64_t sum02) {
+    TValueCC cc = -1.0f;
 
-    TSum sum1 = 0.0f;
-    TSum2 sum12 = 0.0f;
-    TSum2 sum01 = 0.0f;
+    int64_t sum1 = 0;
+    int64_t sum12 = 0;
+    int64_t sum01 = 0;
 
     //auto [samples0, n0] = waveform0;
     auto samples0 = std::get<0>(waveform0);
@@ -223,11 +221,11 @@ TCC calcCC(
     return cc;
 }
 
-std::tuple<TCC, TOffset> findBestCC(
+std::tuple<TValueCC, TOffset> findBestCC(
     const TWaveformView & waveform0,
     const TWaveformView & waveform1,
     int64_t alignWindow) {
-    TCC bestcc = -1.0;
+    TValueCC bestcc = -1.0;
     TOffset besto = -1;
 
     //auto [samples0, n0] = waveform0;
@@ -257,7 +255,7 @@ std::tuple<TCC, TOffset> findBestCC(
         }
     }
 
-    return std::tuple<TCC, TOffset>(bestcc, besto);
+    return std::tuple<TValueCC, TOffset>(bestcc, besto);
 }
 
 bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & res) {
@@ -311,7 +309,7 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
     return true;
 }
 
-bool clusterDBSCAN(const TSimilarityMap & sim, TCC epsCC, int minPts, TKeyPressCollection & keyPresses) {
+bool clusterDBSCAN(const TSimilarityMap & sim, TValueCC epsCC, int minPts, TKeyPressCollection & keyPresses) {
     int n = keyPresses.size();
     for (int i = 0; i < n; ++i) {
         //auto & [_i0, _i1, cid, _i3] = keyPresses[i];
@@ -335,7 +333,7 @@ bool clusterDBSCAN(const TSimilarityMap & sim, TCC epsCC, int minPts, TKeyPressC
             if (cc > epsCC) nbi.push_back(j);
         }
 
-        if (nbi.size() < minPts) {
+        if ((int) nbi.size() < minPts) {
             cid = 0;
             continue;
         }
@@ -357,7 +355,7 @@ bool clusterDBSCAN(const TSimilarityMap & sim, TCC epsCC, int minPts, TKeyPressC
                 if (cc > epsCC) nbq.push_back(j);
             }
 
-            if (nbq.size() >= minPts) {
+            if ((int) nbq.size() >= minPts) {
                 nbi.insert(nbi.end(), nbq.begin(), nbq.end());
             }
         }
@@ -366,7 +364,7 @@ bool clusterDBSCAN(const TSimilarityMap & sim, TCC epsCC, int minPts, TKeyPressC
     return true;
 }
 
-bool clusterSimple(const TSimilarityMap & sim, TCC tholdCC, TKeyPressCollection & keyPresses) {
+bool clusterSimple(const TSimilarityMap & sim, TValueCC tholdCC, TKeyPressCollection & keyPresses) {
     int n = keyPresses.size();
     for (int i = 0; i < n; ++i) {
         //auto & [_i0, _i1, cid, _i2] = keyPresses[i];
@@ -453,7 +451,7 @@ bool clusterG(const TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
     struct Pair {
         int i = -1;
         int j = -1;
-        TCC cc = -1.0;
+        TValueCC cc = -1.0;
 
         bool operator < (const Pair & a) const { return cc > a.cc; }
     };
@@ -578,7 +576,7 @@ bool clusterG2(TSimilarityMap & sim, TKeyPressCollection & keyPresses) {
     struct Pair {
         int i = -1;
         int j = -1;
-        TCC cc = -1.0;
+        TValueCC cc = -1.0;
 
         bool operator < (const Pair & a) const { return cc > a.cc; }
     };

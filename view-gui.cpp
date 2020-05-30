@@ -67,7 +67,7 @@ TWaveformView getView(const TWaveform & waveform, int64_t idx) { return { wavefo
 
 TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return { waveform.data() + idx, len }; }
 
-bool readFromFile(const TParameters & params, const std::string & fname, TWaveform & res, TTrainKeys & trainKeys) {
+bool readFromFile(const TParameters & , const std::string & fname, TWaveform & res, TTrainKeys & trainKeys) {
     trainKeys.clear();
 
     std::ifstream fin(fname, std::ios::binary);
@@ -103,15 +103,15 @@ bool readFromFile(const TParameters & params, const std::string & fname, TWavefo
                 res.resize(offset + size/sizeof(TSampleInput));
                 fin.read((char *)(buf.data()), size);
                 double amax = 0.0f;
-                for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-                for (auto i = 0; i < buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
+                for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
+                for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
             } else if (std::is_same<TSample, int32_t>::value) {
                 std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
                 res.resize(offset + size/sizeof(TSampleInput));
                 fin.read((char *)(buf.data()), size);
                 double amax = 0.0f;
-                for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-                for (auto i = 0; i < buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
+                for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
+                for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
             } else if (std::is_same<TSample, float>::value) {
                 res.resize(offset + size/sizeof(TSample));
                 fin.read((char *)(res.data() + offset), size);
@@ -175,12 +175,12 @@ bool generateLowResWaveform(const TWaveform & waveform, TWaveform & waveformLowR
 float plotWaveform(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return waveform->samples[i];
-};
+}
 
 float plotWaveformInverse(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return -waveform->samples[i];
-};
+}
 
 struct PlaybackData {
     static const int kSamples = 1024;
@@ -294,13 +294,13 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
             }
 
             {
-                float x0 = ((float)(pos - offset))/nview;
+                //float x0 = ((float)(pos - offset))/nview;
                 float x1 = ((float)(pos + params.offsetFromPeak - params.keyPressWidth_samples - offset))/nview;
                 float x2 = ((float)(pos + params.offsetFromPeak + params.keyPressWidth_samples - offset))/nview;
 
-                ImVec2 p0 = { savePos.x + x0*wsize.x, savePos.y };
-                ImVec2 p1 = { savePos.x + x1*wsize.x, savePos.y };
-                ImVec2 p2 = { savePos.x + x2*wsize.x, savePos.y + wsize.y };
+                //ImVec2 p0 = { savePos.x + x0*wsize.x, savePos.y };
+                //ImVec2 p1 = { savePos.x + x1*wsize.x, savePos.y };
+                //ImVec2 p2 = { savePos.x + x2*wsize.x, savePos.y + wsize.y };
 
                 if (nview < 64.0*wsize.x) {
                     ImGui::SetCursorScreenPos({ savePos.x + 0.5f*((x1 + x2)*wsize.x - ImGui::CalcTextSize(std::to_string(i).c_str()).x), savePos.y + wsize.y - ImGui::GetTextLineHeightWithSpacing() });

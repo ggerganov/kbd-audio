@@ -18,28 +18,28 @@ std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
     return res;
 }
 
-std::tuple<TSumF, TSum2F> calcSum(const TKeyWaveformF & waveform, int is0, int is1) {
-    TSumF sum = 0.0f;
-    TSum2F sum2 = 0.0f;
+std::tuple<double, double> calcSum(const TKeyWaveformF & waveform, int is0, int is1) {
+    double sum = 0.0f;
+    double sum2 = 0.0f;
     for (int is = is0; is < is1; ++is) {
         auto a0 = waveform[is];
         sum += a0;
         sum2 += a0*a0;
     }
 
-    return std::tuple<TSumF, TSum2F>(sum, sum2);
+    return std::tuple<double, double>(sum, sum2);
 }
 
 TValueCC calcCC(
     const TKeyWaveformF & waveform0,
     const TKeyWaveformF & waveform1,
-    TSumF sum0, TSum2F sum02,
+    double sum0, double sum02,
     int is00, int is0, int is1) {
     TValueCC cc = -1.0f;
 
-    TSumF sum1 = 0.0f;
-    TSum2F sum12 = 0.0f;
-    TSum2F sum01 = 0.0f;
+    double sum1 = 0.0f;
+    double sum12 = 0.0f;
+    double sum01 = 0.0f;
     for (int is = 0; is < is1 - is0; ++is) {
         auto a0 = waveform0[is00 + is];
         auto a1 = waveform1[is0 + is];
@@ -102,7 +102,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
     int nWorkers = std::min(4u, std::thread::hardware_concurrency());
     std::mutex mutex;
     std::vector<std::thread> workers(nWorkers);
-    for (int i = 0; i < workers.size(); ++i) {
+    for (int i = 0; i < (int) workers.size(); ++i) {
         auto & worker = workers[i];
         worker = std::thread([&, sum0 = sum0, sum02 = sum02, i]() {
             TOffset cbesto = -1;
