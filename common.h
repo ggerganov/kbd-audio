@@ -13,14 +13,80 @@
 
 // types
 
+struct stMatch;
+template<typename T> struct stWaveformView;
+template<typename T> struct stKeyPressData;
+template<typename T> struct stKeyPressCollection;
+
+template<typename T> using TWaveformT           = std::vector<T>;
+template<typename T> using TWaveformViewT       = stWaveformView<T>;
+template<typename T> using TKeyPressDataT       = stKeyPressData<T>;
+template<typename T> using TKeyPressCollectionT = stKeyPressCollection<T>;
+
+using TConfidence   = float;
+using TValueCC      = double;
+using TOffset       = int64_t;
+using TClusterId    = int32_t;
+
+using TSampleF      = float;
+using TSampleI16    = int16_t;
+using TSampleI32    = int32_t;
+
+using TKey              = int32_t;
+using TKeyPressPosition = int64_t;
+using TKeyConfidenceMap = std::map<TKey, TConfidence>;
+using TTrainKeys        = std::vector<TKey>;
+
+using TMatch         = stMatch;
+using TSimilarityMap = std::vector<std::vector<TMatch>>;
+
+// - i16 samples
+
+using TWaveformI16          = TWaveformT<TSampleI16>;
+using TWaveformViewI16      = TWaveformViewT<TSampleI16>;
+
+// - i32 samples
+
+using TWaveformI32              = TWaveformT<TSampleI32>;
+using TWaveformViewI32          = TWaveformViewT<TSampleI32>;
+using TKeyPressDataI32          = TKeyPressDataT<TSampleI32>;
+using TKeyPressCollectionI32    = TKeyPressCollectionT<TSampleI32>;
+
+// - float samples
+
+using TKeyWaveformF = std::vector<TSampleF>;
+using TKeyHistoryF = std::vector<TKeyWaveformF>;
+
+// structs
+struct stMatch {
+    TValueCC    cc      = 0.0;
+    TOffset     offset  = 0;
+};
+
 template<typename T>
 struct stWaveformView {
     const T * samples = nullptr;
     int64_t n         = 0;
 };
 
-template<typename T> using TWaveformT = std::vector<T>;
-template<typename T> using TWaveformViewT = stWaveformView<T>;
+template<typename T>
+struct stKeyPressData {
+    TWaveformViewT<T>   waveform;
+    TKeyPressPosition   pos         = 0;
+    TValueCC            ccAvg       = 0.0;
+    TClusterId          cid         = -1;
+    TKey                bind        = -1;
+    TKey                predicted   = '?';
+};
+
+template<typename T>
+struct stKeyPressCollection : public std::vector<TKeyPressDataT<T>> {
+    int nClusters = 0;
+};
+
+// helpers
+
+inline float frand() { return ((float)rand())/RAND_MAX; }
 
 template<typename T>
 stWaveformView<T> getView(const TWaveformT<T> & waveform, int64_t idx) {
@@ -31,37 +97,6 @@ template<typename T>
 stWaveformView<T> getView(const TWaveformT<T> & waveform, int64_t idx, int64_t len) {
     return { waveform.data() + idx, len };
 }
-
-using TConfidence   = float;
-using TValueCC      = double;
-using TOffset       = int64_t;
-
-using TSampleF      = float;
-using TSampleI16    = int16_t;
-using TSampleI32    = int32_t;
-
-using TKey              = int32_t;
-using TKeyConfidenceMap = std::map<TKey, TConfidence>;
-using TTrainKeys        = std::vector<TKey>;
-
-// - i16 samples
-
-using TWaveformI16          = TWaveformT<TSampleI16>;
-using TWaveformViewI16      = TWaveformViewT<TSampleI16>;
-
-// - i32 samples
-
-using TWaveformI32          = TWaveformT<TSampleI32>;
-using TWaveformViewI32      = TWaveformViewT<TSampleI32>;
-
-// - float samples
-
-using TKeyWaveformF = std::vector<TSampleF>;
-using TKeyHistoryF = std::vector<TKeyWaveformF>;
-
-// helpers
-
-inline float frand() { return ((float)rand())/RAND_MAX; }
 
 std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv);
 
@@ -116,3 +151,57 @@ std::tuple<TValueCC, TOffset> findBestCC(
     const TWaveformViewT<T> & waveform0,
     const TWaveformViewT<T> & waveform1,
     int64_t alignWindow);
+
+//
+// calculateSimilarityMap
+//
+
+template<typename T>
+bool calculateSimilartyMap(
+        const int32_t keyPressWidth_samples,
+        const int32_t alignWindow_samples,
+        const int32_t offsetFromPeak_samples,
+        TKeyPressCollectionT<T> & keyPresses,
+        TSimilarityMap & res) {
+    res.clear();
+    int nPresses = keyPresses.size();
+
+    int w = keyPressWidth_samples;
+    int a = alignWindow_samples;
+
+    res.resize(nPresses);
+    for (auto & x : res) x.resize(nPresses);
+
+    for (int i = 0; i < nPresses; ++i) {
+        res[i][i].cc = 1.0f;
+        res[i][i].offset = 0;
+
+        auto & waveform0 = keyPresses[i].waveform;
+        auto & pos0      = keyPresses[i].pos;
+        auto & avgcc     = keyPresses[i].ccAvg;
+
+        auto samples0 = waveform0.samples;
+        //auto n0       = waveform0.n;
+
+        for (int j = 0; j < nPresses; ++j) {
+            if (i == j) continue;
+
+            auto waveform1 = keyPresses[j].waveform;
+            auto pos1      = keyPresses[j].pos;
+
+            auto samples1 = waveform1.samples;
+            auto ret = findBestCC(TWaveformViewT<T> { samples0 + pos0 + offsetFromPeak_samples,     2*w },
+                                  TWaveformViewT<T> { samples1 + pos1 + offsetFromPeak_samples - a, 2*w + 2*a }, a);
+            auto bestcc     = std::get<0>(ret);
+            auto bestoffset = std::get<1>(ret);
+
+            res[i][j].cc = bestcc;
+            res[i][j].offset = bestoffset;
+
+            avgcc += bestcc;
+        }
+        avgcc /= (nPresses - 1);
+    }
+
+    return true;
+}
