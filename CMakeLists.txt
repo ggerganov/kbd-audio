@@ -96,7 +96,8 @@ target_link_libraries(Core PRIVATE
     ${COREFOUNDATION_LIBRARY}
     )
 
-add_library(ImGui STATIC
+add_library(Gui STATIC
+    common-gui.cpp
     imgui/imgui.cpp
     imgui/imgui_draw.cpp
     imgui/imgui_demo.cpp
@@ -106,11 +107,11 @@ add_library(ImGui STATIC
     imgui/examples/imgui_impl_opengl3.cpp
     )
 
-target_compile_definitions(ImGui PRIVATE
+target_compile_definitions(Gui PRIVATE
     IMGUI_USER_CONFIG="../imconfig-vtx32.h"
     )
 
-target_link_libraries(ImGui PRIVATE
+target_link_libraries(Gui PRIVATE
     ${CMAKE_DL_LIBS}
     ${SDL2_LIBRARIES}
     ${OPENGL_LIBRARIES}
@@ -124,10 +125,10 @@ add_executable(keytap2 keytap2.cpp)
 target_link_libraries(keytap2 PRIVATE Core)
 
 add_executable(keytap-gui keytap-gui.cpp)
-target_link_libraries(keytap-gui PRIVATE Core ImGui)
+target_link_libraries(keytap-gui PRIVATE Core Gui)
 
 add_executable(keytap2-gui keytap2-gui.cpp subbreak2.cpp)
-target_link_libraries(keytap2-gui PRIVATE Core ImGui)
+target_link_libraries(keytap2-gui PRIVATE Core Gui)
 
 add_executable(play play.cpp)
 target_link_libraries(play PRIVATE Core)
@@ -142,10 +143,10 @@ add_executable(record-full record-full.cpp)
 target_link_libraries(record-full PRIVATE Core)
 
 add_executable(view-gui view-gui.cpp)
-target_link_libraries(view-gui PRIVATE Core ImGui)
+target_link_libraries(view-gui PRIVATE Core Gui)
 
 add_executable(view-full-gui view-full-gui.cpp)
-target_link_libraries(view-full-gui PRIVATE Core ImGui)
+target_link_libraries(view-full-gui PRIVATE Core Gui)
 
 #
 ## Experimental stuff
@@ -154,7 +155,7 @@ if (BUILD_EXPERIMENTAL)
     if (FFTW_FOUND)
         add_executable(key_average_gui key_average_gui.cpp)
         target_include_directories(key_average_gui PRIVATE ${FFTW_INCLUDE_DIRS})
-        target_link_libraries(key_average_gui PRIVATE Core ImGui ${FFTW_LIBRARIES})
+        target_link_libraries(key_average_gui PRIVATE Core Gui ${FFTW_LIBRARIES})
     else()
         message(WARNING "Skipping 'key_average_gui' target because FFTW is not available")
     endif()
