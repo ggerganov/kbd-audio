@@ -5,15 +5,10 @@
 
 #include "common.h"
 
-#include <array>
 #include <chrono>
-#include <cmath>
 #include <cstdio>
-#include <deque>
 #include <fstream>
-#include <map>
 #include <string>
-#include <tuple>
 #include <vector>
 #include <algorithm>
 
@@ -113,7 +108,7 @@ bool clusterSimple(const TSimilarityMap & sim, TValueCC tholdCC, TKeyPressCollec
 
         if (cc < tholdCC) continue;
         auto r = frand();
-        if (std::pow(r, 1.0) < cc) {
+        if (r < cc) {
             if (icid == jcid && icid == 0) {
                 icid = jcid = ++curId;
             } else if (icid == 0) {

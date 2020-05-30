@@ -15,15 +15,11 @@
 #include <SDL.h>
 #include <GL/gl3w.h>
 
-#include <array>
 #include <chrono>
-#include <cmath>
 #include <cstdio>
 #include <deque>
 #include <fstream>
-#include <map>
 #include <string>
-#include <tuple>
 #include <vector>
 #include <thread>
 #include <algorithm>

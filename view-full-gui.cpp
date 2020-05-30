@@ -27,15 +27,10 @@
 #include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
 #endif
 
-#include <array>
 #include <chrono>
-#include <cmath>
 #include <cstdio>
 #include <deque>
-#include <fstream>
-#include <map>
 #include <string>
-#include <tuple>
 #include <vector>
 #include <thread>
 #include <algorithm>
