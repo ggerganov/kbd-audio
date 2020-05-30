@@ -140,8 +140,8 @@ void mutateClusters(const Cipher::TParameters & params, Cipher::TClusters & clus
 }
 
 float calcPClusters(
-        const Cipher::TParameters & params,
-        const Cipher::TSimilarityMap & ccMap,
+        const Cipher::TParameters & ,
+        const Cipher::TSimilarityMap & ,
         const Cipher::TSimilarityMap & logMap,
         const Cipher::TSimilarityMap & logMapInv,
         const Cipher::TClusters & clusters) {
@@ -162,7 +162,7 @@ float calcPClusters(
 }
 
 void normalizeSimilarityMap(
-        const Cipher::TParameters & params,
+        const Cipher::TParameters & ,
         Cipher::TSimilarityMap & ccMap,
         Cipher::TSimilarityMap & logMap,
         Cipher::TSimilarityMap & logMapInv) {

@@ -11,7 +11,7 @@
 #include <chrono>
 #include <thread>
 
-int main(int argc, const char ** argv) {
+int main(int , const char ** ) {
     constexpr float kBufferSize_s = 0.150f;
     constexpr uint64_t kSampleRate = 96000;
     constexpr uint64_t kRingBufferSize = 16*1024;
@@ -34,8 +34,8 @@ int main(int argc, const char ** argv) {
     AudioLogger::Callback cbAudio = [&](const auto & frames) {
         doRecord = true;
         float amax = 0.0f;
-        for (int f = 0; f < frames.size(); ++f) {
-            for (int s = 0; s < frames[f].size(); s += bkgrStep_samples) {
+        for (int f = 0; f < (int) frames.size(); ++f) {
+            for (int s = 0; s < (int) frames[f].size(); s += bkgrStep_samples) {
                 rbAverage *= rbSamples.size();
                 rbAverage -= rbSamples[rbBegin];
                 auto acur = std::abs(frames[f][s]);
@@ -43,7 +43,7 @@ int main(int argc, const char ** argv) {
                 if (acur > amax) amax = acur;
                 rbAverage += acur;
                 rbAverage /= rbSamples.size();
-                if (++rbBegin >= rbSamples.size()) rbBegin = 0;
+                if (++rbBegin >= (int) rbSamples.size()) rbBegin = 0;
             }
         }
 
@@ -51,8 +51,8 @@ int main(int argc, const char ** argv) {
         int nFrames = frames.size();
         int nFrames2 = std::max(1, nFrames/2);
         for (int f = nFrames2 - nFrames2/2; f <= nFrames2 + nFrames2/2; ++f) {
-            for (int s = 0; s < frames[f].size(); ++s) {
-                if (s + skip_samples >= frames[f].size()) {
+            for (int s = 0; s < (int) frames[f].size(); ++s) {
+                if (s + skip_samples >= (int) frames[f].size()) {
                     skip_samples -= frames[f].size() - s;
                     s += skip_samples;
                     continue;

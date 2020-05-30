@@ -161,8 +161,8 @@ int main(int, char**) {
 
             {
                 float amax = 0.0f;
-                for (int f = 0; f < frames.size(); ++f) {
-                    for (int s = 0; s < frames[f].size(); s += bkgrStep_samples) {
+                for (int f = 0; f < (int) frames.size(); ++f) {
+                    for (int s = 0; s < (int) frames[f].size(); s += bkgrStep_samples) {
                         rbAverage *= rbSamples.size();
                         rbAverage -= rbSamples[rbBegin];
                         auto acur = std::abs(frames[f][s]);
@@ -170,15 +170,15 @@ int main(int, char**) {
                         if (acur > amax) amax = acur;
                         rbAverage += acur;
                         rbAverage /= rbSamples.size();
-                        if (++rbBegin >= rbSamples.size()) rbBegin = 0;
+                        if (++rbBegin >= (int) rbSamples.size()) rbBegin = 0;
                     }
                 }
 
                 int skip_samples = 0;
                 int nFrames = frames.size();
                 for (int f = nFrames/4; f <= 3*nFrames/4; ++f) {
-                    for (int s = 0; s < frames[f].size(); ++s) {
-                        if (s + skip_samples >= frames[f].size()) {
+                    for (int s = 0; s < (int) frames[f].size(); ++s) {
+                        if (s + skip_samples >= (int) frames[f].size()) {
                             skip_samples -= frames[f].size() - s;
                             s += skip_samples;
                             continue;
@@ -206,7 +206,7 @@ int main(int, char**) {
 
                 int alignWindow = nSamplesPerFrame;
 
-                for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
+                for (int ipos = 0; ipos < (int) positionsToPredict.size() ; ++ipos) {
                     int scmp0 = positionsToPredict[ipos] - nSamplesPerFrame/4;
                     int scmp1 = positionsToPredict[ipos] + nSamplesPerFrame/4;
 
