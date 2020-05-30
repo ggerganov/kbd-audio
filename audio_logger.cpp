@@ -127,7 +127,7 @@ struct AudioLogger::Data {
     std::array<Frame, getBufferSize_frames(kMaxSampleRate, kMaxBufferSize_s)> buffer;
 
     int32_t nRecords = 0;
-    std::array<int32_t, kMaxRecords>  nFramesToRecord;
+    std::array<int32_t, kMaxRecords> nFramesToRecord;
     std::array<Record, kMaxRecords> records;
 
     Parameters parameters;

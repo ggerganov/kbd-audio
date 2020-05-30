@@ -293,7 +293,6 @@ int main(int argc, char ** argv) {
                 const auto & ampl = workData.ampl;
                 const auto & positionsToPredict = workData.positionsToPredict;
 
-                //int alignWindow = kSamplesPerFrame/2;
                 int alignWindow = 0.10*kSamplesPerWaveformTrain;
 
                 for (int ipos = 0; ipos < (int) positionsToPredict.size() ; ++ipos) {
