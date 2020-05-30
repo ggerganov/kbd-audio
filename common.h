@@ -17,11 +17,13 @@ struct stMatch;
 template<typename T> struct stWaveformView;
 template<typename T> struct stKeyPressData;
 template<typename T> struct stKeyPressCollection;
+template<typename T> struct stPlaybackData;
 
 template<typename T> using TWaveformT           = std::vector<T>;
 template<typename T> using TWaveformViewT       = stWaveformView<T>;
 template<typename T> using TKeyPressDataT       = stKeyPressData<T>;
 template<typename T> using TKeyPressCollectionT = stKeyPressCollection<T>;
+template<typename T> using TPlaybackDataT       = stPlaybackData<T>;
 
 using TConfidence   = float;
 using TValueCC      = double;
@@ -45,6 +47,7 @@ using TWaveformI16              = TWaveformT<TSampleI16>;
 using TWaveformViewI16          = TWaveformViewT<TSampleI16>;
 using TKeyPressDataI16          = TKeyPressDataT<TSampleI16>;
 using TKeyPressCollectionI16    = TKeyPressCollectionT<TSampleI16>;
+using TPlaybackDataI16          = TPlaybackDataT<TSampleI16>;
 
 // - float samples
 
@@ -76,6 +79,16 @@ struct stKeyPressData {
 template<typename T>
 struct stKeyPressCollection : public std::vector<TKeyPressDataT<T>> {
     int nClusters = 0;
+};
+
+template<typename T>
+struct stPlaybackData {
+    static const int kSamples = 1024;
+    bool playing = false;
+    int slowDown = 1;
+    int64_t idx = 0;
+    int64_t offset = 0;
+    TWaveformViewT<T> waveform;
 };
 
 // helpers
@@ -178,3 +191,6 @@ bool loadKeyPresses(const std::string & fname, const TWaveformViewT<T> & wavefor
 
 template<typename T>
 bool dumpKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & data);
+
+template<typename T>
+void cbPlayback(void * userData, uint8_t * stream, int len);

@@ -39,6 +39,7 @@ using TWaveform             = TWaveformI16;
 using TWaveformView         = TWaveformViewI16;
 using TKeyPressData         = TKeyPressDataI16;
 using TKeyPressCollection   = TKeyPressCollectionI16;
+using TPlaybackData         = TPlaybackDataI16;
 
 enum Approach {
     ClusterG = 0,
@@ -358,17 +359,8 @@ float plotWaveformInverse(void * data, int i) {
     return -waveform->samples[i];
 }
 
-struct PlaybackData {
-    static const int kSamples = 1024;
-    bool playing = false;
-    int slowDown = 1;
-    int64_t idx = 0;
-    int64_t offset = 0;
-    TWaveformView waveform;
-};
-
 SDL_AudioDeviceID g_deviceIdOut = 0;
-PlaybackData g_playbackData;
+TPlaybackData g_playbackData;
 
 bool renderKeyPresses(TParameters & params, const char * fnameInput, const TWaveform & waveform, TKeyPressCollection & keyPresses) {
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
@@ -572,7 +564,7 @@ bool renderKeyPresses(TParameters & params, const char * fnameInput, const TWave
         if (g_playbackData.playing) {
             if (ImGui::Button("Stop") || ImGui::IsKeyPressed(44)) { // space
                 g_playbackData.playing = false;
-                g_playbackData.idx = g_playbackData.waveform.n - PlaybackData::kSamples;
+                g_playbackData.idx = g_playbackData.waveform.n - TPlaybackData::kSamples;
             }
         } else {
             if (ImGui::Button("Play") || ImGui::IsKeyPressed(44)) { // space
@@ -979,44 +971,6 @@ bool renderSolution(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
     return false;
 }
 
-void cbPlayback(void * userData, uint8_t * stream, int len) {
-    PlaybackData * data = (PlaybackData *)(userData);
-    if (data->playing == false) {
-        int offset = 0;
-        TSample a = 0;
-        while (len > 0) {
-            memcpy(stream + offset*sizeof(a), &a, sizeof(a));
-            len -= sizeof(a);
-            ++offset;
-        }
-        return;
-    }
-    auto end = std::min(data->idx + PlaybackData::kSamples/data->slowDown, data->waveform.n);
-    auto idx = data->idx;
-    auto sidx = 0;
-    for (; idx < end; ++idx) {
-        TSample a = data->waveform.samples[idx];
-        memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
-        len -= sizeof(a);
-        ++sidx;
-
-        if (data->slowDown == 2) {
-            TSample a2 = data->waveform.samples[idx + 1];
-            a = 0.5*a + 0.5*a2;
-            memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
-            len -= sizeof(a);
-            ++sidx;
-        }
-    }
-    while (len > 0) {
-        TSample a = 0;
-        memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
-        len -= sizeof(a);
-        ++idx;
-    }
-    data->idx = idx;
-}
-
 bool prepareAudioOut(const TParameters & params) {
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
@@ -1035,8 +989,8 @@ bool prepareAudioOut(const TParameters & params) {
     playbackSpec.freq = params.sampleRate;
     playbackSpec.format = std::is_same<TSample, int16_t>::value ? AUDIO_S16 : AUDIO_S32;
     playbackSpec.channels = 1;
-    playbackSpec.samples = PlaybackData::kSamples;
-    playbackSpec.callback = cbPlayback;
+    playbackSpec.samples = TPlaybackData::kSamples;
+    playbackSpec.callback = cbPlayback<TSample>;
     playbackSpec.userdata = &g_playbackData;
 
     SDL_AudioSpec obtainedSpec;

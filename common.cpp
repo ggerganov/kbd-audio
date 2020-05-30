@@ -539,3 +539,44 @@ bool dumpKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & d
 }
 
 template bool dumpKeyPresses<TSampleI16>(const std::string & fname, const TKeyPressCollectionT<TSampleI16> & data);
+
+template<typename TSample>
+void cbPlayback(void * userData, uint8_t * stream, int len) {
+    TPlaybackDataT<TSample> * data = (TPlaybackDataT<TSample> *)(userData);
+    if (data->playing == false) {
+        int offset = 0;
+        TSample a = 0;
+        while (len > 0) {
+            memcpy(stream + offset*sizeof(a), &a, sizeof(a));
+            len -= sizeof(a);
+            ++offset;
+        }
+        return;
+    }
+    auto end = std::min(data->idx + TPlaybackDataT<TSample>::kSamples/data->slowDown, data->waveform.n);
+    auto idx = data->idx;
+    auto sidx = 0;
+    for (; idx < end; ++idx) {
+        TSample a = data->waveform.samples[idx];
+        memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
+        len -= sizeof(a);
+        ++sidx;
+
+        if (data->slowDown == 2) {
+            TSample a2 = data->waveform.samples[idx + 1];
+            a = 0.5*a + 0.5*a2;
+            memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
+            len -= sizeof(a);
+            ++sidx;
+        }
+    }
+    while (len > 0) {
+        TSample a = 0;
+        memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
+        len -= sizeof(a);
+        ++idx;
+    }
+    data->idx = idx;
+}
+
+template void cbPlayback<TSampleI16>(void * userData, uint8_t * stream, int len);
