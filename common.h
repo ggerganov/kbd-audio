@@ -61,6 +61,8 @@ using TKeyHistoryF = std::vector<TKeyWaveformF>;
 
 // helpers
 
+inline float frand() { return ((float)rand())/RAND_MAX; }
+
 std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv);
 
 template <typename T>

@@ -148,7 +148,6 @@ bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveform
     int k = nWindow;
     std::deque<int64_t> que(k);
 
-    //auto [samples, n] = waveform;
     auto samples = waveform.samples;
     auto n       = waveform.n;
 
@@ -197,7 +196,6 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res, T
     int k = historySize;
     std::deque<int64_t> que(k);
 
-    //auto [samples, n] = waveform;
     auto samples = waveform.samples;
     auto n       = waveform.n;
 
@@ -284,12 +282,10 @@ bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & key
         res[i][i].cc = 1.0f;
         res[i][i].offset = 0;
 
-        //auto & [waveform0, pos0, avgcc, _x] = keyPresses[i];
         auto & waveform0 = keyPresses[i].waveform;
         auto & pos0      = keyPresses[i].pos;
         auto & avgcc     = keyPresses[i].ccAvg;
 
-        //auto [samples0, n0] = waveform0;
         auto samples0 = waveform0.samples;
         //auto n0       = waveform0.n;
 
@@ -300,8 +296,6 @@ bool calculateSimilartyMap(const TParameters & params, TKeyPressCollection & key
             auto pos1      = keyPresses[j].pos;
 
             auto samples1 = waveform1.samples;
-            //auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + params.offsetFromPeak,               2*w },
-            //                                       { samples1 + pos1 + params.offsetFromPeak - alignWindow, 2*w + 2*alignWindow }, alignWindow);
             auto ret = findBestCC(TWaveformView { samples0 + pos0 + params.offsetFromPeak,               2*w },
                                   TWaveformView { samples1 + pos1 + params.offsetFromPeak - alignWindow, 2*w + 2*alignWindow }, alignWindow);
             auto bestcc     = std::get<0>(ret);

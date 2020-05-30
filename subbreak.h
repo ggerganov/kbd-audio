@@ -15,8 +15,6 @@
 #include <tuple>
 #include <vector>
 
-inline float frand() { return ((float)rand())/RAND_MAX; }
-
 using TCode = int32_t;
 using TProb = double;
 using TGramLen = int;
