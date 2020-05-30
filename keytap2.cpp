@@ -25,8 +25,8 @@ using TSimilarityMap        = std::vector<std::vector<TMatch>>;
 using TClusterId            = int32_t;
 using TSampleInput          = TSampleF;
 using TSample               = TSampleI32;
-using TWaveform             = std::vector<TSample>;
-using TWaveformView         = std::tuple<const TSample *, int64_t>;
+using TWaveform             = TWaveformI32;
+using TWaveformView         = TWaveformViewI32;
 using TKeyPressPosition     = int64_t;
 using TKeyPressData         = std::tuple<TWaveformView, TKeyPressPosition, TClusterId, TValueCC>;
 using TKeyPressCollection   = std::vector<TKeyPressData>;
@@ -37,10 +37,6 @@ float toSeconds(T t0, T t1) {
 }
 
 inline float frand() { return ((float)rand())/RAND_MAX; }
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx) { return TWaveformView { waveform.data() + idx, waveform.size() - idx }; }
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return TWaveformView { waveform.data() + idx, len }; }
 
 bool readFromFile(const std::string & fname, TWaveform & res) {
     std::ifstream fin(fname, std::ios::binary | std::ios::ate);
@@ -101,10 +97,10 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res) {
 
     std::deque<int64_t> que(k);
     //auto [samples, nSamples] = waveform;
-    auto samples  = std::get<0>(waveform);
-    auto nSamples = std::get<1>(waveform);
+    auto samples = waveform.samples;
+    auto n       = waveform.n;
 
-    for (int64_t i = 0; i < nSamples; ++i) {
+    for (int64_t i = 0; i < n; ++i) {
         {
             rbAverage *= rbSamples.size();
             rbAverage -= rbSamples[rbBegin];
@@ -134,7 +130,7 @@ bool findKeyPresses(const TWaveformView & waveform, TKeyPressCollection & res) {
             que.push_back(i);
 
             int64_t itest = i - k/2;
-            if (itest >= 2*k && itest < nSamples - 2*k && que.front() == itest) {
+            if (itest >= 2*k && itest < n - 2*k && que.front() == itest) {
                 double acur = samples[itest];
                 if (acur > thresholdBackground*rbAverage){
                     res.push_back(TKeyPressData {waveform, itest, 0, 0.0});
@@ -165,8 +161,8 @@ std::tuple<int64_t, int64_t> calcSum(const TWaveformView & waveform) {
     int64_t sum = 0;
     int64_t sum2 = 0;
     //auto [samples, n] = waveform;
-    auto samples = std::get<0>(waveform);
-    auto n       = std::get<1>(waveform);
+    auto samples = waveform.samples;
+    auto n       = waveform.n;
 
     for (int64_t is = 0; is < n; ++is) {
         auto a0 = samples[is];
@@ -188,12 +184,12 @@ TValueCC calcCC(
     int64_t sum01 = 0;
 
     //auto [samples0, n0] = waveform0;
-    auto samples0 = std::get<0>(waveform0);
-    auto n0       = std::get<1>(waveform0);
+    auto samples0 = waveform0.samples;
+    auto n0       = waveform0.n;
 
     //auto [samples1, n1] = waveform1;
-    auto samples1 = std::get<0>(waveform1);
-    auto n1       = std::get<1>(waveform1);
+    auto samples1 = waveform1.samples;
+    auto n1       = waveform1.n;
 
 #ifdef MY_DEBUG
     if (n0 != n1) {
@@ -230,13 +226,13 @@ std::tuple<TValueCC, TOffset> findBestCC(
 
     //auto [samples0, n0] = waveform0;
     //auto samples0 = std::get<0>(waveform0);
-    auto n0       = std::get<1>(waveform0);
+    auto n0       = waveform0.n;
 
     //auto [samples1, n1] = waveform1;
-    auto samples1 = std::get<0>(waveform1);
-    auto n1       = std::get<1>(waveform1);
+    auto samples1 = waveform1.samples;
 
 #ifdef MY_DEBUG
+    auto n1 = waveform1.n;
     if (n0 + 2*alignWindow != n1) {
         printf("BUG 924830jm92, n0 = %d, n1 = %d, a = %d\n", (int) n0, (int) n1, (int) alignWindow);
     }
@@ -277,7 +273,7 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
         auto & avgcc     = std::get<3>(keyPresses[i]);
 
         //auto [samples0, n0] = waveform0;
-        auto samples0 = std::get<0>(waveform0);
+        auto samples0 = waveform0.samples;
         //auto n0       = std::get<1>(waveform0);
 
         for (int j = 0; j < nPresses; ++j) {
@@ -288,7 +284,7 @@ bool calculateSimilartyMap(TKeyPressCollection & keyPresses, TSimilarityMap & re
             auto pos1      = std::get<1>(keyPresses[j]);
 
             //auto [samples1, n1] = waveform1;
-            auto samples1 = std::get<0>(waveform1);
+            auto samples1 = waveform1.samples;
             //auto n1       = std::get<1>(waveform1);
 
             //auto [bestcc, bestoffset] = findBestCC({ samples0 + pos0 + (int)(0.5f*w),               2*w },

@@ -36,7 +36,6 @@ int g_windowSizeY = 1200;
 struct stParameters;
 struct stMatch;
 struct stKeyPressData;
-struct stWaveformView;
 struct stKeyPressCollection;
 
 using TMatch                = stMatch;
@@ -46,8 +45,8 @@ using TSimilarityMap        = std::vector<std::vector<TMatch>>;
 using TClusterId            = int32_t;
 using TSampleInput          = TSampleF;
 using TSample               = TSampleI32;
-using TWaveform             = std::vector<TSample>;
-using TWaveformView         = stWaveformView;
+using TWaveform             = TWaveformI32;
+using TWaveformView         = TWaveformViewI32;
 using TKeyPressPosition     = int64_t;
 using TKeyPressData         = stKeyPressData;
 using TKeyPressCollection   = stKeyPressCollection;
@@ -102,11 +101,6 @@ struct stMatch {
     TOffset     offset  = 0;
 };
 
-struct stWaveformView {
-    const TSample * samples     = nullptr;
-    int64_t                     n = 0;
-};
-
 struct stKeyPressData {
     TWaveformView       waveform;
     TKeyPressPosition   pos         = 0;
@@ -124,10 +118,6 @@ template <typename T>
 float toSeconds(T t0, T t1) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1024.0f;
 }
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx) { return { waveform.data() + idx, (int64_t) waveform.size() - idx }; }
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return { waveform.data() + idx, len }; }
 
 bool saveKeyPresses(const char * fname, const TKeyPressCollection & keyPresses) {
     std::ofstream fout(fname, std::ios::binary);
@@ -407,6 +397,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
     auto samples1 = waveform1.samples;
 
 #ifdef MY_DEBUG
+    auto n1 = waveform1.n;
     if (n0 + 2*alignWindow != n1) {
         printf("BUG 924830jm92, n0 = %d, a = %d\n", (int) n0, (int) alignWindow);
     }

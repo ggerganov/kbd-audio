@@ -4,6 +4,11 @@
 
 #include "common.h"
 
+#include <cstring>
+#include <cmath>
+#include <thread>
+#include <mutex>
+
 std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
     int last = argc;
     std::map<std::string, std::string> res;

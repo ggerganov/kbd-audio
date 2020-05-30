@@ -7,14 +7,28 @@
 
 #include <map>
 #include <string>
-#include <cstring>
 #include <tuple>
-#include <cmath>
-#include <thread>
-#include <mutex>
 #include <vector>
 
 // types
+
+template<typename T>
+struct stWaveformView {
+    const T * samples = nullptr;
+    int64_t n         = 0;
+};
+
+template<typename T> using TWaveformT = std::vector<T>;
+
+template<typename T>
+stWaveformView<T> getView(const TWaveformT<T> & waveform, int64_t idx) {
+    return { waveform.data() + idx, (int64_t) waveform.size() - idx };
+}
+
+template<typename T>
+stWaveformView<T> getView(const TWaveformT<T> & waveform, int64_t idx, int64_t len) {
+    return { waveform.data() + idx, len };
+}
 
 using TConfidence = float;
 using TValueCC = double;
@@ -26,6 +40,16 @@ using TSampleI32 = int32_t;
 
 using TKey = int;
 using TKeyConfidenceMap = std::map<TKey, TConfidence>;
+
+// - i16 samples
+
+using TWaveformI16          = TWaveformT<TSampleI16>;
+using TWaveformViewI16      = stWaveformView<TSampleI16>;
+
+// - i32 samples
+
+using TWaveformI32          = TWaveformT<TSampleI32>;
+using TWaveformViewI32      = stWaveformView<TSampleI32>;
 
 // - float samples
 

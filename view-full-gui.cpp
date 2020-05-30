@@ -66,14 +66,13 @@ int g_windowSizeY = 400;
 #endif
 
 struct stParameters;
-struct stWaveformView;
 
 using TParameters           = stParameters;
 
 using TSampleInput          = TSampleF;
 using TSample               = TSampleI16;
-using TWaveform             = std::vector<TSample>;
-using TWaveformView         = stWaveformView;
+using TWaveform             = TWaveformI16;
+using TWaveformView         = TWaveformViewI16;
 
 struct stParameters {
     int playbackId              = 0;
@@ -84,19 +83,10 @@ struct stParameters {
     float thresholdClustering   = 0.5f;
 };
 
-struct stWaveformView {
-    const TSample * samples     = nullptr;
-    int64_t n                   = 0;
-};
-
 template <typename T>
 float toSeconds(T t0, T t1) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1024.0f;
 }
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx) { return { waveform.data() + idx, (int64_t) waveform.size() - idx }; }
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return { waveform.data() + idx, len }; }
 
 bool readFromFile(const std::string & fname, TWaveform & res) {
     std::ifstream fin(fname, std::ios::binary | std::ios::ate);
