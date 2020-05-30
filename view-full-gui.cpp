@@ -27,15 +27,9 @@
 #include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
 #endif
 
-#include <array>
 #include <chrono>
-#include <cmath>
 #include <cstdio>
-#include <deque>
-#include <fstream>
-#include <map>
 #include <string>
-#include <tuple>
 #include <vector>
 #include <thread>
 #include <algorithm>
@@ -66,14 +60,14 @@ int g_windowSizeY = 400;
 #endif
 
 struct stParameters;
-struct stWaveformView;
 
 using TParameters           = stParameters;
 
-using TSampleInput          = float;
-using TSample               = int16_t;
-using TWaveform             = std::vector<TSample>;
-using TWaveformView         = stWaveformView;
+using TSampleInput          = TSampleF;
+using TSample               = TSampleI16;
+using TWaveform             = TWaveformI16;
+using TWaveformView         = TWaveformViewI16;
+using TPlaybackData         = TPlaybackDataI16;
 
 struct stParameters {
     int playbackId              = 0;
@@ -84,130 +78,20 @@ struct stParameters {
     float thresholdClustering   = 0.5f;
 };
 
-struct stWaveformView {
-    const TSample * samples     = nullptr;
-    int64_t n                   = 0;
-};
-
-template <typename T>
-float toSeconds(T t0, T t1) {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1024.0f;
-}
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx) { return { waveform.data() + idx, (int64_t) waveform.size() - idx }; }
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return { waveform.data() + idx, len }; }
-
-bool readFromFile(const std::string & fname, TWaveform & res) {
-    std::ifstream fin(fname, std::ios::binary | std::ios::ate);
-    if (fin.good() == false) {
-        return false;
-    }
-
-    {
-        std::streamsize size = fin.tellg();
-        fin.seekg(0, std::ios::beg);
-
-        static_assert(std::is_same<TSampleInput, float>::value, "TSampleInput not recognised");
-        static_assert(
-            std::is_same<TSample, float>::value
-            || std::is_same<TSample, int16_t>::value
-            || std::is_same<TSample, int32_t>::value
-                      , "TSampleInput not recognised");
-
-        if (std::is_same<TSample, int16_t>::value) {
-            std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
-            res.resize(size/sizeof(TSampleInput));
-            fin.read((char *)(buf.data()), size);
-            double amax = 0.0f;
-            for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
-        } else if (std::is_same<TSample, int32_t>::value) {
-            std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
-            res.resize(size/sizeof(TSampleInput));
-            fin.read((char *)(buf.data()), size);
-            double amax = 0.0f;
-            for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < buf.size(); ++i) res[i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
-        } else if (std::is_same<TSample, float>::value) {
-            res.resize(size/sizeof(TSample));
-            fin.read((char *)(res.data()), size);
-        } else {
-        }
-    }
-
-    fin.close();
-
-    return true;
-}
-
-bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveformLowRes, int nWindow) {
-    waveformLowRes.resize(waveform.n);
-
-    int k = nWindow;
-    std::deque<int64_t> que(k);
-
-    //auto [samples, n] = waveform;
-    auto samples = waveform.samples;
-    auto n       = waveform.n;
-
-    TWaveform waveformAbs(n);
-    for (int64_t i = 0; i < n; ++i) {
-        waveformAbs[i] = std::abs(samples[i]);
-    }
-
-    for (int64_t i = 0; i < n; ++i) {
-        if (i < k) {
-            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
-                que.pop_back();
-            }
-            que.push_back(i);
-        } else {
-            while((!que.empty()) && que.front() <= i - k) {
-                que.pop_front();
-            }
-
-            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
-                que.pop_back();
-            }
-
-            que.push_back(i);
-
-            int64_t itest = i - k/2;
-            waveformLowRes[itest] = waveformAbs[que.front()];
-        }
-    }
-
-    return true;
-}
-
-bool generateLowResWaveform(const TWaveform & waveform, TWaveform & waveformLowRes, int nWindow) {
-    return generateLowResWaveform(getView(waveform, 0), waveformLowRes, nWindow);
-}
-
 float plotWaveform(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return waveform->samples[i];
-};
+}
 
 float plotWaveformInverse(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return -waveform->samples[i];
-};
-
-struct PlaybackData {
-    static const int kSamples = 1024;
-    bool playing = false;
-    int slowDown = 1;
-    int64_t idx = 0;
-    int64_t offset = 0;
-    TWaveformView waveform;
-};
+}
 
 SDL_AudioDeviceID g_deviceIdOut = 0;
-PlaybackData g_playbackData;
+TPlaybackData g_playbackData;
 
-bool renderWaveform(TParameters & params, const TWaveform & waveform) {
+bool renderWaveform(TParameters & , const TWaveform & waveform) {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, g_windowSizeY));
     if (ImGui::Begin("Waveform", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
@@ -313,7 +197,7 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
         if (g_playbackData.playing) {
             if (ImGui::Button("Stop") || ImGui::IsKeyPressed(44)) { // space
                 g_playbackData.playing = false;
-                g_playbackData.idx = g_playbackData.waveform.n - PlaybackData::kSamples;
+                g_playbackData.idx = g_playbackData.waveform.n - TPlaybackData::kSamples;
             }
         } else {
             if (ImGui::Button("Play") || ImGui::IsKeyPressed(44)) { // space
@@ -344,44 +228,6 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform) {
     return false;
 }
 
-void cbPlayback(void * userData, uint8_t * stream, int len) {
-    PlaybackData * data = (PlaybackData *)(userData);
-    if (data->playing == false) {
-        int offset = 0;
-        TSample a = 0;
-        while (len > 0) {
-            memcpy(stream + offset*sizeof(a), &a, sizeof(a));
-            len -= sizeof(a);
-            ++offset;
-        }
-        return;
-    }
-    auto end = std::min(data->idx + PlaybackData::kSamples/data->slowDown, data->waveform.n);
-    auto idx = data->idx;
-    auto sidx = 0;
-    for (; idx < end; ++idx) {
-        TSample a = data->waveform.samples[idx];
-        memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
-        len -= sizeof(a);
-        ++sidx;
-
-        if (data->slowDown == 2) {
-            TSample a2 = data->waveform.samples[idx + 1];
-            a = 0.5*a + 0.5*a2;
-            memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
-            len -= sizeof(a);
-            ++sidx;
-        }
-    }
-    while (len > 0) {
-        TSample a = 0;
-        memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
-        len -= sizeof(a);
-        ++idx;
-    }
-    data->idx = idx;
-}
-
 bool prepareAudioOut(const TParameters & params) {
     if (SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
@@ -405,8 +251,8 @@ bool prepareAudioOut(const TParameters & params) {
     playbackSpec.freq = params.sampleRate;
     playbackSpec.format = std::is_same<TSample, int16_t>::value ? AUDIO_S16 : AUDIO_S32;
     playbackSpec.channels = 1;
-    playbackSpec.samples = PlaybackData::kSamples;
-    playbackSpec.callback = cbPlayback;
+    playbackSpec.samples = TPlaybackData::kSamples;
+    playbackSpec.callback = cbPlayback<TSample>;
     playbackSpec.userdata = &g_playbackData;
 
     SDL_AudioSpec obtainedSpec;
@@ -458,7 +304,7 @@ int main(int argc, char ** argv) {
     };
 
     printf("[+] Loading recording from '%s'\n", argv[1]);
-    if (readFromFile(argv[1], waveformInput) == false) {
+    if (readFromFile<TSampleF>(argv[1], waveformInput) == false) {
         printf("Specified file '%s' does not exist\n", argv[1]);
         return -1;
     }

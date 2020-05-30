@@ -359,7 +359,7 @@ namespace Cipher {
             if (len == 0) {
                 len = gram.size();
                 prob.resize(1 << (5*len), 1.0);
-            } else if (len != gram.size()) {
+            } else if (len != (int) gram.size()) {
                 printf("Error: loaded n-grams with vaying lengths\n");
                 return false;
             }
@@ -382,7 +382,7 @@ namespace Cipher {
         return true;
     }
 
-    bool encryptExact(const TParameters & params, const std::string & text, TClusters & clusters) {
+    bool encryptExact(const TParameters & , const std::string & text, TClusters & clusters) {
         auto myCharToLetter = kCharToLetter;
 
 		int k = 26;
@@ -396,7 +396,7 @@ namespace Cipher {
         }
 
 		std::vector<TCluster> alphabetTransformation(k);
-		for (int i = 0; i < alphabetTransformation.size(); ++i) {
+		for (int i = 0; i < (int) alphabetTransformation.size(); ++i) {
 			alphabetTransformation[i] = i;
 		}
 
@@ -535,7 +535,7 @@ namespace Cipher {
     TProb calcScore0(const TParameters & params, const TFreqMap & freqMap, const TClusters & txt, const TClusterToLetterMap & clMap) {
         TProb res = 0.0;
 
-        auto n = txt.size();
+        int n = txt.size();
         const auto & len  = freqMap.len;
         const auto & pmin = freqMap.pmin;
         const auto & prob = freqMap.prob;
@@ -973,7 +973,7 @@ namespace Cipher {
 
                 printf("Speed: %6.2f iter/ms, Iter %5d : temp = %16.4f, cost0 = %8.4f, costCL = %8.4f, costLM = %8.4f\n",
                        iterPerT, iter, temp, cost0, cost0CL, cost0LM);
-                for (int i = 0; i < clusters.size(); ++i) { printf("%c", 'a'+clMap[clusters[i]]-1); }
+                for (int i = 0; i < (int) clusters.size(); ++i) { printf("%c", 'a'+clMap[clusters[i]]-1); }
                 printf("\n");
             }
 
@@ -1062,9 +1062,9 @@ namespace Cipher {
 
     void getRandomCLMap(
         const TParameters & params,
-        const TClusters & clusters,
+        const TClusters & ,
         TClusterToLetterMap & clMap,
-        [[maybe_unused]] const std::vector<int> & hint) {
+        const std::vector<int> & ) {
 
         clMap.clear();
 

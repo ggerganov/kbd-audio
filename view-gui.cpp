@@ -13,15 +13,9 @@
 #include <SDL.h>
 #include <GL/gl3w.h>
 
-#include <array>
 #include <chrono>
-#include <cmath>
 #include <cstdio>
-#include <deque>
-#include <fstream>
-#include <map>
 #include <string>
-#include <tuple>
 #include <vector>
 #include <thread>
 #include <algorithm>
@@ -33,16 +27,14 @@ int g_windowSizeX = 1600;
 int g_windowSizeY = 400;
 
 struct stParameters;
-struct stWaveformView;
 
-using TKey                  = int32_t;
 using TParameters           = stParameters;
 
-using TSampleInput          = float;
-using TSample               = int16_t;
-using TTrainKeys            = std::vector<TKey>;
-using TWaveform             = std::vector<TSample>;
-using TWaveformView         = stWaveformView;
+using TSampleInput          = TSampleF;
+using TSample               = TSampleI16;
+using TWaveform             = TWaveformI16;
+using TWaveformView         = TWaveformViewI16;
+using TPlaybackData         = TPlaybackDataI16;
 
 struct stParameters {
     int playbackId              = 0;
@@ -53,146 +45,18 @@ struct stParameters {
     float thresholdClustering   = 0.5f;
 };
 
-struct stWaveformView {
-    const TSample * samples     = nullptr;
-    int64_t n                   = 0;
-};
-
-template <typename T>
-float toSeconds(T t0, T t1) {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1024.0f;
-}
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx) { return { waveform.data() + idx, (int64_t) waveform.size() - idx }; }
-
-TWaveformView getView(const TWaveform & waveform, int64_t idx, int64_t len) { return { waveform.data() + idx, len }; }
-
-bool readFromFile(const TParameters & params, const std::string & fname, TWaveform & res, TTrainKeys & trainKeys) {
-    trainKeys.clear();
-
-    std::ifstream fin(fname, std::ios::binary);
-    if (fin.good() == false) {
-        return false;
-    }
-
-    int32_t bufferSize_frames = 1;
-    fin.read((char *)(&bufferSize_frames), sizeof(bufferSize_frames));
-    if (bufferSize_frames != kBufferSizeTrain_frames) {
-        printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kBufferSizeTrain_frames);
-        return false;
-    }
-
-    {
-        static_assert(std::is_same<TSampleInput, float>::value, "TSampleInput not recognised");
-        static_assert(
-            std::is_same<TSample, float>::value
-            || std::is_same<TSample, int16_t>::value
-            || std::is_same<TSample, int32_t>::value
-                      , "TSampleInput not recognised");
-
-        int32_t offset = 0;
-        std::streamsize size = bufferSize_frames*kSamplesPerFrame*sizeof(TSampleInput);
-        while (true) {
-            TKey keyPressed = 0;
-            fin.read((char *)(&keyPressed), sizeof(keyPressed));
-            if (fin.eof()) break;
-            trainKeys.push_back(keyPressed);
-
-            if (std::is_same<TSample, int16_t>::value) {
-                std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
-                res.resize(offset + size/sizeof(TSampleInput));
-                fin.read((char *)(buf.data()), size);
-                double amax = 0.0f;
-                for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-                for (auto i = 0; i < buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int16_t>::max()*(buf[i]/amax));
-            } else if (std::is_same<TSample, int32_t>::value) {
-                std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
-                res.resize(offset + size/sizeof(TSampleInput));
-                fin.read((char *)(buf.data()), size);
-                double amax = 0.0f;
-                for (auto i = 0; i < buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-                for (auto i = 0; i < buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<int32_t>::max()*(buf[i]/amax));
-            } else if (std::is_same<TSample, float>::value) {
-                res.resize(offset + size/sizeof(TSample));
-                fin.read((char *)(res.data() + offset), size);
-            } else {
-            }
-
-            offset += size/sizeof(TSampleInput);
-            if (fin.eof()) break;
-        }
-    }
-
-    fin.close();
-
-    return true;
-}
-
-bool generateLowResWaveform(const TWaveformView & waveform, TWaveform & waveformLowRes, int nWindow) {
-    waveformLowRes.resize(waveform.n);
-
-    int k = nWindow;
-    std::deque<int64_t> que(k);
-
-    //auto [samples, n] = waveform;
-    auto samples = waveform.samples;
-    auto n       = waveform.n;
-
-    TWaveform waveformAbs(n);
-    for (int64_t i = 0; i < n; ++i) {
-        waveformAbs[i] = std::abs(samples[i]);
-    }
-
-    for (int64_t i = 0; i < n; ++i) {
-        if (i < k) {
-            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
-                que.pop_back();
-            }
-            que.push_back(i);
-        } else {
-            while((!que.empty()) && que.front() <= i - k) {
-                que.pop_front();
-            }
-
-            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
-                que.pop_back();
-            }
-
-            que.push_back(i);
-
-            int64_t itest = i - k/2;
-            waveformLowRes[itest] = waveformAbs[que.front()];
-        }
-    }
-
-    return true;
-}
-
-bool generateLowResWaveform(const TWaveform & waveform, TWaveform & waveformLowRes, int nWindow) {
-    return generateLowResWaveform(getView(waveform, 0), waveformLowRes, nWindow);
-}
-
 float plotWaveform(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return waveform->samples[i];
-};
+}
 
 float plotWaveformInverse(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
     return -waveform->samples[i];
-};
-
-struct PlaybackData {
-    static const int kSamples = 1024;
-    bool playing = false;
-    int slowDown = 1;
-    int64_t idx = 0;
-    int64_t offset = 0;
-    TWaveformView waveform;
-};
+}
 
 SDL_AudioDeviceID g_deviceIdOut = 0;
-PlaybackData g_playbackData;
+TPlaybackData g_playbackData;
 
 bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTrainKeys & trainKeys) {
     ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -294,13 +158,13 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
             }
 
             {
-                float x0 = ((float)(pos - offset))/nview;
+                //float x0 = ((float)(pos - offset))/nview;
                 float x1 = ((float)(pos + params.offsetFromPeak - params.keyPressWidth_samples - offset))/nview;
                 float x2 = ((float)(pos + params.offsetFromPeak + params.keyPressWidth_samples - offset))/nview;
 
-                ImVec2 p0 = { savePos.x + x0*wsize.x, savePos.y };
-                ImVec2 p1 = { savePos.x + x1*wsize.x, savePos.y };
-                ImVec2 p2 = { savePos.x + x2*wsize.x, savePos.y + wsize.y };
+                //ImVec2 p0 = { savePos.x + x0*wsize.x, savePos.y };
+                //ImVec2 p1 = { savePos.x + x1*wsize.x, savePos.y };
+                //ImVec2 p2 = { savePos.x + x2*wsize.x, savePos.y + wsize.y };
 
                 if (nview < 64.0*wsize.x) {
                     ImGui::SetCursorScreenPos({ savePos.x + 0.5f*((x1 + x2)*wsize.x - ImGui::CalcTextSize(std::to_string(i).c_str()).x), savePos.y + wsize.y - ImGui::GetTextLineHeightWithSpacing() });
@@ -343,8 +207,9 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
             }
         }
 
-        if (g_playbackData.idx > g_playbackData.waveform.n) {
+        if (g_playbackData.idx >= g_playbackData.waveform.n) {
             g_playbackData.playing = false;
+            SDL_ClearQueuedAudio(g_deviceIdOut);
             SDL_PauseAudioDevice(g_deviceIdOut, 1);
         }
 
@@ -358,34 +223,6 @@ bool renderWaveform(TParameters & params, const TWaveform & waveform, const TTra
     ImGui::End();
 
     return false;
-}
-
-void cbPlayback(void * userData, uint8_t * stream, int len) {
-    PlaybackData * data = (PlaybackData *)(userData);
-    auto end = std::min(data->idx + PlaybackData::kSamples/data->slowDown, data->waveform.n);
-    auto idx = data->idx;
-    auto sidx = 0;
-    for (; idx < end; ++idx) {
-        TSample a = data->waveform.samples[idx];
-        memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
-        len -= sizeof(a);
-        ++sidx;
-
-        if (data->slowDown == 2) {
-            TSample a2 = data->waveform.samples[idx + 1];
-            a = 0.5*(a + a2);
-            memcpy(stream + (sidx)*sizeof(a), &a, sizeof(a));
-            len -= sizeof(a);
-            ++sidx;
-        }
-    }
-    while (len > 0) {
-        TSample a = 0;
-        memcpy(stream + (idx - data->idx)*sizeof(a), &a, sizeof(a));
-        len -= sizeof(a);
-        ++idx;
-    }
-    data->idx = idx;
 }
 
 bool prepareAudioOut(const TParameters & params) {
@@ -411,8 +248,8 @@ bool prepareAudioOut(const TParameters & params) {
     playbackSpec.freq = params.sampleRate;
     playbackSpec.format = std::is_same<TSample, int16_t>::value ? AUDIO_S16 : AUDIO_S32;
     playbackSpec.channels = 1;
-    playbackSpec.samples = PlaybackData::kSamples;
-    playbackSpec.callback = cbPlayback;
+    playbackSpec.samples = TPlaybackData::kSamples;
+    playbackSpec.callback = cbPlayback<TSample>;
     playbackSpec.userdata = &g_playbackData;
 
     SDL_AudioSpec obtainedSpec;
@@ -466,9 +303,17 @@ int main(int argc, char ** argv) {
     }
 
     printf("[+] Loading recording from '%s'\n", argv[1]);
-    if (readFromFile(params, argv[1], waveformInput, trainKeys) == false) {
-        printf("Specified file '%s' does not exist\n", argv[1]);
-        return -1;
+    {
+        int32_t bufferSize_frames = 0;
+        if (readFromFile<TSampleF>(argv[1], waveformInput, trainKeys, bufferSize_frames) == false) {
+            printf("Specified file '%s' does not exist\n", argv[1]);
+            return -1;
+        }
+
+        if (bufferSize_frames != kBufferSizeTrain_frames) {
+            printf("Buffer size in file (%d) does not match the expected one (%d)\n", bufferSize_frames, (int) kBufferSizeTrain_frames);
+            return -1;
+        }
     }
 
 #if __APPLE__

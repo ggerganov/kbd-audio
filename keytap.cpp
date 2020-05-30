@@ -98,8 +98,8 @@ int main(int argc, char ** argv) {
     }
 
     TKey keyPressed = -1;
-    std::map<TKey, TKeyHistory> keySoundHistoryAmpl;
-    std::map<TKey, TKeyWaveform> keySoundAverageAmpl;
+    std::map<TKey, TKeyHistoryF> keySoundHistoryAmpl;
+    std::map<TKey, TKeyWaveformF> keySoundAverageAmpl;
 
     int ntest = 0;
 
@@ -134,7 +134,7 @@ int main(int argc, char ** argv) {
     AudioLogger audioLogger;
 
     struct WorkData {
-        TKeyWaveform ampl;
+        TKeyWaveformF ampl;
         std::vector<int> positionsToPredict;
     };
 
@@ -167,25 +167,25 @@ int main(int argc, char ** argv) {
                 //int alignWindow = kSamplesPerFrame/2;
                 int alignWindow = 64;
 
-                for (int ipos = 0; ipos < positionsToPredict.size() ; ++ipos) {
+                for (int ipos = 0; ipos < (int) positionsToPredict.size(); ++ipos) {
                     auto curPos = positionsToPredict[ipos];
                     int scmp0 = curPos - kSamplesPerFrame;
                     int scmp1 = curPos + kSamplesPerFrame;
 
                     char res = -1;
                     TValueCC maxcc = -1.0f;
-                    TOffset offs = 0;
+                    //TOffset offs = 0;
                     TKeyConfidenceMap keyConfidenceTmp;
                     for (const auto & ka : keySoundAverageAmpl) {
                         //auto [bestcc, bestoffset] = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
                         auto ret = findBestCC(keySoundAverageAmpl[ka.first], ampl, scmp0, scmp1, alignWindow);
                         auto bestcc     = std::get<0>(ret);
-                        auto bestoffset = std::get<1>(ret);
+                        //auto bestoffset = std::get<1>(ret);
 
                         if (bestcc > maxcc) {
                             res = ka.first;
                             maxcc = bestcc;
-                            offs = bestoffset;
+                            //offs = bestoffset;
                         }
                         keyConfidenceTmp[ka.first] = bestcc;
                     }
@@ -237,8 +237,8 @@ int main(int argc, char ** argv) {
 
             {
                 float amax = 0.0f;
-                for (int f = 0; f < frames.size(); ++f) {
-                    for (int s = 0; s < frames[f].size(); s += kBkgrStep_samples) {
+                for (int f = 0; f < (int) frames.size(); ++f) {
+                    for (int s = 0; s < (int) frames[f].size(); s += kBkgrStep_samples) {
                         rbAverage *= rbSamples.size();
                         rbAverage -= rbSamples[rbBegin];
                         auto acur = std::abs(frames[f][s]);
@@ -246,7 +246,7 @@ int main(int argc, char ** argv) {
                         if (acur > amax) amax = acur;
                         rbAverage += acur;
                         rbAverage /= rbSamples.size();
-                        if (++rbBegin >= rbSamples.size()) rbBegin = 0;
+                        if (++rbBegin >= (int) rbSamples.size()) rbBegin = 0;
                     }
                 }
 
@@ -302,7 +302,7 @@ int main(int argc, char ** argv) {
             doRecord = true;
         } else {
             auto & history = keySoundHistoryAmpl[keyPressed];
-            history.push_back(TKeyWaveform());
+            history.push_back(TKeyWaveformF());
             auto & ampl = history.back();
             ampl.resize(nFrames*kSamplesPerFrame);
             for (int k = 0; k < nFrames; ++k) {
@@ -351,7 +351,7 @@ int main(int argc, char ** argv) {
                 fins[curFile].read((char *)(&keyPressed), sizeof(keyPressed));
                 if (fins[curFile].eof()) {
                     ++curFile;
-                    if (curFile >= fins.size()) {
+                    if (curFile >= (int) fins.size()) {
                         processingInput = false;
                     }
                 } else {
@@ -425,8 +425,9 @@ int main(int argc, char ** argv) {
                     double sum = 0.0f;
                     double sum2 = 0.0f;
                     for (const auto & p : data) {
-                        sum += p;
-                        sum2 += p*p;
+                        int64_t v = p;
+                        sum += v;
+                        sum2 += v*v;
                     }
                     sum /= data.size();
                     sum2 /= data.size();
@@ -448,7 +449,7 @@ int main(int argc, char ** argv) {
                     int offset = peakUsed[iwaveform] - centerSample;
                     //printf("        Offset for waveform %-4d = %-4d\n", iwaveform, offset);
 
-                    auto newWaveform = TKeyWaveform();
+                    auto newWaveform = TKeyWaveformF();
                     newWaveform.resize(kSamplesPerWaveformTrain);
                     auto & waveform = history[iwaveform];
                     for (int icur = 0; icur < kSamplesPerWaveformTrain; ++icur) {
@@ -471,7 +472,7 @@ int main(int argc, char ** argv) {
                 int bestw = -1;
                 int ntrain = 0;
                 double bestccsum = -1.0f;
-                double bestosum = 1e10;
+                //double bestosum = 1e10;
                 std::map<int, std::map<int, std::tuple<TValueCC, TOffset>>> ccs;
 
                 for (int alignToWaveform = 0; alignToWaveform < nWaveforms; ++alignToWaveform) {
@@ -512,7 +513,7 @@ int main(int argc, char ** argv) {
                         ntrain = curntrain;
                         bestw = alignToWaveform;
                         bestccsum = curccsum;
-                        bestosum = curosum;
+                        //bestosum = curosum;
                     }
                 }
                 bestccsum = sqrt(bestccsum/ntrain);
@@ -531,7 +532,7 @@ int main(int argc, char ** argv) {
                     //auto cc     = std::get<0>(ccs[iwaveform][bestw]);
                     auto offset = std::get<1>(ccs[iwaveform][bestw]);
 
-                    auto newWaveform = TKeyWaveform();
+                    auto newWaveform = TKeyWaveformF();
                     newWaveform.resize(kSamplesPerWaveformTrain);
                     for (int icur = 0; icur < kSamplesPerWaveformTrain; ++icur) {
                         int iorg = icur + offset;
@@ -562,7 +563,7 @@ int main(int argc, char ** argv) {
                     auto offset = std::get<1>(ccs[iwaveform][bestw]);
 
                     //if (std::abs(offset) > 5) continue;
-                    printf("        Adding waveform %d - cc = %g, offset = %d\n", iwaveform, cc, offset);
+                    printf("        Adding waveform %d - cc = %g, offset = %ld\n", iwaveform, cc, offset);
                     ccsum += cc*cc;
                     norm += cc*cc;
                     auto & waveform = history[iwaveform];

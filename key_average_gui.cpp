@@ -266,7 +266,7 @@ int main(int argc, char ** argv) {
                 buffersFreq[fid][i] += buffersFreq[fid][kSamplesPerFrame - i];
             }
 
-            if (++fid >= buffersAmpl.size()) break;
+            if (++fid >= (int) buffersAmpl.size()) break;
         }
 
         keyPressed = -1;

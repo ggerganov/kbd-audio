@@ -127,7 +127,7 @@ struct AudioLogger::Data {
     std::array<Frame, getBufferSize_frames(kMaxSampleRate, kMaxBufferSize_s)> buffer;
 
     int32_t nRecords = 0;
-    std::array<int32_t, kMaxRecords>  nFramesToRecord;
+    std::array<int32_t, kMaxRecords> nFramesToRecord;
     std::array<Record, kMaxRecords> records;
 
     Parameters parameters;
@@ -271,7 +271,7 @@ bool AudioLogger::addFrame(const Sample * stream) {
 
     if (data.isReady == false) return false;
 
-	if ((int) SDL_GetQueuedAudioSize(data.deviceIdIn) > 32*sizeof(float)*kSamplesPerFrame) {
+	if (SDL_GetQueuedAudioSize(data.deviceIdIn) > 32*sizeof(float)*kSamplesPerFrame) {
 		printf("Queue size: %d\n", SDL_GetQueuedAudioSize(data.deviceIdIn));
 		SDL_ClearQueuedAudio(data.deviceIdIn);
 	}
@@ -364,7 +364,7 @@ bool AudioLogger::record(float bufferSize_s, int32_t nPrevFrames) {
     if (record.size() == 0) {
         int fStart = data.bufferId - nPrevFrames;
         if (fStart < 0) fStart += data.buffer.size();
-        for (size_t i = 0; i < nPrevFrames; ++i) {
+        for (int i = 0; i < nPrevFrames; ++i) {
             record.push_back(data.buffer[(fStart + i)%data.buffer.size()]);
         }
     } else {
