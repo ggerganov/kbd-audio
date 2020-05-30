@@ -10,6 +10,23 @@
 #include <fstream>
 #include <chrono>
 #include <cassert>
+#include <algorithm>
+
+namespace {
+// generate k random distinct ints in [0..n)
+std::vector<int> subset(int k, int n) {
+    std::vector<int> res(k);
+    for (int i = 0; i < k; ++i) res[i] = i;
+
+    for (int i = k; i < n; ++i) {
+        const int j = rand()%(i + 1);
+        if (j < k) {
+            res[j] = i;
+        }
+    }
+
+    return res;
+}
 
 template <typename T>
 void shuffle(T & t, int start = -1, int end = -1, const std::vector<int> & hint = {}) {
@@ -25,10 +42,9 @@ void shuffle(T & t, int start = -1, int end = -1, const std::vector<int> & hint 
         std::swap(t[i0], t[i1]);
     }
 }
+}
 
 namespace Cipher {
-    inline float frand() { return ((float)rand())/RAND_MAX; }
-
     static const std::array<float, 26> kEnglishLetterFreq = {
         8.167,
         1.492,
@@ -395,7 +411,7 @@ namespace Cipher {
             printf("[encryptExact] Unique symbols = %d\n", k);
         }
 
-		std::vector<TCluster> alphabetTransformation(k);
+		std::vector<TClusterId> alphabetTransformation(k);
 		for (int i = 0; i < (int) alphabetTransformation.size(); ++i) {
 			alphabetTransformation[i] = i;
 		}
@@ -416,7 +432,10 @@ namespace Cipher {
 
 	bool generateSimilarityMap(const TParameters & params, const std::string & text, TSimilarityMap & ccMap) {
 		int n = text.size();
+
 		ccMap.clear();
+        ccMap.resize(n);
+        for (auto & x : ccMap) x.resize(n);
 
 		std::vector<float> waveformAccuracy(n);
 
@@ -436,7 +455,7 @@ namespace Cipher {
 		for (int i = 0; i < n; ++i) {
 			for (int j = 0; j < n; ++j) {
 				if (i == j) {
-					ccMap[i][j] = 1.0;
+					ccMap[i][j].cc = 1.0;
 
 					continue;
 				}
@@ -444,13 +463,13 @@ namespace Cipher {
 				if (text[i] != text[j]) {
 					float sim = params.similarityMismatchAvg + 2.0f*(0.5f - frand())*params.similarityMismatchSig;
 
-					ccMap[i][j] = sim;
-					ccMap[j][i] = sim;
+					ccMap[i][j].cc = sim;
+					ccMap[j][i].cc = sim;
 				} else {
 					float sim = waveformAccuracy[i]*waveformAccuracy[j];
 
-					ccMap[i][j] = sim;
-					ccMap[j][i] = sim;
+					ccMap[i][j].cc = sim;
+					ccMap[j][i].cc = sim;
 				}
 			}
 		}
@@ -458,19 +477,19 @@ namespace Cipher {
 		return true;
 	}
 
-    bool generateClusters(const TParameters & params, int N, TClusters & clusters, const std::vector<int> & hint) {
+    bool generateClusters(const TParameters & params, int n, TClusters & clusters, const std::vector<int> & hint) {
         clusters.clear();
-        clusters.resize(N);
+        clusters.resize(n);
 
         std::map<int, bool> used;
-        for (int i = 0; i < N; ++i) {
+        for (int i = 0; i < n; ++i) {
             if (hint[i] < 0) continue;
             clusters[i] = hint[i];
             used[hint[i]] = true;
         }
 
         int cid = 0;
-        for (int i = 0; i < N; ++i) {
+        for (int i = 0; i < n; ++i) {
             if (hint[i] >= 0) continue;
             //clusters[i] = rand()%params.maxClusters;
             while (used[cid]) {
@@ -509,7 +528,7 @@ namespace Cipher {
         for (int i = 0; i < len; ++i) {
             for (int j = i + 1; j < len; ++j) {
                 if (clusters[i] == clusters[j]) {
-                    res += 1.0f - ccMap.at(i).at(j);
+                    res += 1.0f - ccMap[i][j].cc;
                 }
             }
         }
@@ -522,10 +541,10 @@ namespace Cipher {
         float res = -c0;
         for (int j = 0; j < len; ++j) {
             if (cid == clusters[j]) {
-                res -= 1.0f - ccMap.at(i).at(j);
+                res -= 1.0f - ccMap[i][j].cc;
             }
             if (clusters[i] == clusters[j]) {
-                res += 1.0f - ccMap.at(i).at(j);
+                res += 1.0f - ccMap[i][j].cc;
             }
         }
 
@@ -607,13 +626,13 @@ namespace Cipher {
         const std::vector<int> & hint
         ) {
 
-        int N = clusters.size();
+        int n = clusters.size();
 
         int ncc = 0;
         float ccavg = 0.0;
-        for (int j = 0; j < N; ++j) {
-            for (int i = j + 1; i < N; ++i) {
-                ccavg += ccMap.at(j).at(i);
+        for (int j = 0; j < n; ++j) {
+            for (int i = j + 1; i < n; ++i) {
+                ccavg += ccMap[j][i].cc;
                 ++ncc;
             }
         }
@@ -651,8 +670,8 @@ namespace Cipher {
             if (doMerge) {
                 if (hintMerge == false) {
                     bool isValid = true;
-                    std::map<TCluster, int> ch;
-                    for (int k = 0; k < N; ++k) {
+                    std::map<TClusterId, int> ch;
+                    for (int k = 0; k < n; ++k) {
                         if (hint[k] < 0) continue;
                         int cid = clusters[k];
                         if (ch.find(cid) != ch.end()) {
@@ -666,9 +685,9 @@ namespace Cipher {
                     }
                     printf("IsValid = %d\n", isValid);
 
-                    for (int k0 = 0; k0 < N; ++k0) {
+                    for (int k0 = 0; k0 < n; ++k0) {
                         if (hint[k0] < 0) continue;
-                        for (int k1 = k0 + 1; k1 < N; ++k1) {
+                        for (int k1 = k0 + 1; k1 < n; ++k1) {
                             if (hint[k1] < 0) continue;
                             if (hint[k0] != hint[k1]) continue;
 
@@ -678,7 +697,7 @@ namespace Cipher {
                                 int cid0 = clusters[k0];
                                 int cid1 = clusters[k1];
 
-                                for (int i = 0; i < N; ++i) {
+                                for (int i = 0; i < n; ++i) {
                                     if (clusters[i] == cid1) {
                                         clusters[i] = cid0;
                                     }
@@ -692,11 +711,11 @@ namespace Cipher {
 
                 clustersNew = clusters;
 
-                int i0 = rand()%N;
-                int i1 = rand()%N;
-                while (clusters[i0] == clusters[i1] || ccMap.at(i0).at(i1) < ccavg) {
-                    i0 = rand()%N;
-                    i1 = rand()%N;
+                int i0 = rand()%n;
+                int i1 = rand()%n;
+                while (clusters[i0] == clusters[i1] || ccMap[i0][i1].cc < ccavg) {
+                    i0 = rand()%n;
+                    i1 = rand()%n;
                 }
 
                 int cid0 = clusters[i0];
@@ -720,7 +739,7 @@ namespace Cipher {
 
                 --nonzero;
 
-                for (int i = 0; i < N; ++i) {
+                for (int i = 0; i < n; ++i) {
                     if (clustersNew[i] == cid1) {
                         clustersNew[i] = cid0;
                     }
@@ -742,9 +761,9 @@ namespace Cipher {
                 float costBest = -1e10;
                 float costCur = cost0;
                 for (int k = 0; k < params.nChangePerIteration; ++k) {
-                    int i = rand()%N;
+                    int i = rand()%n;
                     while (hint[i] >= 0) {
-                        i = rand()%N;
+                        i = rand()%n;
                     }
 
                     int cid = clustersNew[i];
@@ -783,11 +802,11 @@ namespace Cipher {
         const std::vector<int> & hint
         ) {
 
-        int N = clusters.size();
+        int n = clusters.size();
 
         clMap.clear();
         std::map<TLetter, bool> used;
-        std::map<TCluster, bool> fixed;
+        std::map<TClusterId, bool> fixed;
         for (int i = 0; i < (int) hint.size(); ++i) {
             if (hint[i] < 0) continue;
             //if (used[hint[i]]) continue;
@@ -817,7 +836,7 @@ namespace Cipher {
         for (int iter = 0; iter < params.saMaxIterations; ++iter) {
             if (iter%5000 == 0) {
                 printf("Iter %5d : temp = %16.4f, cost0 = %8.4f\n", iter, temp, cost0);
-                for (int i = 0; i < N; ++i) {
+                for (int i = 0; i < n; ++i) {
                     if (clMap[clusters[i]] > 0 && clMap[clusters[i]] <= 26) {
                         printf("%c", 'a'+clMap[clusters[i]]-1);
                     } else {
@@ -919,13 +938,13 @@ namespace Cipher {
         const std::vector<int> & hint
         ) {
 
-        int N = clusters.size();
+        int n = clusters.size();
 
         int ncc = 0;
         float ccavg = 0.0;
-        for (int j = 0; j < N; ++j) {
-            for (int i = j + 1; i < N; ++i) {
-                ccavg += ccMap.at(j).at(i);
+        for (int j = 0; j < n; ++j) {
+            for (int i = j + 1; i < n; ++i) {
+                ccavg += ccMap[j][i].cc;
                 ++ncc;
             }
         }
@@ -934,7 +953,7 @@ namespace Cipher {
 
         clMap.clear();
         std::map<TLetter, bool> used;
-        std::map<TCluster, bool> fixed;
+        std::map<TClusterId, bool> fixed;
         for (int i = 0; i < (int) hint.size(); ++i) {
             if (hint[i] < 0) continue;
             //if (used[hint[i]]) continue;
@@ -993,7 +1012,7 @@ namespace Cipher {
 
             int cid = -1;
             int i1l = -1;
-            int i = rand()%N;
+            int i = rand()%n;
             int i1 = rand()%params.maxClusters;
             int i2 = rand()%params.maxClusters;
             int i3 = rand()%params.maxClusters;
@@ -1003,7 +1022,7 @@ namespace Cipher {
 
             {
                 while (hint[i] >= 0) {
-                    i = rand()%N;
+                    i = rand()%n;
                 }
 
                 cid = clusters[i];
@@ -1062,9 +1081,9 @@ namespace Cipher {
 
     void getRandomCLMap(
         const TParameters & params,
-        const TClusters & ,
+        const TClusters & clusters,
         TClusterToLetterMap & clMap,
-        const std::vector<int> & ) {
+        const std::vector<int> & hint) {
 
         clMap.clear();
 
@@ -1079,26 +1098,26 @@ namespace Cipher {
             clMap[i] = t[i];
         }
 
-        //std::map<TLetter, bool> used;
-        //std::map<TCluster, bool> fixed;
+        std::map<TLetter, bool> used;
+        std::map<TClusterId, bool> fixed;
 
-        //for (int i = 0; i < (int) hint.size(); ++i) {
-        //    if (hint[i] < 0) continue;
-        //    //if (used[hint[i]]) continue;
-        //    if (fixed[clusters[i]]) continue;
+        for (int i = 0; i < (int) hint.size(); ++i) {
+            if (hint[i] < 0) continue;
+            //if (used[hint[i]]) continue;
+            if (fixed[clusters[i]]) continue;
 
-        //    clMap[clusters[i]] = hint[i];
-        //    used[hint[i]] = true;
-        //    fixed[clusters[i]] = true;
-        //    printf("Fixed %d\n", clusters[i]);
-        //}
+            clMap[clusters[i]] = hint[i];
+            used[hint[i]] = true;
+            fixed[clusters[i]] = true;
+            //printf("Fixed %d\n", clusters[i]);
+        }
 
-        //{
-        //    for (int i = 0; i < params.maxClusters; ++i) {
-        //        if (fixed[i]) continue;
-        //        clMap[i] = rand()%27;
-        //    }
-        //}
+        {
+            for (int i = 0; i < params.maxClusters; ++i) {
+                if (fixed[i]) continue;
+                clMap[i] = rand()%27;
+            }
+        }
     }
 
     bool subbreak(
@@ -1107,7 +1126,7 @@ namespace Cipher {
         const TClusters & clusters,
         TClusterToLetterMap & clMap,
         const std::vector<int> & hint) {
-        int N = clusters.size();
+        int n = clusters.size();
 
         auto besta = clMap;
         getRandomCLMap(params, clusters, besta, hint);
@@ -1119,9 +1138,10 @@ namespace Cipher {
         }
 
         float bestp = calcScore0(params, freqMap, clusters, besta);
-        printf("Initial prob: %g\n", bestp);
+        //printf("Initial prob: %g\n", bestp);
 
-        static auto bestbestp = bestp;
+        static auto bestbestbestp = bestp;
+        auto bestbestp = bestp;
 
         int nIters = 0;
         int nMainIters = params.nSubbreakIterations;
@@ -1129,7 +1149,7 @@ namespace Cipher {
             if (++nIters > 100) {
                 getRandomCLMap(params, clusters, besta, hint);
                 bestp = calcScore0(params, freqMap, clusters, besta);
-                printf("reset\n");
+                //printf("reset\n");
                 nIters = 0;
             }
 
@@ -1182,25 +1202,210 @@ namespace Cipher {
 
                 if (bestp > bestbestp) {
                     bestbestp = bestp;
-                    printf("[+] Best score = %g\n", bestp);
-                    //for (int i = 0; i < N; ++i) {
-                    //    printf("besta[%d] - %d\n", clusters[i], besta[clusters[i]]);
-                    //}
 
-                    for (int i = 0; i < N; ++i) {
-                        if (besta[clusters[i]] > 0 && besta[clusters[i]] <= 26) {
-                            printf("%c", 'a'+besta[clusters[i]]-1);
-                        } else {
-                            printf(".");
+                    if (bestbestp > bestbestbestp) {
+                        printf("[+] Best score = %g\n", bestp);
+
+                        for (int i = 0; i < n; ++i) {
+                            if (besta[clusters[i]] > 0 && besta[clusters[i]] <= 26) {
+                                printf("%c", 'a'+besta[clusters[i]]-1);
+                            } else {
+                                printf(".");
+                            }
                         }
+                        printf("\n");
+                        bestbestbestp = bestbestp;
                     }
-                    printf("\n");
                 }
                 nIters = 0;
             }
         }
 
         clMap = besta;
+
+        return true;
+    }
+
+    bool generateClustersInitialGuess(
+            const TParameters & params,
+            const TSimilarityMap & ccMap,
+            TClusters & clusters) {
+        int n = ccMap.size();
+
+        int nClusters = n;
+        clusters.resize(n);
+        for (int i = 0; i < n; ++i) {
+            clusters[i] = i;
+        }
+
+        struct Pair {
+            int i;
+            int j;
+            double cc;
+
+            bool operator < (const Pair & a) const { return cc > a.cc; }
+        };
+
+        std::vector<Pair> ccPairs;
+        for (int i = 0; i < n - 1; ++i) {
+            for (int j = i + 1; j < n; ++j) {
+                ccPairs.emplace_back(Pair{i, j, ccMap[i][j].cc});
+            }
+        }
+
+        std::sort(ccPairs.begin(), ccPairs.end());
+
+        for (int k = 0; k < (int) ccPairs.size(); ++k) {
+            int i = ccPairs[k].i;
+            int j = ccPairs[k].j;
+
+            if (clusters[i] == clusters[j]) continue;
+
+            int cidi = clusters[i];
+            int cidj = clusters[j];
+            if (cidi > cidj) {
+                std::swap(cidi, cidj);
+            }
+
+            for (int p = 0; p < n; ++p) {
+                if (clusters[p] == cidj) {
+                    clusters[p] = cidi;
+                }
+            }
+            --nClusters;
+
+            if (nClusters <= params.maxClusters) break;
+        }
+
+        {
+            int cnt = 0;
+            std::map<int, int> used;
+            for (auto & cid : clusters) {
+                if (used[cid] > 0) continue;
+                used[cid] = ++cnt;
+            }
+
+            for (auto & cid : clusters) {
+                cid = used[cid] - 1;
+            }
+        }
+
+        printf("nClusters = %d\n", nClusters);
+        for (auto & cid : clusters) {
+            assert(cid >= 0 && cid < params.maxClusters);
+        }
+
+        return true;
+    }
+
+    bool mutateClusters(const TParameters & params, TClusters & clusters) {
+        int n = clusters.size();
+        int k = std::max(1, std::min(n, (int) std::fabs(std::round(frandGaussian(0.0, 3)))));
+        k = 1;
+
+        auto midxs = subset(k, n);
+
+        for (auto & idx : midxs) {
+            auto p = clusters[idx];
+            while (clusters[idx] == p) {
+                clusters[idx] = rand()%params.maxClusters;
+            }
+        }
+
+        //std::map<int, bool> used;
+        //for (int i = 0; i < n; ++i) {
+        //    if (hint[i] < 0) continue;
+        //    clusters[i] = hint[i];
+        //    used[hint[i]] = true;
+        //}
+
+        return true;
+    }
+
+    float calcPClusters(
+            const TParameters & ,
+            const TSimilarityMap & ,
+            const TSimilarityMap & logMap,
+            const TSimilarityMap & logMapInv,
+            const TClusters & clusters) {
+        float res = 0.0;
+        int n = clusters.size();
+
+        for (int j = 0; j < n - 1; ++j) {
+            for (int i = j + 1; i < n; ++i) {
+                if (clusters[i] == clusters[j]) {
+                    res += logMap[j][i].cc;
+                } else {
+                    res += logMapInv[j][i].cc;
+                }
+            }
+        }
+
+        return res;
+    }
+
+    bool normalizeSimilarityMap(
+            const TParameters & ,
+            TSimilarityMap & ccMap,
+            TSimilarityMap & logMap,
+            TSimilarityMap & logMapInv) {
+        int n = ccMap.size();
+
+        double ccMin = std::numeric_limits<double>::max();
+        double ccMax = std::numeric_limits<double>::min();
+
+        for (int j = 0; j < n - 1; ++j) {
+            for (int i = j + 1; i < n; ++i) {
+                ccMin = std::min(ccMin, ccMap[j][i].cc);
+                ccMax = std::max(ccMax, ccMap[j][i].cc);
+            }
+        }
+
+        ccMin -= 1e-6;
+        ccMax += 1e-6;
+
+        printf("ccMax = %g, ccMin = %g\n", ccMax, ccMin);
+
+        for (int j = 0; j < n; ++j) {
+            for (int i = 0; i < n; ++i) {
+                if (i == j) {
+                    ccMap[j][i].cc = 1.0;
+                    continue;
+                }
+
+                auto & v = ccMap[j][i].cc;
+                v = (v - ccMin)/(ccMax - ccMin);
+                //v = 1.0 - std::exp(-1.1f*v);
+            }
+        }
+
+        logMap = ccMap;
+
+        for (int j = 0; j < n; ++j) {
+            for (int i = 0; i < n; ++i) {
+                if (i == j) {
+                    logMap[j][i].cc = 0.0;
+                    continue;
+                }
+
+                auto & v = logMap[j][i].cc;
+                v = std::log(v);
+            }
+        }
+
+        logMapInv = ccMap;
+
+        for (int j = 0; j < n; ++j) {
+            for (int i = 0; i < n; ++i) {
+                if (i == j) {
+                    logMap[j][i].cc = -1e6;
+                    continue;
+                }
+
+                auto & v = logMapInv[j][i].cc;
+                v = std::log(1.0f - v);
+            }
+        }
 
         return true;
     }

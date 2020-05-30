@@ -32,6 +32,29 @@ template <typename TSampleInput, typename TSample>
     }
 }
 
+float frand() { return ((float)rand())/RAND_MAX; }
+
+float frandGaussian(float mu, float sigma) {
+	static const float two_pi = 2.0*3.14159265358979323846;
+
+	thread_local float z1;
+	thread_local bool generate;
+	generate = !generate;
+
+	if (!generate)
+	   return z1 * sigma + mu;
+
+	float u1 = frand();
+    float u2 = frand();
+
+    float t = sqrt(-2.0f * log(1.0f - u1));
+
+	float z0 = t*cos(two_pi*u2);
+	z1 = t*sin(two_pi*u2);
+
+	return z0 * sigma + mu;
+}
+
 std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
     int last = argc;
     std::map<std::string, std::string> res;

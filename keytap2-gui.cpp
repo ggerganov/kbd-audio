@@ -745,7 +745,7 @@ bool renderClusters(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
         }
         if (params.approach == Approach::NonExactSubstitutionCipher0) {
             ImGui::SliderInt("Min Clusters", &params.cipher.minClusters, 2, 27);
-            ImGui::SliderInt("Max Clusters", &params.cipher.maxClusters, 3, 34);
+            ImGui::SliderInt("Max Clusters", &params.cipher.maxClusters, 3, 80);
             ImGui::SliderFloat("English letter frequency weight", &params.cipher.wEnglishFreq, 0.0f, 20.0f);
             ImGui::SliderFloat("Language model weight", &params.cipher.wLanguageModel, 0.0f, 2.0f);
             ImGui::SliderInt("Iterations", &params.cipher.saMaxIterations, 1000, 50000000);
@@ -851,7 +851,7 @@ bool renderClusters(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
             ImGui::SameLine();
             int w = 32;
             auto cw = ImGui::CalcTextSize("a");
-            for (int j = std::max(0, i - w); j <= std::min(n, i + w); ++j) {
+            for (int j = std::max(0, i - w); j <= std::min(n - 1, i + w); ++j) {
                 if (j == i && keyPresses[j].bind >= 0) {
                     if (keyPresses[j].bind == 26) {
                         ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", '.');
@@ -883,32 +883,67 @@ bool renderSolution(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
     if (ImGui::Begin("Solution")) {
         if (params.approach == Approach::NonExactSubstitutionCipher0) {
             if (ImGui::Button("Calculate")) {
-                Cipher::TClusters clusters;
-                Cipher::TSimilarityMap ccMap;
-                Cipher::TClusterToLetterMap clMap;
+                TClusterToLetterMap clMap;
 
-                int N = keyPresses.size();
+                int n = keyPresses.size();
 
-                std::vector<int> hint(N, -1);
-                for (int i = 0; i < N; ++i) {
+                // todo : consider removing
+                TSimilarityMap ccMap = similarityMap;
+                for (int k0 = 0; k0 < n; ++k0){
+                    for (int k1 = 0; k1 < n; ++k1){
+                        ccMap[k0][k1].cc = 0.5f*(similarityMap[k0][k1].cc + similarityMap[k1][k0].cc);
+                    }
+                }
+
+                std::vector<int> hint(n, -1);
+                for (int i = 0; i < n; ++i) {
                     if (keyPresses[i].bind < 0) continue;
                     hint[i] = keyPresses[i].bind + 1;
                 }
 
-                Cipher::generateClusters(params.cipher, N, clusters, hint);
-                for (int k0 = 0; k0 < N; ++k0){
-                    for (int k1 = 0; k1 < N; ++k1){
-                        ccMap[k0][k1] = 0.5f*(similarityMap[k0][k1].cc + similarityMap[k1][k0].cc);
+                TSimilarityMap logMap;
+                TSimilarityMap logMapInv;
+                Cipher::normalizeSimilarityMap(params.cipher, ccMap, logMap, logMapInv);
+
+                TClusters clusters;
+                Cipher::generateClustersInitialGuess(params.cipher, ccMap, clusters);
+
+                auto clustersNew = clusters;
+                Cipher::mutateClusters(params.cipher, clustersNew);
+                auto pCur = Cipher::calcPClusters(params.cipher, ccMap, logMap, logMapInv, clustersNew);
+                while (true) {
+                    clustersNew = clusters;
+                    Cipher::mutateClusters(params.cipher, clustersNew);
+                    auto pNew = Cipher::calcPClusters(params.cipher, ccMap, logMap, logMapInv, clustersNew);
+
+                    auto u = frand();
+                    //auto alpha = pNew/pCur;
+                    auto alpha = std::exp((pNew - pCur));
+
+                    //printf("pNew = %g, pCur = %g, alpha = %g\n", pNew, pCur, alpha);
+
+                    if (u <= alpha) {
+                        clusters = clustersNew;
+                        pCur = pNew;
+
+                        //printf("pCur = %g, alpha = %g\n", pCur, alpha);
+
+                        static int cnt = 99;
+                        if (++cnt >= 10) {
+                            cnt = 0;
+                            params.cipher.nSubbreakIterations = 2000;
+                            Cipher::subbreak(params.cipher, freqMap, clusters, clMap, hint);
+                        }
                     }
                 }
 
                 //Cipher::doSimulatedAnnealing3(params.cipher, ccMap, clusters, hint);
                 //Cipher::doSimulatedAnnealing4(params.cipher, freqMap, clusters, clMap, hint);
-                Cipher::doSimulatedAnnealing5(params.cipher, freqMap, ccMap, clusters, clMap, hint);
+                //Cipher::doSimulatedAnnealing5(params.cipher, freqMap, ccMap, clusters, clMap, hint);
                 //Cipher::subbreak(params.cipher, freqMap, clusters, clMap, hint);
 
                 decrypted = "";
-                for (int i = 0; i < N; ++i) {
+                for (int i = 0; i < n; ++i) {
                     keyPresses[i].cid = clusters[i];
                     if (clMap[clusters[i]] > 0 && clMap[clusters[i]] <= 26) {
                         keyPresses[i].predicted = 'a' + clMap[clusters[i]]-1;

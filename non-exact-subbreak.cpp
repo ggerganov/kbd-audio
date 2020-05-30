@@ -58,7 +58,7 @@ for sear3ches made through apple prod6u4cts such as the Safa=ri browser a0nd Sir
     //printf("x = '%s'\n", x.c_str());
     //plain = x;
 
-    Cipher::TClusters enc;
+    TClusters enc;
     Cipher::encryptExact(params, plain, enc);
 
     params.maxClusters = 27;
@@ -66,7 +66,7 @@ for sear3ches made through apple prod6u4cts such as the Safa=ri browser a0nd Sir
         params.maxClusters = std::max(params.maxClusters, c + 1);
     }
 
-    Cipher::TClusterToLetterMap clMap;
+    TClusterToLetterMap clMap;
     Cipher::subbreak(params, freqMap, enc, clMap);
 
     Cipher::printText(enc, clMap);

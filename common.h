@@ -38,8 +38,11 @@ using TKeyPressPosition = int64_t;
 using TKeyConfidenceMap = std::map<TKey, TConfidence>;
 using TTrainKeys        = std::vector<TKey>;
 
-using TMatch         = stMatch;
-using TSimilarityMap = std::vector<std::vector<TMatch>>;
+using TLetter               = int32_t;
+using TMatch                = stMatch;
+using TSimilarityMap        = std::vector<std::vector<TMatch>>;
+using TClusters             = std::vector<TClusterId>;
+using TClusterToLetterMap   = std::map<TClusterId, TLetter>;
 
 // - i16 samples
 
@@ -93,7 +96,8 @@ struct stPlaybackData {
 
 // helpers
 
-inline float frand() { return ((float)rand())/RAND_MAX; }
+float frand();
+float frandGaussian(float mu, float sigma);
 
 template<typename T>
 stWaveformView<T> getView(const TWaveformT<T> & waveform, int64_t idx) {

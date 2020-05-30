@@ -29,7 +29,7 @@ subscription fees. One is the money paid by Google parent Alphabet
 for searches made through Apple products such as the Safari browser and Siri.
     )";
 
-    Cipher::TClusters enc;
+    TClusters enc;
     Cipher::encryptExact(params, plain, enc);
 
     params.maxClusters = 27;
@@ -37,7 +37,7 @@ for searches made through Apple products such as the Safari browser and Siri.
         params.maxClusters = std::max(params.maxClusters, c + 1);
     }
 
-    Cipher::TClusterToLetterMap clMap;
+    TClusterToLetterMap clMap;
     Cipher::subbreak(params, freqMap, enc, clMap);
 
     Cipher::printText(enc, clMap);
