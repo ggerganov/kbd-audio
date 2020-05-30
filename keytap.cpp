@@ -425,8 +425,9 @@ int main(int argc, char ** argv) {
                     double sum = 0.0f;
                     double sum2 = 0.0f;
                     for (const auto & p : data) {
-                        sum += p;
-                        sum2 += p*p;
+                        int64_t v = p;
+                        sum += v;
+                        sum2 += v*v;
                     }
                     sum /= data.size();
                     sum2 /= data.size();
