@@ -70,6 +70,3 @@ namespace ImGui
     void MyFunction(const char* name, const MyMatrix44& v);
 }
 */
-
-// force GL3W loader
-#define IMGUI_IMPL_OPENGL_LOADER_GL3W

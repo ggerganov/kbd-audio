@@ -111,6 +111,11 @@ target_compile_definitions(Gui PRIVATE
     IMGUI_USER_CONFIG="../imconfig-vtx32.h"
     )
 
+# force GL3W loader
+target_compile_definitions(Gui PUBLIC
+    IMGUI_IMPL_OPENGL_LOADER_GL3W=1
+    )
+
 target_link_libraries(Gui PRIVATE
     ${CMAKE_DL_LIBS}
     ${SDL2_LIBRARIES}
