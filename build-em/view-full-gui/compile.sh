@@ -5,7 +5,7 @@ em++ -O3 -std=c++17 \
     -s WASM=1 \
     -s ASSERTIONS=1 \
     -s TOTAL_MEMORY=134217728 \
-    -s USE_SDL=2 -s USE_WEBGL2=1 -s FULL_ES3=1 \
+    -s USE_SDL=2 \
     -s EXPORTED_FUNCTIONS='["_doInit", "_main"]' \
     -s EXTRA_EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]' \
     --preload-file ../../chal/record \
@@ -13,6 +13,7 @@ em++ -O3 -std=c++17 \
     -I ../../imgui \
     -I ../../imgui/examples \
     -I ../../imgui/examples/libs/gl3w \
+    ../../common.cpp \
     ../../view-full-gui.cpp \
     ../../imgui/imgui.cpp \
     ../../imgui/imgui_draw.cpp \

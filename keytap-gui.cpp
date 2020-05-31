@@ -130,6 +130,13 @@ int main(int argc, char ** argv) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#elif __EMSCRIPTEN__
+    const char* glsl_version = "#version 100";
+    //const char* glsl_version = "#version 300 es";
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #else
     // GL 3.0 + GLSL 130
     const char* glsl_version = "#version 130";
@@ -178,11 +185,7 @@ int main(int argc, char ** argv) {
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
 
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-#ifdef __EMSCRIPTEN__
-    ImGui_ImplOpenGL3_Init("#version 300 es");
-#else
     ImGui_ImplOpenGL3_Init(glsl_version);
-#endif
 
     // Setup style
     ImGui::StyleColorsDark();
