@@ -107,13 +107,10 @@ add_library(Gui STATIC
     imgui/examples/imgui_impl_opengl3.cpp
     )
 
-target_compile_definitions(Gui PRIVATE
-    IMGUI_USER_CONFIG="../imconfig-vtx32.h"
-    )
-
 # force GL3W loader
 target_compile_definitions(Gui PUBLIC
     IMGUI_IMPL_OPENGL_LOADER_GL3W=1
+    IMGUI_USER_CONFIG="../imconfig-vtx32.h"
     )
 
 target_link_libraries(Gui PRIVATE
