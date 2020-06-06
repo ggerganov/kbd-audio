@@ -360,10 +360,11 @@ int main(int argc, char ** argv) {
 
     TKeyPressCollection keyPresses;
     TWaveform waveformThreshold;
+    TWaveform waveformMax;
     {
         auto tStart = std::chrono::high_resolution_clock::now();
         printf("[+] Searching for key presses\n");
-        if (findKeyPresses(getView(waveformInput, 0), keyPresses, waveformThreshold, 10.0, 6*1024) == false) {
+        if (findKeyPresses(getView(waveformInput, 0), keyPresses, waveformThreshold, waveformMax, 10.0, 6*1024) == false) {
             printf("Failed to detect keypresses\n");
             return -2;
         }

@@ -184,8 +184,10 @@ bool findKeyPresses(
         const TWaveformViewT<T> & waveform,
         TKeyPressCollectionT<T> & res,
         TWaveformT<T> & waveformThreshold,
+        TWaveformT<T> & waveformMax,
         double thresholdBackground,
-        int historySize);
+        int historySize,
+        bool removeLowPower = false);
 
 template<typename T>
 bool saveKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & keyPresses);
@@ -206,3 +208,6 @@ template<typename T>
 bool generateLowResWaveform(const TWaveformT<T> & waveform, TWaveformT<T> & waveformLowRes, int nWindow) {
     return generateLowResWaveform(getView(waveform, 0), waveformLowRes, nWindow);
 }
+
+template<typename T>
+bool adjustKeyPresses(TKeyPressCollectionT<T> & keyPresses, TSimilarityMap & sim);

@@ -17,6 +17,7 @@ namespace Cipher {
     using TCode = int32_t;
     using TProb = double;
     using TGramLen = int32_t;
+    using THint = std::vector<int32_t>;
 
     struct TParameters {
         // clustering params
@@ -31,9 +32,16 @@ namespace Cipher {
         float coolingRate = 0.999995;
 
         // subbreak params
-        int nSubbreakIterations = 100000;
+        int nSubbreakIterations = 300;
+        TProb pNonAlphabetic = 0.0;
+
+        // Metropolis–Hastings params
+        int nMHInitialIters = 100;
+        int nMHIters = 100;
+        int nMHImprovementsPerSubbreak = 1;
 
         // language model
+        bool includeSpaces = true;
         float wEnglishFreq = 10.0f;
         float wLanguageModel = 1.0f;
 
@@ -46,12 +54,21 @@ namespace Cipher {
         float similarityNoiseSig = 0.1f;
         float similarityMismatchAvg = 0.3f;
         float similarityMismatchSig = 0.2f;
+
+        THint hint = {};
     };
 
     struct TFreqMap {
-        TGramLen len;
-        TProb pmin;
+        TGramLen len = -1;
+        TProb pmin = 0.0;
+        int64_t nTotal = 0;
         std::vector<TProb> prob;
+    };
+
+    struct TResult {
+        TProb p = -100.0;
+        TClusterToLetterMap clMap;
+        TClusters clusters;
     };
 
     TCode calcCode(const char * data, int n);
@@ -60,7 +77,7 @@ namespace Cipher {
     bool encryptExact(const TParameters & params, const std::string & text, TClusters & clusters);
     bool generateSimilarityMap(const TParameters & params, const std::string & text, TSimilarityMap & ccMap);
 
-    bool generateClusters(const TParameters & params, int n, TClusters & clusters, const std::vector<int> & hint);
+    bool generateClusters(const TParameters & params, int n, TClusters & clusters);
     bool printClusterGoodness(const std::string & text, const TClusters & clusters);
 
     float costF(const TSimilarityMap & ccMap, const TClusters & clusters);
@@ -69,34 +86,25 @@ namespace Cipher {
     bool doSimulatedAnnealing3(
             const TParameters & params,
             const TSimilarityMap & ccMap,
-            TClusters & clusters,
-            const std::vector<int> & hint = {}
-            );
+            TClusters & clusters);
 
     bool doSimulatedAnnealing4(
             const TParameters & params,
             const TFreqMap & freqMap,
             const TClusters & clusters,
-            TClusterToLetterMap & clMap,
-            const std::vector<int> & hint = {}
-            );
+            TClusterToLetterMap & clMap);
 
     bool doSimulatedAnnealing5(
             const TParameters & params,
             const TFreqMap & freqMap,
             const TSimilarityMap & ccMap,
             TClusters & clusters,
-            TClusterToLetterMap & clMap,
-            const std::vector<int> & hint = {}
-            );
+            TClusterToLetterMap & clMap);
 
     bool subbreak(
             const TParameters & params,
             const TFreqMap & freqMap,
-            const TClusters & clusters,
-            TClusterToLetterMap & clMap,
-            const std::vector<int> & hint = {}
-            );
+            TResult & result);
 
     bool generateClustersInitialGuess(
             const TParameters & params,
@@ -105,12 +113,13 @@ namespace Cipher {
 
     bool mutateClusters(const TParameters & params, TClusters & clusters);
 
-    float calcPClusters(
+    double calcPClusters(
             const TParameters & ,
             const TSimilarityMap & ,
             const TSimilarityMap & logMap,
             const TSimilarityMap & logMapInv,
-            const TClusters & clusters);
+            const TClusters & clusters,
+            const TClusterToLetterMap & clMap);
 
     bool normalizeSimilarityMap(
             const TParameters & ,
@@ -120,4 +129,36 @@ namespace Cipher {
 
     void printText(const TClusters & t);
     void printText(const TClusters & t, const TClusterToLetterMap & clMap);
+
+    class Processor {
+    public:
+        Processor();
+
+        bool init(
+                const TParameters & params,
+                const TFreqMap & freqMap,
+                const TSimilarityMap & similarityMap);
+
+        bool setPNonAlphabetic(TProb p);
+        bool setWEnglishFreq(float w);
+        bool setHint(const THint & hint);
+
+        bool compute();
+
+        const TResult & getResult() const;
+        const TSimilarityMap & getSimilarityMap() const;
+
+    private:
+        TParameters m_params;
+        const TFreqMap* m_freqMap = nullptr;
+        TSimilarityMap m_similarityMap;
+        TSimilarityMap m_logMap;
+        TSimilarityMap m_logMapInv;
+
+        int m_nMHInitialIters = 0;
+        int m_nMHImprovements = 0;
+        double m_pCur = 0.0f;
+
+        TResult m_curResult;
+    };
 }

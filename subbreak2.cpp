@@ -29,7 +29,7 @@ std::vector<int> subset(int k, int n) {
 }
 
 template <typename T>
-void shuffle(T & t, int start = -1, int end = -1, const std::vector<int> & hint = {}) {
+void shuffle(T & t, int start = -1, int end = -1, const Cipher::THint & hint = {}) {
     if (start == -1) start = 0;
     if (end == -1) end = t.size();
 
@@ -45,10 +45,11 @@ void shuffle(T & t, int start = -1, int end = -1, const std::vector<int> & hint 
 }
 
 namespace Cipher {
-    static const std::array<float, 26> kEnglishLetterFreq = {
-        8.167,
-        1.492,
-        2.782,
+    static const std::array<float, 27> kEnglishLetterFreq = {
+        0.000, // space
+        8.167, // a
+        1.492, // b
+        2.782, // c
         4.253,
         12.702,
         2.228,
@@ -72,6 +73,36 @@ namespace Cipher {
         0.150,
         1.974,
         0.074,
+    };
+
+    static const std::array<float, 27> kEnglishLetterWithSpacesFreq = {
+        11.505, // space
+        7.228,  // a
+        1.320,  // b
+        2.462,  // c
+        3.764,
+        11.239,
+        1.972,
+        1.783,
+        5.393,
+        6.165,
+        0.135,
+        0.683,
+        3.562,
+        2.129,
+        5.973,
+        6.644,
+        1.707,
+        0.084,
+        5.298,
+        5.599,
+        8.014,
+        2.441,
+        0.866,
+        2.089,
+        0.133,
+        1.747,
+        0.065,
     };
 
     static const std::array<TLetter, 256> kCharToLetter = {
@@ -356,13 +387,13 @@ namespace Cipher {
 
         std::string gram;
         int32_t nfreq = 0;
-        int64_t nTotal = 0;
+        res.nTotal = 0;
 
         while (true) {
             fin >> gram >> nfreq;
             if (fin.eof()) break;
 
-            nTotal += nfreq;
+            res.nTotal += nfreq;
         }
 
         fin.clear();
@@ -385,11 +416,11 @@ namespace Cipher {
                 printf("Error: duplicate n-gram '%s'\n", gram.c_str());
                 return false;
             }
-            prob[idx] = std::log10(((double)(nfreq))/nTotal);
+            prob[idx] = std::log10(((double)(nfreq))/res.nTotal);
         }
-        printf("    Total n-grams loaded = %g\n", (double) nTotal);
+        printf("    Total n-grams loaded = %g\n", (double) res.nTotal);
 
-        res.pmin = std::log(10000000.01/nTotal);
+        res.pmin = std::log(10000000.01/res.nTotal);
         printf("    P-min = %g\n", res.pmin);
         for (auto & p : prob) {
             if (p >= 0.5) p = res.pmin;
@@ -477,20 +508,20 @@ namespace Cipher {
 		return true;
 	}
 
-    bool generateClusters(const TParameters & params, int n, TClusters & clusters, const std::vector<int> & hint) {
+    bool generateClusters(const TParameters & params, int n, TClusters & clusters) {
         clusters.clear();
         clusters.resize(n);
 
         std::map<int, bool> used;
         for (int i = 0; i < n; ++i) {
-            if (hint[i] < 0) continue;
-            clusters[i] = hint[i];
-            used[hint[i]] = true;
+            if (params.hint[i] < 0) continue;
+            clusters[i] = params.hint[i];
+            used[params.hint[i]] = true;
         }
 
         int cid = 0;
         for (int i = 0; i < n; ++i) {
-            if (hint[i] >= 0) continue;
+            if (params.hint[i] >= 0) continue;
             //clusters[i] = rand()%params.maxClusters;
             while (used[cid]) {
                 if (++cid >= params.maxClusters) cid = 0;
@@ -556,27 +587,33 @@ namespace Cipher {
 
         int n = txt.size();
         const auto & len  = freqMap.len;
-        const auto & pmin = freqMap.pmin;
         const auto & prob = freqMap.prob;
 
         int nlet = 0;
-        std::array<int, 26> letCount;
+        std::array<int, 27> letCount;
         letCount.fill(0);
         std::vector<TLetter> plain(n);
         for (int i = 0; i < n; ++i) {
             plain[i] = clMap.at(txt[i]);
             if (plain[i] > 0 && plain[i] <= 26) {
-                ++letCount[plain[i] - 1];
+                ++letCount[plain[i]];
+                ++nlet;
+            } else if (params.includeSpaces) {
+                ++letCount[0];
                 ++nlet;
             }
         }
 
         float letFreqCost = 0.0;
-        for (int i = 0; i < 26; ++i) {
-            float curf = 0.01*kEnglishLetterFreq[i] - ((float)(letCount[i]))/((float)(nlet));
-            letFreqCost += curf*curf;
+        {
+            auto & freq = params.includeSpaces ? kEnglishLetterWithSpacesFreq : kEnglishLetterFreq;
+            for (int i = 0; i < 27; ++i) {
+                float curf = 0.01*freq[i] - ((float)(letCount[i]))/((float)(nlet));
+                letFreqCost += curf*curf;
+            }
         }
-        letFreqCost /= 26.0;
+
+        letFreqCost /= 27.0;
         letFreqCost = sqrt(letFreqCost);
         //printf("letFreqCost = %g\n", letFreqCost);
 
@@ -593,7 +630,7 @@ namespace Cipher {
                 curc += c;
                 --k;
             } else {
-                res += pmin;
+                res += params.pNonAlphabetic;
             }
         }
 
@@ -609,7 +646,7 @@ namespace Cipher {
                     curc += c;
                     break;
                 } else {
-                    res += pmin;
+                    res += params.pNonAlphabetic;
                 }
             }
 
@@ -622,8 +659,7 @@ namespace Cipher {
     bool doSimulatedAnnealing3(
         const TParameters & params,
         const TSimilarityMap & ccMap,
-        TClusters & clusters,
-        const std::vector<int> & hint
+        TClusters & clusters
         ) {
 
         int n = clusters.size();
@@ -672,24 +708,24 @@ namespace Cipher {
                     bool isValid = true;
                     std::map<TClusterId, int> ch;
                     for (int k = 0; k < n; ++k) {
-                        if (hint[k] < 0) continue;
+                        if (params.hint[k] < 0) continue;
                         int cid = clusters[k];
                         if (ch.find(cid) != ch.end()) {
-                            if (ch[cid] != hint[k]) {
+                            if (ch[cid] != params.hint[k]) {
                                 isValid = false;
                                 break;
                             }
                         } else {
-                            ch[cid] = hint[k];
+                            ch[cid] = params.hint[k];
                         }
                     }
                     printf("IsValid = %d\n", isValid);
 
                     for (int k0 = 0; k0 < n; ++k0) {
-                        if (hint[k0] < 0) continue;
+                        if (params.hint[k0] < 0) continue;
                         for (int k1 = k0 + 1; k1 < n; ++k1) {
-                            if (hint[k1] < 0) continue;
-                            if (hint[k0] != hint[k1]) continue;
+                            if (params.hint[k1] < 0) continue;
+                            if (params.hint[k0] != params.hint[k1]) continue;
 
                             if (clusters[k0] != clusters[k1]) {
                                 printf("Merging clusters %d and %d based on hint\n", clusters[k0], clusters[k1]);
@@ -762,7 +798,7 @@ namespace Cipher {
                 float costCur = cost0;
                 for (int k = 0; k < params.nChangePerIteration; ++k) {
                     int i = rand()%n;
-                    while (hint[i] >= 0) {
+                    while (params.hint[i] >= 0) {
                         i = rand()%n;
                     }
 
@@ -798,8 +834,7 @@ namespace Cipher {
         const TParameters & params,
         const TFreqMap & freqMap,
         const TClusters & clusters,
-        TClusterToLetterMap & clMap,
-        const std::vector<int> & hint
+        TClusterToLetterMap & clMap
         ) {
 
         int n = clusters.size();
@@ -807,13 +842,13 @@ namespace Cipher {
         clMap.clear();
         std::map<TLetter, bool> used;
         std::map<TClusterId, bool> fixed;
-        for (int i = 0; i < (int) hint.size(); ++i) {
-            if (hint[i] < 0) continue;
-            //if (used[hint[i]]) continue;
+        for (int i = 0; i < (int) params.hint.size(); ++i) {
+            if (params.hint[i] < 0) continue;
+            //if (used[params.hint[i]]) continue;
             if (fixed[clusters[i]]) continue;
 
-            clMap[clusters[i]] = hint[i];
-            used[hint[i]] = true;
+            clMap[clusters[i]] = params.hint[i];
+            used[params.hint[i]] = true;
             fixed[clusters[i]] = true;
             printf("Fixed %d\n", clusters[i]);
         }
@@ -934,8 +969,7 @@ namespace Cipher {
         const TFreqMap & freqMap,
         const TSimilarityMap & ccMap,
         TClusters & clusters,
-        TClusterToLetterMap & clMap,
-        const std::vector<int> & hint
+        TClusterToLetterMap & clMap
         ) {
 
         int n = clusters.size();
@@ -954,13 +988,13 @@ namespace Cipher {
         clMap.clear();
         std::map<TLetter, bool> used;
         std::map<TClusterId, bool> fixed;
-        for (int i = 0; i < (int) hint.size(); ++i) {
-            if (hint[i] < 0) continue;
-            //if (used[hint[i]]) continue;
+        for (int i = 0; i < (int) params.hint.size(); ++i) {
+            if (params.hint[i] < 0) continue;
+            //if (used[params.hint[i]]) continue;
             if (fixed[clusters[i]]) continue;
 
-            clMap[clusters[i]] = hint[i];
-            used[hint[i]] = true;
+            clMap[clusters[i]] = params.hint[i];
+            used[params.hint[i]] = true;
             fixed[clusters[i]] = true;
             printf("Fixed %d\n", clusters[i]);
         }
@@ -1021,7 +1055,7 @@ namespace Cipher {
             float costCurLM = cost0LM;
 
             {
-                while (hint[i] >= 0) {
+                while (params.hint[i] >= 0) {
                     i = rand()%n;
                 }
 
@@ -1082,8 +1116,7 @@ namespace Cipher {
     void getRandomCLMap(
         const TParameters & params,
         const TClusters & clusters,
-        TClusterToLetterMap & clMap,
-        const std::vector<int> & hint) {
+        TClusterToLetterMap & clMap) {
 
         clMap.clear();
 
@@ -1101,13 +1134,13 @@ namespace Cipher {
         std::map<TLetter, bool> used;
         std::map<TClusterId, bool> fixed;
 
-        for (int i = 0; i < (int) hint.size(); ++i) {
-            if (hint[i] < 0) continue;
-            //if (used[hint[i]]) continue;
+        for (int i = 0; i < (int) params.hint.size(); ++i) {
+            if (params.hint[i] < 0) continue;
+            //if (used[params.hint[i]]) continue;
             if (fixed[clusters[i]]) continue;
 
-            clMap[clusters[i]] = hint[i];
-            used[hint[i]] = true;
+            clMap[clusters[i]] = params.hint[i];
+            used[params.hint[i]] = true;
             fixed[clusters[i]] = true;
             //printf("Fixed %d\n", clusters[i]);
         }
@@ -1123,33 +1156,30 @@ namespace Cipher {
     bool subbreak(
         const TParameters & params,
         const TFreqMap & freqMap,
-        const TClusters & clusters,
-        TClusterToLetterMap & clMap,
-        const std::vector<int> & hint) {
-        int n = clusters.size();
+        TResult & result) {
+        const auto & clusters = result.clusters;
+        auto & clMap = result.clMap;
+        auto & minBestP = result.p;
+
+        //int n = clusters.size();
 
         auto besta = clMap;
-        getRandomCLMap(params, clusters, besta, hint);
+        getRandomCLMap(params, clusters, besta);
 
         std::map<TLetter, bool> fixed;
-        for (int i = 0; i < (int) hint.size(); ++i) {
-            if (hint[i] < 0) continue;
+        for (int i = 0; i < (int) params.hint.size(); ++i) {
+            if (params.hint[i] < 0) continue;
             fixed[clusters[i]] = true;
         }
 
         float bestp = calcScore0(params, freqMap, clusters, besta);
-        //printf("Initial prob: %g\n", bestp);
-
-        static auto bestbestbestp = bestp;
-        auto bestbestp = bestp;
 
         int nIters = 0;
         int nMainIters = params.nSubbreakIterations;
         while (nMainIters--) {
             if (++nIters > 100) {
-                getRandomCLMap(params, clusters, besta, hint);
+                getRandomCLMap(params, clusters, besta);
                 bestp = calcScore0(params, freqMap, clusters, besta);
-                //printf("reset\n");
                 nIters = 0;
             }
 
@@ -1172,16 +1202,12 @@ namespace Cipher {
 
             auto iterp = calcScore0(params, freqMap, clusters, itera);
             auto cura = itera;
-            for (int i = 0; i < 100; ++i) {
+            for (int i = 0; i < 10; ++i) {
                 int a0 = rand()%params.maxClusters;
                 int a1 = rand()%params.maxClusters;
                 while (a0 == a1) {
                     a0 = rand()%params.maxClusters;
                     a1 = rand()%params.maxClusters;
-                }
-
-                if (hint.size() > 0 && (hint[a0] != -1 || hint[a1] != -1)) {
-                    continue;
                 }
 
                 std::swap(cura[a0], cura[a1]);
@@ -1200,28 +1226,24 @@ namespace Cipher {
                 besta = itera;
                 bestp = iterp;
 
-                if (bestp > bestbestp) {
-                    bestbestp = bestp;
+                if (bestp > minBestP) {
+                    minBestP = bestp;
+                    clMap = besta;
 
-                    if (bestbestp > bestbestbestp) {
-                        printf("[+] Best score = %g\n", bestp);
+                    //printf("[+] Best score = %g\n", bestp);
 
-                        for (int i = 0; i < n; ++i) {
-                            if (besta[clusters[i]] > 0 && besta[clusters[i]] <= 26) {
-                                printf("%c", 'a'+besta[clusters[i]]-1);
-                            } else {
-                                printf(".");
-                            }
-                        }
-                        printf("\n");
-                        bestbestbestp = bestbestp;
-                    }
+                    //for (int i = 0; i < n; ++i) {
+                    //    if (besta[clusters[i]] > 0 && besta[clusters[i]] <= 26) {
+                    //        printf("%c", 'a'+besta[clusters[i]]-1);
+                    //    } else {
+                    //        printf(".");
+                    //    }
+                    //}
+                    //printf("\n");
                 }
                 nIters = 0;
             }
         }
-
-        clMap = besta;
 
         return true;
     }
@@ -1255,26 +1277,34 @@ namespace Cipher {
 
         std::sort(ccPairs.begin(), ccPairs.end());
 
-        for (int k = 0; k < (int) ccPairs.size(); ++k) {
-            int i = ccPairs[k].i;
-            int j = ccPairs[k].j;
+        {
+            std::vector<bool> used(n);
 
-            if (clusters[i] == clusters[j]) continue;
+            for (int k = 0; k < (int) ccPairs.size(); ++k) {
+                int i = ccPairs[k].i;
+                int j = ccPairs[k].j;
 
-            int cidi = clusters[i];
-            int cidj = clusters[j];
-            if (cidi > cidj) {
-                std::swap(cidi, cidj);
-            }
+                if (clusters[i] == clusters[j]) continue;
 
-            for (int p = 0; p < n; ++p) {
-                if (clusters[p] == cidj) {
-                    clusters[p] = cidi;
+                int cidi = clusters[i];
+                int cidj = clusters[j];
+
+                if (used[cidi] || used[cidj]) continue;
+
+                if (cidi > cidj) {
+                    std::swap(cidi, cidj);
                 }
-            }
-            --nClusters;
 
-            if (nClusters <= params.maxClusters) break;
+                for (int p = 0; p < n; ++p) {
+                    if (clusters[p] == cidj) {
+                        clusters[p] = cidi;
+                    }
+                }
+                used[cidj] = true;
+                --nClusters;
+
+                if (nClusters <= params.maxClusters) break;
+            }
         }
 
         {
@@ -1300,12 +1330,9 @@ namespace Cipher {
 
     bool mutateClusters(const TParameters & params, TClusters & clusters) {
         int n = clusters.size();
-        int k = std::max(1, std::min(n, (int) std::fabs(std::round(frandGaussian(0.0, 3)))));
-        k = 1;
 
-        auto midxs = subset(k, n);
-
-        for (auto & idx : midxs) {
+        for (int i = 0; i < 1; ++i) {
+            int idx = rand()%n;
             auto p = clusters[idx];
             while (clusters[idx] == p) {
                 clusters[idx] = rand()%params.maxClusters;
@@ -1322,13 +1349,15 @@ namespace Cipher {
         return true;
     }
 
-    float calcPClusters(
+    double calcPClusters(
             const TParameters & ,
             const TSimilarityMap & ,
             const TSimilarityMap & logMap,
             const TSimilarityMap & logMapInv,
-            const TClusters & clusters) {
-        float res = 0.0;
+            const TClusters & clusters,
+            const TClusterToLetterMap & ) {
+
+        double res = 0.0;
         int n = clusters.size();
 
         for (int j = 0; j < n - 1; ++j) {
@@ -1340,6 +1369,29 @@ namespace Cipher {
                 }
             }
         }
+
+        //if (clMap.empty()) {
+        //    for (int j = 0; j < n - 1; ++j) {
+        //        for (int i = j + 1; i < n; ++i) {
+        //            if (clusters[i] == clusters[j]) {
+        //                res += logMap[j][i].cc;
+        //            } else {
+        //                res += logMapInv[j][i].cc;
+        //            }
+        //        }
+        //    }
+        //    res *= 2.0;
+        //} else {
+        //    for (int j = 0; j < n - 1; ++j) {
+        //        for (int i = j + 1; i < n; ++i) {
+        //            if (clMap.at(clusters[i]) == clMap.at(clusters[j])) {
+        //                res += logMap[j][i].cc;
+        //            } else {
+        //                res += logMapInv[j][i].cc;
+        //            }
+        //        }
+        //    }
+        //}
 
         return res;
     }
@@ -1403,7 +1455,7 @@ namespace Cipher {
                 }
 
                 auto & v = logMapInv[j][i].cc;
-                v = std::log(1.0f - v);
+                v = std::log(1.0 - v);
             }
         }
 
@@ -1424,4 +1476,94 @@ namespace Cipher {
         }
         printf("\n");
     }
+
+    //
+    // Processor
+    //
+
+    Processor::Processor() {
+    }
+
+    bool Processor::init(
+            const TParameters & params,
+            const TFreqMap & freqMap,
+            const TSimilarityMap & similarityMap) {
+        m_params = params;
+        m_freqMap = &freqMap;
+        m_similarityMap = similarityMap;
+
+        normalizeSimilarityMap(m_params, m_similarityMap, m_logMap, m_logMapInv);
+        generateClustersInitialGuess(m_params, m_similarityMap, m_curResult.clusters);
+
+        auto clustersNew = m_curResult.clusters;
+
+        Cipher::mutateClusters(m_params, clustersNew);
+        m_pCur = calcPClusters(m_params, m_similarityMap, m_logMap, m_logMapInv, clustersNew, m_curResult.clMap);
+
+        return true;
+    }
+
+    bool Processor::setPNonAlphabetic(TProb p) {
+        m_params.pNonAlphabetic = p;
+
+        return true;
+    }
+
+    bool Processor::setWEnglishFreq(float w) {
+        m_params.wEnglishFreq = w;
+        m_curResult.p *= 1.1;
+        m_pCur *= 1.1;
+
+        return true;
+    }
+
+    bool Processor::setHint(const THint & hint) {
+        m_params.hint = hint;
+
+        return true;
+    }
+
+    bool Processor::compute() {
+        auto clustersNew = m_curResult.clusters;
+
+        for (int iter = 0; iter < m_params.nMHIters; ++iter) {
+            clustersNew = m_curResult.clusters;
+            Cipher::mutateClusters(m_params, clustersNew);
+            auto pNew = calcPClusters(m_params, m_similarityMap, m_logMap, m_logMapInv, clustersNew, m_curResult.clMap);
+
+            auto u = frand();
+            //auto alpha = pNew/pCur;
+            auto alpha = pNew > m_pCur ? 1.0 : std::exp((pNew - m_pCur));
+
+            //printf("pNew = %g, pCur = %g, alpha = %g\n", pNew, pCur, alpha);
+
+            if (u <= alpha) {
+                m_curResult.clusters = clustersNew;
+                m_pCur = pNew;
+
+                //printf("pCur = %g, alpha = %g\n", m_pCur, alpha);
+
+                if (++m_nMHInitialIters > m_params.nMHInitialIters) {
+                    if (++m_nMHImprovements >= m_params.nMHImprovementsPerSubbreak) {
+                        m_nMHImprovements = 0;
+                        m_curResult.p *= 1.00001;
+                        Cipher::subbreak(m_params, *m_freqMap, m_curResult);
+                    }
+                }
+            } else {
+                m_pCur *= 1.00001;
+            }
+        }
+
+        return true;
+    }
+
+    const TResult & Processor::getResult() const {
+        return m_curResult;
+    }
+
+    const TSimilarityMap & Processor::getSimilarityMap() const {
+        return m_similarityMap;
+    }
+
 }

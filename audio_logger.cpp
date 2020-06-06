@@ -155,7 +155,7 @@ bool AudioLogger::install(Parameters && parameters) {
     }
 
     if (parameters.sampleRate <= 0) {
-        fprintf(stderr, "error : invalid sampleRate = %ld\n", parameters.sampleRate);
+        fprintf(stderr, "error : invalid sampleRate = %d\n", (int) parameters.sampleRate);
         return false;
     }
 

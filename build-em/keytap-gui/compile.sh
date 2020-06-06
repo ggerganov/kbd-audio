@@ -29,6 +29,7 @@ em++ -O3 -std=c++17 \
     -I ../../imgui/examples \
     -I ../../imgui/examples/libs/gl3w \
     ../../common.cpp \
+    ../../common-gui.cpp \
     ../../keytap-gui.cpp \
     ../../audio_logger.cpp \
     ../../imgui/imgui.cpp \
