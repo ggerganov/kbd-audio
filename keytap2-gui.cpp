@@ -63,7 +63,7 @@ struct stParameters {
     int32_t alignWindow_samples     = 256;
 
     std::vector<int>    valuesClusters = { 50, };
-    std::vector<float>  valuesPNonAlphabetic = { 0.01, 0.02, 0.05, 0.07, 0.1 };
+    std::vector<float>  valuesPNonAlphabetic = { 0.05, 0.05, 0.05 };
     std::vector<float>  valuesWEnglishFreq = { 50.0 };
 
     int32_t nProcessors() const {
@@ -127,7 +127,7 @@ struct stStateCore {
 
     bool processing = true;
 
-    Cipher::TFreqMap * freqMap;
+    Cipher::TFreqMap * freqMap[3];
     TParameters params;
     TSimilarityMap similarityMap;
     TKeyPressCollection keyPresses;
@@ -879,7 +879,7 @@ bool prepareAudioOut(const TParameters & params) {
 int main(int argc, char ** argv) {
     srand(time(0));
 
-    printf("Usage: %s recrod.kbd n-gram.txt [letter.mask] [-pN]\n", argv[0]);
+    printf("Usage: %s recrod.kbd n-gram-dir [letter.mask] [-pN]\n", argv[0]);
     printf("    -pN - select playback device N\n");
     if (argc < 3) {
         return -1;
@@ -910,11 +910,22 @@ int main(int argc, char ** argv) {
         return -4;
     }
 
-    Cipher::TFreqMap freqMap;
-    if (Cipher::loadFreqMap(argv[2], freqMap) == false) {
+    Cipher::TFreqMap freqMap3;
+    Cipher::TFreqMap freqMap4;
+    Cipher::TFreqMap freqMap5;
+
+    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_trigrams.txt").c_str(), freqMap3) == false) {
         return -5;
     }
-    stateCore.freqMap = &freqMap;
+    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_quadgrams.txt").c_str(), freqMap4) == false) {
+        return -5;
+    }
+    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_quintgrams.txt").c_str(), freqMap5) == false) {
+        return -5;
+    }
+    stateCore.freqMap[0] = &freqMap3;
+    stateCore.freqMap[1] = &freqMap4;
+    stateCore.freqMap[2] = &freqMap5;
 
     Gui::Objects guiObjects;
     if (Gui::init("Keytap2", g_windowSizeX, g_windowSizeY, guiObjects) == false) {
@@ -1064,7 +1075,7 @@ int main(int argc, char ** argv) {
                         params.maxClusters = nClusters;
                         stateCore.processors[i].init(
                                 params,
-                                *stateCore.freqMap,
+                                *stateCore.freqMap[i%3],
                                 stateCore.similarityMap);
 
                         stateCore.processors[i].setPNonAlphabetic(std::log(p));
@@ -1091,7 +1102,7 @@ int main(int argc, char ** argv) {
                         params.maxClusters = nClusters;
                         stateCore.processors[i].init(
                                 params,
-                                *stateCore.freqMap,
+                                *stateCore.freqMap[i%3],
                                 stateCore.similarityMap);
 
                         stateCore.processors[i].setPNonAlphabetic(std::log(p));
