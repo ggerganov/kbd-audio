@@ -108,6 +108,11 @@ struct stStateUI {
     float amin = std::numeric_limits<TSample>::min();
     float amax = std::numeric_limits<TSample>::max();
 
+    // window sizes
+    float windowHeightKeyPesses = 0;
+    float windowHeightResults = 0;
+    float windowHeightSimilarity = 0;
+
     TParameters params;
     TWaveform waveformInput;
     TKeyPressCollection keyPresses;
@@ -484,6 +489,10 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
             stateUI.flags.recalculateSimilarityMap = true;
             stateUI.doUpdate = true;
         }
+
+        stateUI.windowHeightKeyPesses = ImGui::GetWindowHeight();
+    } else {
+        stateUI.windowHeightKeyPesses = ImGui::GetTextLineHeightWithSpacing();
     }
     ImGui::End();
 
@@ -521,8 +530,8 @@ bool renderResults(stStateUI & stateUI) {
         }
     }
 
-    ImGui::SetNextWindowPos(ImVec2(0, 360.0f), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, g_windowSizeY - 360.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(0, stateUI.windowHeightKeyPesses), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, (14 + stateUI.results.size())*ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Always);
     if (ImGui::Begin("Results", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
         auto drawList = ImGui::GetWindowDrawList();
 
@@ -751,15 +760,21 @@ bool renderResults(stStateUI & stateUI) {
             }
             ImGui::PopID();
         }
+
+        stateUI.windowHeightResults = ImGui::GetWindowHeight();
+    } else {
+        stateUI.windowHeightResults = ImGui::GetTextLineHeightWithSpacing();
     }
+
     ImGui::End();
     return true;
 }
 
-bool renderSimilarity(TParameters & params, const TKeyPressCollection & keyPresses, const TSimilarityMap & similarityMap) {
-    ImGui::SetNextWindowPos(ImVec2(0, 360.0f), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(0.5f*g_windowSizeX, g_windowSizeY - 360.0f), ImGuiCond_Once);
-    if (ImGui::Begin("Similarity")) {
+bool renderSimilarity(const TKeyPressCollection & keyPresses, const TSimilarityMap & similarityMap) {
+    int offsetY = stateUI.windowHeightKeyPesses + stateUI.windowHeightResults;
+    ImGui::SetNextWindowPos(ImVec2(0, offsetY), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, g_windowSizeY - offsetY), ImGuiCond_Always);
+    if (ImGui::Begin("Similarity", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
         auto wsize = ImGui::GetContentRegionAvail();
 
         static float bsize = 4.0f;
@@ -1017,9 +1032,7 @@ int main(int argc, char ** argv) {
 
         renderKeyPresses(stateUI, argv[1], stateUI.waveformInput, stateUI.keyPresses);
         renderResults(stateUI);
-        //renderSimilarity(stateUI.params, stateUI.keyPresses, stateUI.similarityMap);
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        renderSimilarity(stateUI.keyPresses, stateUI.similarityMap);
 
         Gui::render(guiObjects);
 
