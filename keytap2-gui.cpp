@@ -63,7 +63,7 @@ struct stParameters {
     int32_t alignWindow_samples     = 256;
 
     std::vector<int>    valuesClusters = { 50, };
-    std::vector<float>  valuesPNonAlphabetic = { 0.05, 0.05, 0.05 };
+    std::vector<float>  valuesPNonAlphabetic = { 0.05, 0.05, 0.05, };
     std::vector<float>  valuesWEnglishFreq = { 50.0 };
 
     int32_t nProcessors() const {
@@ -176,6 +176,8 @@ private:
 
 template<> bool TripleBuffer<stStateCore>::update() {
     std::lock_guard<std::mutex> lock(mutex);
+    if (hasChanged) return false;
+
     hasChanged = true;
 
     buffer.flags = this->flags;
@@ -531,21 +533,27 @@ bool renderResults(stStateUI & stateUI) {
     }
 
     ImGui::SetNextWindowPos(ImVec2(0, stateUI.windowHeightKeyPesses), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, (14 + stateUI.results.size())*ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, (12 + stateUI.results.size())*ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Always);
     if (ImGui::Begin("Results", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
         auto drawList = ImGui::GetWindowDrawList();
 
         ImGui::PushItemWidth(200.0);
+
         if (ImGui::Checkbox("Auto", &stateUI.autoHint)) {
         }
+
+        ImGui::SameLine();
         if (ImGui::SliderInt("Clusters", &stateUI.params.valuesClusters[0], 30, 150.0)) {
             stateUI.flags.applyClusters = true;
             stateUI.doUpdate = true;
         }
+
+        ImGui::SameLine();
         if (ImGui::SliderFloat("English weight", &stateUI.params.valuesWEnglishFreq[0], 1.0, 100.0, "%.6f", 2.0)) {
             stateUI.flags.applyWEnglishFreq = true;
             stateUI.doUpdate = true;
         }
+
         ImGui::PopItemWidth();
 
         ImGui::Text("%s", "");
@@ -702,6 +710,19 @@ bool renderResults(stStateUI & stateUI) {
             const auto & result = item.second;
             ImGui::PushID(id);
             ImGui::Text("%2d. %8.3f", id, result.p);
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("Processor   %d", item.first);
+                ImGui::Text("Cluster-to-letter map:");
+                {
+                    int i = 0;
+                    for (auto& pair : item.second.clMap) {
+                        ImGui::Text("%3d: %3d  ", pair.first, pair.second);
+                        if (++i % 10 != 0) ImGui::SameLine();
+                    }
+                }
+                ImGui::EndTooltip();
+            }
             if (result.clMap.empty() == false) {
                 ImGui::SameLine();
                 int n = result.clusters.size();
@@ -805,7 +826,7 @@ bool renderSimilarity(const TKeyPressCollection & keyPresses, const TSimilarityM
                     ImVec2 p0 = {savePos.x + j*bsize, savePos.y + i*bsize};
                     ImVec2 p1 = {savePos.x + (j + 1)*bsize - 1.0f, savePos.y + (i + 1)*bsize - 1.0f};
                     if (similarityMap[i][j].cc > threshold) {
-                        drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({1.0f, 1.0f, 1.0f, col}));
+                        drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32(ImVec4{1.0f - col, col, 0.0f, col}));
                     }
                     if (ImGui::IsMouseHoveringRect(p0, {p1.x + 1.0f, p1.y + 1.0f})) {
                         if (i == j) hoveredId = i;
