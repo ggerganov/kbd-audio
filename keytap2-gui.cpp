@@ -99,7 +99,7 @@ struct stStateUI {
         void clear() { memset(this, 0, sizeof(Flags)); }
     } flags;
 
-    bool autoHint = false;
+    bool autoHint = true;
     bool processing = true;
     bool calculatingSimilarityMap = false;
 
@@ -568,6 +568,12 @@ bool renderResults(stStateUI & stateUI) {
 
         ImGui::PushItemWidth(200.0);
 
+        if (ImGui::SliderInt("Clusters", &stateUI.params.valuesClusters[0], 30, 150.0)) {
+            stateUI.flags.applyClusters = true;
+            stateUI.doUpdate = true;
+        }
+
+        ImGui::SameLine();
         if (ImGui::Checkbox("Auto", &stateUI.autoHint)) {
         }
         if (ImGui::IsItemHovered()) {
@@ -576,16 +582,17 @@ bool renderResults(stStateUI & stateUI) {
             ImGui::EndTooltip();
         }
 
-        if (stateUI.autoHint && stateUI.results.size() > 0) {
-            int nPerAutoHint = 20;
+        if (stateUI.results.size() > 0) {
+            int nPerAutoHint = 10;
             auto id0 = stateUI.results.begin()->second.id%stateUI.params.cipher.nMHIters;
             auto id1 = (stateUI.results.begin()->second.id/stateUI.params.cipher.nMHIters)%nPerAutoHint;
+            if (stateUI.processing) stateUI.results.begin()->second.id++;
             ImGui::SameLine();
             ImGui::ProgressBar(float(id1)/nPerAutoHint, { 100.0, ImGui::GetTextLineHeightWithSpacing() });
-            if (id0 == 0 && id1 == 0) {
+            if (stateUI.processing && stateUI.autoHint && id0 == 0 && id1 == 0) {
                 int n = stateUI.suggestions.size();
                 for (int i = 0; i < n; ++i) {
-                    if (frand() > 0.1) {
+                    if (frand() > 0.5) {
                         stateUI.keyPresses[i].bind = -1;
                         continue;
                     }
@@ -593,26 +600,31 @@ bool renderResults(stStateUI & stateUI) {
                         stateUI.keyPresses[i].bind = -1;
                         continue;
                     }
-                    //if (stateUI.suggestions[i] == 0 || stateUI.suggestions[i] == 5) {
-                    //    stateUI.keyPresses[i].bind = frand() > 0.5 ? 4 : 26;
-                    //    continue;
-                    //}
-                    if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
-                        stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
+
+                    if (frand() > 0.5) {
+                        if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
+                            stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
+                        } else {
+                            stateUI.keyPresses[i].bind = 26;
+                        }
                     } else {
-                        stateUI.keyPresses[i].bind = 26;
+                        char c0 = (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) ?
+                            'a' + stateUI.suggestions[i] - 1 : '_';
+
+                        int idx = rand()%kNearbyKeys.at(c0).size();
+                        char c1 = kNearbyKeys.at(c0)[idx];
+
+                        if (c1 == '_') {
+                            stateUI.keyPresses[i].bind = 26;
+                        } else {
+                            stateUI.keyPresses[i].bind = c1 - 'a';
+                        }
                     }
                 }
                 stateUI.flags.applyHints = true;
                 stateUI.flags.applyWEnglishFreq = true;
                 stateUI.doUpdate = true;
             }
-        }
-
-        ImGui::SameLine();
-        if (ImGui::SliderInt("Clusters", &stateUI.params.valuesClusters[0], 30, 150.0)) {
-            stateUI.flags.applyClusters = true;
-            stateUI.doUpdate = true;
         }
 
         //ImGui::SameLine();

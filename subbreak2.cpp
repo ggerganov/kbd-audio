@@ -1511,8 +1511,8 @@ namespace Cipher {
 
     bool Processor::setWEnglishFreq(float w) {
         m_params.wEnglishFreq = w;
-        m_curResult.p *= 1.1;
-        m_pCur *= 1.1;
+        m_curResult.p *= 1.001;
+        m_pCur *= 1.001;
 
         return true;
     }
