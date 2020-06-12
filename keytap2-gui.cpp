@@ -224,7 +224,7 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
     if (offset < 0) offset = (waveform.size() - nview)/2;
 
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 340.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 330.0f), ImGuiCond_Always);
     if (ImGui::Begin("Key Presses", nullptr, ImGuiWindowFlags_NoMove)) {
         int viewMin = 512;
         int viewMax = waveform.size();
@@ -730,7 +730,11 @@ bool renderResults(stStateUI & stateUI) {
                 {
                     int i = 0;
                     for (auto& pair : item.second.clMap) {
-                        ImGui::Text("%3d: %3d  ", pair.first, pair.second);
+                        char c = '_';
+                        if (pair.second > 0 && pair.second <= 26) {
+                            c = 'a' + pair.second - 1;
+                        }
+                        ImGui::Text("%3d: %c  ", pair.first, c);
                         if (++i % 10 != 0) ImGui::SameLine();
                     }
                 }
@@ -811,7 +815,7 @@ bool renderSimilarity(const TKeyPressCollection & keyPresses, const TSimilarityM
     if (ImGui::Begin("Similarity", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
         auto wsize = ImGui::GetContentRegionAvail();
 
-        static float bsize = 4.0f;
+        static float bsize = 10.0f;
         static float threshold = 0.0f;
         ImGui::PushItemWidth(100.0);
 
@@ -869,6 +873,8 @@ bool renderSimilarity(const TKeyPressCollection & keyPresses, const TSimilarityM
                     }
                 }
             }
+        } else {
+            ImGui::TextColored({1.0f, 0.3f, 0.4f, 1.0f}, "Waiting for similarity map to be available!");
         }
 
         ImGui::EndChild();
