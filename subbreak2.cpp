@@ -1553,6 +1553,8 @@ namespace Cipher {
             } else {
                 m_pCur *= 1.00001;
             }
+
+            ++m_curResult.id;
         }
 
         return true;

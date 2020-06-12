@@ -101,6 +101,7 @@ struct stStateUI {
 
     bool autoHint = false;
     bool processing = true;
+    bool calculatingSimilarityMap = false;
 
     // key presses window
     int nview = -1;
@@ -124,6 +125,7 @@ struct stStateUI {
 
 struct stStateCore {
     struct Flags {
+        bool calculatingSimilarityMap = false;
         bool updateSimilarityMap = false;
         bool updateResult[128];
 
@@ -142,9 +144,9 @@ struct stStateCore {
 
 template<typename T>
 struct TripleBuffer : public T {
-    bool update() {
+    bool update(bool force = false) {
         std::lock_guard<std::mutex> lock(mutex);
-        hasChanged = true;
+        hasChanged = true || force;
         buffer = *this;
         this->flags.clear();
 
@@ -174,9 +176,9 @@ private:
     mutable std::mutex mutex;
 };
 
-template<> bool TripleBuffer<stStateCore>::update() {
+template<> bool TripleBuffer<stStateCore>::update(bool force) {
     std::lock_guard<std::mutex> lock(mutex);
-    if (hasChanged) return false;
+    if (hasChanged && force == false) return false;
 
     hasChanged = true;
 
@@ -222,7 +224,7 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
     if (offset < 0) offset = (waveform.size() - nview)/2;
 
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 360.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 340.0f), ImGuiCond_Always);
     if (ImGui::Begin("Key Presses", nullptr, ImGuiWindowFlags_NoMove)) {
         int viewMin = 512;
         int viewMax = waveform.size();
@@ -487,11 +489,6 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
             nviewPrev = nview;
         }
 
-        if (ImGui::Button("Calculate Key Similarity")) {
-            stateUI.flags.recalculateSimilarityMap = true;
-            stateUI.doUpdate = true;
-        }
-
         stateUI.windowHeightKeyPesses = ImGui::GetWindowHeight();
     } else {
         stateUI.windowHeightKeyPesses = ImGui::GetTextLineHeightWithSpacing();
@@ -502,63 +499,19 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
 }
 
 bool renderResults(stStateUI & stateUI) {
-    if (stateUI.autoHint) {
-        static int nFrames = 0;
-        if (++nFrames > 5*60) {
-            int n = stateUI.suggestions.size();
-            for (int i = 0; i < n; ++i) {
-                if (frand() > 0.1) {
-                    stateUI.keyPresses[i].bind = -1;
-                    continue;
-                }
-                if (stateUI.suggestions[i] < 0) {
-                    stateUI.keyPresses[i].bind = -1;
-                    continue;
-                }
-                //if (stateUI.suggestions[i] == 0 || stateUI.suggestions[i] == 5) {
-                //    stateUI.keyPresses[i].bind = frand() > 0.5 ? 4 : 26;
-                //    continue;
-                //}
-                if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
-                    stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
-                } else {
-                    stateUI.keyPresses[i].bind = 26;
-                }
-            }
-            stateUI.flags.applyHints = true;
-            stateUI.flags.applyWEnglishFreq = true;
-            stateUI.doUpdate = true;
-            nFrames = 0;
-        }
-    }
-
     ImGui::SetNextWindowPos(ImVec2(0, stateUI.windowHeightKeyPesses), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, (12 + stateUI.results.size())*ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Always);
     if (ImGui::Begin("Results", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
         auto drawList = ImGui::GetWindowDrawList();
 
-        ImGui::PushItemWidth(200.0);
-
-        if (ImGui::Checkbox("Auto", &stateUI.autoHint)) {
-        }
-
-        ImGui::SameLine();
-        if (ImGui::SliderInt("Clusters", &stateUI.params.valuesClusters[0], 30, 150.0)) {
-            stateUI.flags.applyClusters = true;
+        if (ImGui::Button("Calculate Key Similarity")) {
+            stateUI.similarityMap.clear();
+            stateUI.flags.recalculateSimilarityMap = true;
             stateUI.doUpdate = true;
         }
 
-        ImGui::SameLine();
-        if (ImGui::SliderFloat("English weight", &stateUI.params.valuesWEnglishFreq[0], 1.0, 100.0, "%.6f", 2.0)) {
-            stateUI.flags.applyWEnglishFreq = true;
-            stateUI.doUpdate = true;
-        }
-
-        ImGui::PopItemWidth();
-
-        ImGui::Text("%s", "");
-
-        if (stateUI.similarityMap.size() > 0) {
+        if (stateUI.similarityMap.size() > 0 && stateUI.calculatingSimilarityMap == false) {
+            ImGui::SameLine();
             if (stateUI.processing) {
                 if (ImGui::Button("Pause") || (ImGui::IsKeyPressed(44) && !ImGui::GetIO().KeyCtrl)) { // space
                     stateUI.processing = false;
@@ -606,9 +559,69 @@ bool renderResults(stStateUI & stateUI) {
                 stateUI.flags.applyHints = true;
                 stateUI.doUpdate = true;
             }
-
-            ImGui::Text("%s", "");
+        } else {
+            if (stateUI.calculatingSimilarityMap) {
+                ImGui::SameLine();
+                ImGui::TextColored({0.3f, 1.0f, 0.4f, 1.0f}, "Calculating similarity map ...");
+            }
         }
+
+        ImGui::PushItemWidth(200.0);
+
+        if (ImGui::Checkbox("Auto", &stateUI.autoHint)) {
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("If checked, hints will be updated automatically based on the suggestions");
+            ImGui::EndTooltip();
+        }
+
+        if (stateUI.autoHint && stateUI.results.size() > 0) {
+            int nPerAutoHint = 20;
+            auto id0 = stateUI.results.begin()->second.id%stateUI.params.cipher.nMHIters;
+            auto id1 = (stateUI.results.begin()->second.id/stateUI.params.cipher.nMHIters)%nPerAutoHint;
+            ImGui::SameLine();
+            ImGui::ProgressBar(float(id1)/nPerAutoHint, { 100.0, ImGui::GetTextLineHeightWithSpacing() });
+            if (id0 == 0 && id1 == 0) {
+                int n = stateUI.suggestions.size();
+                for (int i = 0; i < n; ++i) {
+                    if (frand() > 0.1) {
+                        stateUI.keyPresses[i].bind = -1;
+                        continue;
+                    }
+                    if (stateUI.suggestions[i] < 0) {
+                        stateUI.keyPresses[i].bind = -1;
+                        continue;
+                    }
+                    //if (stateUI.suggestions[i] == 0 || stateUI.suggestions[i] == 5) {
+                    //    stateUI.keyPresses[i].bind = frand() > 0.5 ? 4 : 26;
+                    //    continue;
+                    //}
+                    if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
+                        stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
+                    } else {
+                        stateUI.keyPresses[i].bind = 26;
+                    }
+                }
+                stateUI.flags.applyHints = true;
+                stateUI.flags.applyWEnglishFreq = true;
+                stateUI.doUpdate = true;
+            }
+        }
+
+        ImGui::SameLine();
+        if (ImGui::SliderInt("Clusters", &stateUI.params.valuesClusters[0], 30, 150.0)) {
+            stateUI.flags.applyClusters = true;
+            stateUI.doUpdate = true;
+        }
+
+        //ImGui::SameLine();
+        //if (ImGui::SliderFloat("English weight", &stateUI.params.valuesWEnglishFreq[0], 1.0, 100.0, "%.6f", 2.0)) {
+        //    stateUI.flags.applyWEnglishFreq = true;
+        //    stateUI.doUpdate = true;
+        //}
+
+        ImGui::PopItemWidth();
 
         ImGui::Separator();
         ImGui::Text(" Suggestions");
@@ -799,7 +812,7 @@ bool renderSimilarity(const TKeyPressCollection & keyPresses, const TSimilarityM
         auto wsize = ImGui::GetContentRegionAvail();
 
         static float bsize = 4.0f;
-        static float threshold = 0.3f;
+        static float threshold = 0.0f;
         ImGui::PushItemWidth(100.0);
 
         int n = similarityMap.size();
@@ -981,6 +994,8 @@ int main(int argc, char ** argv) {
         if (stateCore.changed()) {
             auto stateCoreNew = stateCore.get();
 
+            stateUI.calculatingSimilarityMap = stateCoreNew.flags.calculatingSimilarityMap;
+
             if (stateCoreNew.flags.updateSimilarityMap) {
                 stateUI.similarityMap = stateCoreNew.similarityMap;
             }
@@ -1077,6 +1092,9 @@ int main(int argc, char ** argv) {
                     stateCore.keyPresses = stateUINew.keyPresses;
 
                     if (stateUINew.flags.recalculateSimilarityMap) {
+                        stateCore.flags.calculatingSimilarityMap = true;
+                        stateCore.update(true);
+
                         calculateSimilartyMap(
                                 stateUINew.params.keyPressWidth_samples,
                                 stateUINew.params.alignWindow_samples,
@@ -1095,6 +1113,7 @@ int main(int argc, char ** argv) {
 
                         printf("[+] Similarity map recalculated\n");
 
+                        stateCore.flags.calculatingSimilarityMap = false;
                         stateCore.flags.updateSimilarityMap = true;
                         stateCore.update();
                     }

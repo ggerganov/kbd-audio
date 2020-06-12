@@ -66,6 +66,7 @@ namespace Cipher {
     };
 
     struct TResult {
+        int32_t id = 0;
         TProb p = -100.0;
         TClusterToLetterMap clMap;
         TClusters clusters;
