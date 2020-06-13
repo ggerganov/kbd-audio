@@ -299,8 +299,14 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
     TWaveform & waveformThreshold = stateUI.waveformThreshold;
     TWaveform & waveformMax = stateUI.waveformMax;
 
-    if (nview < 128*kSamplesPerFrame && scrolling == false) {
-        nview = std::min((int) (128*kSamplesPerFrame), (int) waveform.size());
+    if (stateUI.recording) {
+        if (nview < 1024*kSamplesPerFrame && scrolling == false) {
+            nview = std::min((int) (1024*kSamplesPerFrame), (int) waveform.size());
+        }
+    } else {
+        if (nview < 16*kSamplesPerFrame && scrolling == false) {
+            nview = std::min((int) (16*kSamplesPerFrame), (int) waveform.size());
+        }
     }
 
     if (offset < 0) offset = (waveform.size() - nview)/2;
@@ -1355,6 +1361,7 @@ int main(int argc, char ** argv) {
 
                         Cipher::TParameters params;
                         params.maxClusters = nClusters;
+                        stateCore.processors[i] = Cipher::Processor();
                         stateCore.processors[i].init(
                                 params,
                                 *stateCore.freqMap[i%3],
