@@ -3,7 +3,6 @@
  *  \author Georgi Gerganov
  */
 
-
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
 #endif

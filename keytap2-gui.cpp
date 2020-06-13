@@ -3,6 +3,10 @@
  *  \author Georgi Gerganov
  */
 
+#ifdef __EMSCRIPTEN__
+#include "emscripten.h"
+#endif
+
 #include "constants.h"
 #include "common.h"
 #include "common-gui.h"
@@ -39,8 +43,13 @@ extern "C" {
     int doInit() { return g_doInit(); }
 }
 
-int g_windowSizeX = 1920;
-int g_windowSizeY = 1200;
+#ifdef __EMSCRIPTEN__
+    int g_windowSizeX = 740;
+    int g_windowSizeY = 700;
+#else
+    int g_windowSizeX = 1920;
+    int g_windowSizeY = 1200;
+#endif
 
 struct stParameters;
 
