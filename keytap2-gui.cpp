@@ -132,6 +132,10 @@ struct stStateUI {
     float windowHeightResults = 0;
     float windowHeightSimilarity = 0;
 
+    bool openAboutWindow = false;
+
+    std::string fnameRecord = "default.kbd";
+    std::string fnameKeyPressess = "default.kbd.keys";
 
     TParameters params;
     TWaveformF waveformOriginal;
@@ -276,7 +280,7 @@ float plotWaveformInverse(void * data, int i) {
     return -waveform->samples[i];
 }
 
-bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWaveform & waveform, TKeyPressCollection & keyPresses) {
+bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPressCollection & keyPresses) {
     auto & params = stateUI.params;
 
     bool & scrolling = stateUI.scrolling;
@@ -299,6 +303,16 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
     TWaveform & waveformThreshold = stateUI.waveformThreshold;
     TWaveform & waveformMax = stateUI.waveformMax;
 
+    if (nview < 0) nview = waveform.size();
+    if (offset < 0) offset = (waveform.size() - nview)/2;
+    if (nviewPrev < 0) {
+        nviewPrev = nview + 1;
+
+        waveformLowRes = waveform;
+        waveformThreshold = waveform;
+        waveformMax = waveform;
+    }
+
     if (stateUI.recording) {
         if (nview < 1024*kSamplesPerFrame && scrolling == false) {
             nview = std::min((int) (1024*kSamplesPerFrame), (int) waveform.size());
@@ -307,15 +321,6 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
         if (nview < 16*kSamplesPerFrame && scrolling == false) {
             nview = std::min((int) (16*kSamplesPerFrame), (int) waveform.size());
         }
-    }
-
-    if (offset < 0) offset = (waveform.size() - nview)/2;
-    if (nviewPrev < 0) {
-        nviewPrev = nview + 1;
-
-        waveformLowRes = waveform;
-        waveformThreshold = waveform;
-        waveformMax = waveform;
     }
 
     if (lastSize != (int) waveform.size()) {
@@ -339,7 +344,7 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
         stateUI.doUpdate = true;
     }
 
-    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
+    ImGui::SetNextWindowPos(ImVec2(0, ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 336.0f), ImGuiCond_Always);
     if (ImGui::Begin("Key Presses", nullptr, ImGuiWindowFlags_NoMove)) {
         int viewMin = 512;
@@ -584,20 +589,6 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
                 recalculateKeyPresses = true;
             }
 
-            static std::string filename = std::string(fnameInput) + ".keys";
-            ImGui::SameLine();
-            ImGui::Text("%s", filename.c_str());
-
-            ImGui::SameLine();
-            if (ImGui::Button("Save")) {
-                saveKeyPresses(filename.c_str(), keyPresses);
-            }
-
-            ImGui::SameLine();
-            if (ImGui::Button("Load")) {
-                loadKeyPresses(filename.c_str(), getView(waveform, 0), keyPresses);
-            }
-
             ImGui::SameLine();
             ImGui::DragInt("Key width", &params.keyPressWidth_samples, 8, 0, kSampleRate/10);
             ImGui::SameLine();
@@ -647,9 +638,9 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
             nviewPrev = nview;
         }
 
-        stateUI.windowHeightKeyPesses = ImGui::GetWindowHeight();
+        stateUI.windowHeightKeyPesses = ImGui::GetWindowHeight() + ImGui::GetTextLineHeightWithSpacing();
     } else {
-        stateUI.windowHeightKeyPesses = ImGui::GetTextLineHeightWithSpacing();
+        stateUI.windowHeightKeyPesses = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetTextLineHeightWithSpacing();
     }
     ImGui::End();
 
@@ -1118,6 +1109,8 @@ int main(int argc, char ** argv) {
     int nChannels = argm["C"].empty() ? 0 : std::stoi(argm["C"]);
 
     stateUI.params.playbackId = playbackId;
+    stateUI.fnameRecord = argv[1];
+    stateUI.fnameKeyPressess = stateUI.fnameRecord + ".keys";
 
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
@@ -1295,11 +1288,94 @@ int main(int argc, char ** argv) {
         ImGui_ImplSDL2_NewFrame(guiObjects.window);
         ImGui::NewFrame();
 
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("File"))
+            {
+                ImGui::Separator();
+                ImGui::TextDisabled("Record: %s", stateUI.fnameRecord.c_str());
+                ImGui::Separator();
+                if (ImGui::MenuItem("Save Record")) {
+                    saveToFile(stateUI.fnameRecord, stateUI.waveformOriginal);
+                }
+                if (ImGui::MenuItem("Load Record")) {
+                    printf("[+] Loading recording from '%s'\n", argv[1]);
+                    if (readFromFile<TSampleF>(argv[1], stateUI.waveformOriginal) == false) {
+                        printf("Specified file '%s' does not exist\n", argv[1]);
+                    } else {
+                        printf("[+] Converting waveform to i16 format ...\n");
+                        if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
+                            printf("Conversion failed\n");
+                        } else {
+                        }
+                    }
+                }
+
+                ImGui::Separator();
+                ImGui::TextDisabled("Key Presses: %s", stateUI.fnameKeyPressess.c_str());
+                ImGui::Separator();
+                if (ImGui::MenuItem("Save Key Presses")) {
+                    saveKeyPresses(stateUI.fnameKeyPressess.c_str(), stateUI.keyPresses);
+                }
+                if (ImGui::MenuItem("Load Key Presses")) {
+                    loadKeyPresses(stateUI.fnameKeyPressess.c_str(), getView(stateUI.waveformInput, 0), stateUI.keyPresses);
+                }
+
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Help")) {
+                if (ImGui::MenuItem("About")) {
+                    stateUI.openAboutWindow = true;
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
+        if (stateUI.openAboutWindow) {
+            ImGui::OpenPopup("About");
+            stateUI.openAboutWindow = false;
+        }
+        ImGui::SetNextWindowSize({512, -1}, ImGuiCond_Once);
+        if (ImGui::BeginPopupModal("About", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
+            ImGui::Text("%s", "");
+            {
+                const char * text = "Keytap2 : v0.1 [commit-hash]";
+                ImGui::Text("%s", "");
+                ImGui::SameLine(0.5f*ImGui::GetContentRegionAvailWidth() - 0.45f*ImGui::CalcTextSize(text).x);
+                ImGui::Text("%s", text);
+            }
+            ImGui::Text("%s", "");
+            {
+                const char * text = "author : Georgi Gerganov";
+                ImGui::Text("%s", "");
+                ImGui::SameLine(0.5f*ImGui::GetContentRegionAvailWidth() - 0.45f*ImGui::CalcTextSize(text).x);
+                ImGui::Text("%s", text);
+            }
+            {
+                const char * text = "source code : https://github.com/ggerganov/kbd-audio";
+                ImGui::Text("%s", "");
+                ImGui::SameLine(0.5f*ImGui::GetContentRegionAvailWidth() - 0.45f*ImGui::CalcTextSize(text).x);
+                ImGui::Text("%s", text);
+            }
+            ImGui::Text("%s", "");
+            {
+                const char * text = "Close";
+                ImGui::Text("%s", "");
+                ImGui::SameLine(0.5f*ImGui::GetContentRegionAvailWidth() - 0.45f*ImGui::CalcTextSize(text).x);
+                if (ImGui::Button(text)) {
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::Text("%s", "");
+            ImGui::EndPopup();
+        }
+
         for (int i = 0; i < IM_ARRAYSIZE(ImGui::GetIO().KeysDown); i++) if (ImGui::IsKeyPressed(i)) {
             //printf("Key pressed: %d\n", i);
         }
 
-        renderKeyPresses(stateUI, argv[1], stateUI.waveformInput, stateUI.keyPresses);
+        renderKeyPresses(stateUI, stateUI.waveformInput, stateUI.keyPresses);
         renderResults(stateUI);
         renderSimilarity(stateUI.keyPresses, stateUI.similarityMap);
 

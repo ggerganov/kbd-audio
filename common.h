@@ -120,6 +120,9 @@ float toSeconds(T t0, T t1) {
 template <typename TSampleSrc, typename TSampleDst>
 bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst);
 
+template <typename TSample>
+bool saveToFile(const std::string & fname, TWaveformT<TSample> & waveform);
+
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res);
 

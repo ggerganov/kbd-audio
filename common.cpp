@@ -92,6 +92,27 @@ bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst) {
 
 template bool convert<TSampleF, TSampleI16>(const TWaveformT<TSampleF> & src, TWaveformT<TSampleI16> & dst);
 
+template <typename TSample>
+bool saveToFile(const std::string & fname, TWaveformT<TSample> & waveform) {
+    static_assert(std::is_same<TSample, TSampleF>::value, "Sample type not supported");
+
+    std::ofstream fout(fname, std::ios::binary);
+    if (fout.good() == false) {
+        return false;
+    }
+
+    auto totalSize_bytes = sizeof(TSample)*waveform.size();
+
+    fout.write((char *)(waveform.data()), totalSize_bytes);
+    fout.close();
+
+    printf("Total data saved: %g MB\n", ((float)(totalSize_bytes)/1024.0f/1024.0f));
+
+    return true;
+}
+
+template bool saveToFile<TSampleF>(const std::string & fname, TWaveformT<TSampleF> & waveform);
+
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res) {
     std::ifstream fin(fname, std::ios::binary | std::ios::ate);

@@ -381,6 +381,8 @@ bool AudioLogger::record(float bufferSize_s, int32_t nPrevFrames) {
 bool AudioLogger::pause() {
     auto & data = getData();
     SDL_PauseAudioDevice(data.deviceIdIn, 1);
+    data.nFramesToRecord.fill(0);
+
     return true;
 }
 
