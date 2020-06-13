@@ -108,12 +108,14 @@ struct stStateUI {
     bool calculatingSimilarityMap = false;
 
     // key presses window
+    bool scrolling = false;
     bool recalculateKeyPresses = false;
 
-    int lastSize = -1;
     int nview = -1;
     int offset = -1;
     int nviewPrev = -1;
+    int lastSize = -1;
+    int lastKeyPresses = 0;
 
     float amin = std::numeric_limits<TSample>::min();
     float amax = std::numeric_limits<TSample>::max();
@@ -277,11 +279,14 @@ float plotWaveformInverse(void * data, int i) {
 bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWaveform & waveform, TKeyPressCollection & keyPresses) {
     auto & params = stateUI.params;
 
+    bool & scrolling = stateUI.scrolling;
     bool & recalculateKeyPresses = stateUI.recalculateKeyPresses;
 
-    int & lastSize = stateUI.lastSize;
     int & nview = stateUI.nview;
     int & offset = stateUI.offset;
+    int & lastSize = stateUI.lastSize;
+    int & lastKeyPresses = stateUI.lastKeyPresses;
+
     float & amin = stateUI.amin;
     float & amax = stateUI.amax;
 
@@ -294,7 +299,10 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
     TWaveform & waveformThreshold = stateUI.waveformThreshold;
     TWaveform & waveformMax = stateUI.waveformMax;
 
-    if (nview < 0) nview = waveform.size();
+    if (nview < 128*kSamplesPerFrame && scrolling == false) {
+        nview = std::min((int) (128*kSamplesPerFrame), (int) waveform.size());
+    }
+
     if (offset < 0) offset = (waveform.size() - nview)/2;
     if (nviewPrev < 0) {
         nviewPrev = nview + 1;
@@ -307,12 +315,22 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
     if (lastSize != (int) waveform.size()) {
         lastSize = waveform.size();
         nviewPrev = nview + 1;
-        offset = waveform.size() - nview;
+        if (scrolling == false) {
+            offset = waveform.size() - nview;
+        }
         recalculateKeyPresses = true;
 
         waveformLowRes = waveform;
         waveformThreshold = waveform;
         waveformMax = waveform;
+    }
+
+    if ((int) keyPresses.size() >= lastKeyPresses + 10) {
+        lastKeyPresses = keyPresses.size();
+
+        stateUI.similarityMap.clear();
+        stateUI.flags.recalculateSimilarityMap = true;
+        stateUI.doUpdate = true;
     }
 
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
@@ -420,7 +438,6 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
 
         auto savePos2 = ImGui::GetCursorScreenPos();
 
-        static bool scrolling = false;
         if (ImGui::IsItemHovered()) {
             if (ImGui::IsMouseDown(0)) {
                 scrolling = true;
@@ -609,6 +626,9 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
                 ImGui::GetWindowDrawList()->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
                 ImGui::SetCursorScreenPos(savePos);
             }
+
+            ImGui::SameLine();
+            ImGui::Text("Total key presses detected: %d", (int) keyPresses.size());
         }
 
         if (recalculateKeyPresses) {
@@ -1078,7 +1098,7 @@ bool prepareAudioOut(const TParameters & params) {
 int main(int argc, char ** argv) {
     srand(time(0));
 
-    printf("Usage: %s recrod.kbd n-gram-dir [letter.mask] [-pN] [-cN] [-CN]\n", argv[0]);
+    printf("Usage: %s record.kbd n-gram-dir [letter.mask] [-pN] [-cN] [-CN]\n", argv[0]);
     printf("    -pN - select playback device N\n");
     printf("    -cN - select capture device N\n");
     printf("    -CN - select number N of capture channels to use\n");
@@ -1140,13 +1160,13 @@ int main(int argc, char ** argv) {
     printf("[+] Loading recording from '%s'\n", argv[1]);
     if (readFromFile<TSampleF>(argv[1], stateUI.waveformOriginal) == false) {
         printf("Specified file '%s' does not exist\n", argv[1]);
-        return -4;
-    }
-
-    printf("[+] Converting waveform to i16 format ...\n");
-    if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
-        printf("Conversion failed\n");
-        return -4;
+        //return -4;
+    } else {
+        printf("[+] Converting waveform to i16 format ...\n");
+        if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
+            printf("Conversion failed\n");
+            return -4;
+        }
     }
 
     Cipher::TFreqMap freqMap3;
@@ -1293,10 +1313,12 @@ int main(int argc, char ** argv) {
                 auto stateUINew = stateUI.get();
 
                 if (stateUINew.flags.recalculateSimilarityMap || stateUINew.flags.resetOptimization) {
-                    printf("[+] Recalculating similarity map ...\n");
+                    if (stateUINew.keyPresses.size() < 3) continue;
 
                     stateCore.params = stateUINew.params;
                     stateCore.keyPresses = stateUINew.keyPresses;
+
+                    printf("[+] Recalculating similarity map ...\n");
 
                     if (stateUINew.flags.recalculateSimilarityMap) {
                         stateCore.flags.calculatingSimilarityMap = true;
@@ -1385,7 +1407,7 @@ int main(int argc, char ** argv) {
                 }
             }
 
-            if (stateCore.processing && stateCore.keyPresses.size() > 0) {
+            if (stateCore.processing && stateCore.keyPresses.size() >= 3) {
                 {
                     int n = stateCore.keyPresses.size();
                     stateCore.params.cipher.hint.clear();
