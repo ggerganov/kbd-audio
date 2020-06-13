@@ -23,7 +23,8 @@ template <typename TSampleInput, typename TSample>
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
             for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<TSampleI16>::max()*(buf[i]/amax));
+            double iamax = amax != 0.0 ? 1.0/amax : 1.0;
+            for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<TSampleI16>::max()*(buf[i]*iamax));
         } else if (std::is_same<TSample, TSampleF>::value) {
             res.resize(offset + size/sizeof(TSample));
             fin.read((char *)(res.data() + offset), size);
@@ -72,6 +73,25 @@ std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
     return res;
 }
 
+template <typename TSampleSrc, typename TSampleDst>
+bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst) {
+    static_assert(std::is_same<TSampleSrc, TSampleDst>::value == false, "Required different sample types");
+
+    static_assert(std::is_same<TSampleSrc, TSampleF>::value, "Source sample type not supported");
+    static_assert(std::is_same<TSampleDst, TSampleI16>::value, "Destination sample type not supported");
+
+    dst.resize(src.size());
+
+    double amax = 0.0f;
+    for (auto i = 0; i < (int) src.size(); ++i) if (std::abs(src[i]) > amax) amax = std::abs(src[i]);
+    double iamax = amax != 0.0 ? 1.0/amax : 1.0;
+    for (auto i = 0; i < (int) src.size(); ++i) dst[i] = std::round(std::numeric_limits<TSampleDst>::max()*(src[i]*iamax));
+
+    return true;
+}
+
+template bool convert<TSampleF, TSampleI16>(const TWaveformT<TSampleF> & src, TWaveformT<TSampleI16> & dst);
+
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res) {
     std::ifstream fin(fname, std::ios::binary | std::ios::ate);
@@ -98,6 +118,7 @@ bool readFromFile(const std::string & fname, TWaveformT<TSample> & res) {
 }
 
 template bool readFromFile<TSampleF, TSampleI16>(const std::string & fname, TWaveformT<TSampleI16> & res);
+template bool readFromFile<TSampleF, TSampleF>(const std::string & fname, TWaveformT<TSampleF> & res);
 
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames) {

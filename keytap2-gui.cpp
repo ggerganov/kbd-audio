@@ -8,6 +8,7 @@
 #include "common-gui.h"
 #include "subbreak.h"
 #include "subbreak2.h"
+#include "audio_logger.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
@@ -15,6 +16,7 @@
 
 #include <SDL.h>
 
+#include <atomic>
 #include <cstdio>
 #include <fstream>
 #include <string>
@@ -101,20 +103,36 @@ struct stStateUI {
 
     bool autoHint = true;
     bool processing = true;
+    bool recording = false;
+    bool audioCapture = false;
     bool calculatingSimilarityMap = false;
 
     // key presses window
+    bool recalculateKeyPresses = false;
+
+    int lastSize = -1;
     int nview = -1;
     int offset = -1;
+    int nviewPrev = -1;
+
     float amin = std::numeric_limits<TSample>::min();
     float amax = std::numeric_limits<TSample>::max();
+
+    float dragOffset = 0.0f;
+    float scrollSize = 18.0f;
+
+    TWaveform waveformLowRes;
+    TWaveform waveformThreshold;
+    TWaveform waveformMax;
 
     // window sizes
     float windowHeightKeyPesses = 0;
     float windowHeightResults = 0;
     float windowHeightSimilarity = 0;
 
+
     TParameters params;
+    TWaveformF waveformOriginal;
     TWaveform waveformInput;
     TKeyPressCollection keyPresses;
     TSimilarityMap similarityMap;
@@ -140,6 +158,16 @@ struct stStateCore {
     TKeyPressCollection keyPresses;
 
     std::map<int, Cipher::Processor> processors;
+};
+
+struct stStateCapture {
+    struct Flags {
+        bool updateRecord = false;
+
+        void clear() { memset(this, 0, sizeof(Flags)); }
+    } flags;
+
+    AudioLogger::Record recordNew;
 };
 
 template<typename T>
@@ -199,8 +227,42 @@ template<> bool TripleBuffer<stStateCore>::update(bool force) {
     return true;
 }
 
+template<> const stStateCapture & TripleBuffer<stStateCapture>::get() {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (hasChanged) {
+        out = std::move(buffer);
+        hasChanged = false;
+    }
+
+    return out;
+}
+
+template<> bool TripleBuffer<stStateCapture>::update(bool force) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (hasChanged && force == false) return false;
+
+    hasChanged = true;
+
+    buffer.flags = this->flags;
+
+    if (this->flags.updateRecord) {
+        buffer.recordNew.insert(
+                buffer.recordNew.end(),
+                this->recordNew.begin(),
+                this->recordNew.end());
+        this->recordNew.clear();
+    }
+
+    this->flags.clear();
+
+    return true;
+}
+
+std::atomic<bool> g_doRecord;
+AudioLogger audioLogger;
 TripleBuffer<stStateUI> stateUI;
 TripleBuffer<stStateCore> stateCore;
+TripleBuffer<stStateCapture> stateCapture;
 
 float plotWaveform(void * data, int i) {
     TWaveformView * waveform = (TWaveformView *)data;
@@ -215,30 +277,51 @@ float plotWaveformInverse(void * data, int i) {
 bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWaveform & waveform, TKeyPressCollection & keyPresses) {
     auto & params = stateUI.params;
 
+    bool & recalculateKeyPresses = stateUI.recalculateKeyPresses;
+
+    int & lastSize = stateUI.lastSize;
     int & nview = stateUI.nview;
     int & offset = stateUI.offset;
     float & amin = stateUI.amin;
     float & amax = stateUI.amax;
 
+    float & dragOffset = stateUI.dragOffset;
+    float & scrollSize = stateUI.scrollSize;
+
+    auto & nviewPrev = stateUI.nviewPrev;
+
+    TWaveform & waveformLowRes = stateUI.waveformLowRes;
+    TWaveform & waveformThreshold = stateUI.waveformThreshold;
+    TWaveform & waveformMax = stateUI.waveformMax;
+
     if (nview < 0) nview = waveform.size();
     if (offset < 0) offset = (waveform.size() - nview)/2;
+    if (nviewPrev < 0) {
+        nviewPrev = nview + 1;
+
+        waveformLowRes = waveform;
+        waveformThreshold = waveform;
+        waveformMax = waveform;
+    }
+
+    if (lastSize != (int) waveform.size()) {
+        lastSize = waveform.size();
+        nviewPrev = nview + 1;
+        offset = waveform.size() - nview;
+        recalculateKeyPresses = true;
+
+        waveformLowRes = waveform;
+        waveformThreshold = waveform;
+        waveformMax = waveform;
+    }
 
     ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 330.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 336.0f), ImGuiCond_Always);
     if (ImGui::Begin("Key Presses", nullptr, ImGuiWindowFlags_NoMove)) {
         int viewMin = 512;
         int viewMax = waveform.size();
 
         bool ignoreDelete = false;
-
-        static float dragOffset = 0.0f;
-        static float scrollSize = 18.0f;
-
-        static auto nviewPrev = nview + 1;
-
-        static TWaveform waveformLowRes = waveform;
-        static TWaveform waveformThreshold = waveform;
-        static TWaveform waveformMax = waveform;
 
         auto wview = getView(waveformLowRes, offset, nview);
         auto tview = getView(waveformThreshold, offset, nview);
@@ -421,68 +504,117 @@ bool renderKeyPresses(stStateUI & stateUI, const char * fnameInput, const TWavef
         //auto io = ImGui::GetIO();
         //ImGui::Text("Keys pressed:");   for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyPressed(i))             { ImGui::SameLine(); ImGui::Text("%d", i); }
 
-        static bool recalculate = true;
         static bool playHalfSpeed = false;
         static int historySize = 3*1024;
         static float thresholdBackground = 10.0;
         ImGui::PushItemWidth(100.0);
 
-        ImGui::Checkbox("x0.5", &playHalfSpeed);
-        ImGui::SameLine();
-        if (g_playbackData.playing) {
-            if (ImGui::Button("Stop") || (ImGui::IsKeyPressed(44) && ImGui::GetIO().KeyCtrl)) { // Ctrl + space
+        if (stateUI.recording == false) {
+            if (stateUI.audioCapture) {
+                if (ImGui::Button("   Record")) {
+                    audioLogger.resume();
+                    stateUI.recording = true;
+                    g_doRecord = true;
+                }
+                {
+                    auto savePos = ImGui::GetCursorScreenPos();
+                    auto p = savePos;
+                    p.x += 0.90f*ImGui::CalcTextSize("  ").x;
+                    p.y -= 0.56f*ImGui::GetFrameHeightWithSpacing();
+                    ImGui::GetWindowDrawList()->AddCircleFilled(p, 6.0, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 1.0f }));
+                    ImGui::SetCursorScreenPos(savePos);
+                }
+
+                ImGui::SameLine();
+            }
+
+            ImGui::Checkbox("x0.5", &playHalfSpeed);
+            ImGui::SameLine();
+            if (g_playbackData.playing) {
+                if (ImGui::Button("Stop") || (ImGui::IsKeyPressed(44) && ImGui::GetIO().KeyCtrl)) { // Ctrl + space
+                    g_playbackData.playing = false;
+                    g_playbackData.idx = g_playbackData.waveform.n - TPlaybackData::kSamples;
+                }
+            } else {
+                if (ImGui::Button("Play") || (ImGui::IsKeyPressed(44) && ImGui::GetIO().KeyCtrl)) { // Ctrl + space
+                    g_playbackData.playing = true;
+                    g_playbackData.slowDown = playHalfSpeed ? 2 : 1;
+                    g_playbackData.idx = 0;
+                    g_playbackData.offset = offset;
+                    g_playbackData.waveform = getView(waveform, offset, std::min((int) (10*kSampleRate), nview));
+                    SDL_PauseAudioDevice(g_deviceIdOut, 0);
+                }
+            }
+
+            if (g_playbackData.idx >= g_playbackData.waveform.n) {
                 g_playbackData.playing = false;
-                g_playbackData.idx = g_playbackData.waveform.n - TPlaybackData::kSamples;
+                SDL_ClearQueuedAudio(g_deviceIdOut);
+                SDL_PauseAudioDevice(g_deviceIdOut, 1);
             }
+
+            ImGui::SameLine();
+            ImGui::SliderFloat("Threshold background", &thresholdBackground, 0.1f, 50.0f) && (recalculateKeyPresses = true);
+            ImGui::SameLine();
+            ImGui::SliderInt("History Size", &historySize, 512, 1024*16) && (recalculateKeyPresses = true);
+            ImGui::SameLine();
+            if (ImGui::Button("Recalculate")) {
+                recalculateKeyPresses = true;
+            }
+
+            static std::string filename = std::string(fnameInput) + ".keys";
+            ImGui::SameLine();
+            ImGui::Text("%s", filename.c_str());
+
+            ImGui::SameLine();
+            if (ImGui::Button("Save")) {
+                saveKeyPresses(filename.c_str(), keyPresses);
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("Load")) {
+                loadKeyPresses(filename.c_str(), getView(waveform, 0), keyPresses);
+            }
+
+            ImGui::SameLine();
+            ImGui::DragInt("Key width", &params.keyPressWidth_samples, 8, 0, kSampleRate/10);
+            ImGui::SameLine();
+            ImGui::DragInt("Peak offset", &params.offsetFromPeak_samples, 8, -kSampleRate/10, kSampleRate/10);
+            ImGui::SameLine();
+            ImGui::DragInt("Align window", &params.alignWindow_samples, 8, 0, kSampleRate/10);
+
+            ImGui::PopItemWidth();
         } else {
-            if (ImGui::Button("Play") || (ImGui::IsKeyPressed(44) && ImGui::GetIO().KeyCtrl)) { // Ctrl + space
-                g_playbackData.playing = true;
-                g_playbackData.slowDown = playHalfSpeed ? 2 : 1;
-                g_playbackData.idx = 0;
-                g_playbackData.offset = offset;
-                g_playbackData.waveform = getView(waveform, offset, std::min((int) (10*kSampleRate), nview));
-                SDL_PauseAudioDevice(g_deviceIdOut, 0);
+            if (g_doRecord) {
+                g_doRecord = false;
+                audioLogger.record(0.2f, 0);
+            }
+
+            if (ImGui::Button("   Stop Recording")) {
+                audioLogger.pause();
+                g_doRecord = false;
+                stateUI.recording = false;
+            }
+            {
+                auto savePos = ImGui::GetCursorScreenPos();
+                auto p0 = savePos;
+                p0.x += 0.90f*ImGui::CalcTextSize("  ").x;
+                p0.y -= 0.56f*ImGui::GetFrameHeightWithSpacing();
+
+                auto p1 = p0;
+                p0.x -= 4.0f;
+                p0.y -= 4.0f;
+                p1.x += 4.0f;
+                p1.y += 4.0f;
+
+                ImGui::GetWindowDrawList()->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
+                ImGui::SetCursorScreenPos(savePos);
             }
         }
 
-        if (g_playbackData.idx >= g_playbackData.waveform.n) {
-            g_playbackData.playing = false;
-            SDL_ClearQueuedAudio(g_deviceIdOut);
-            SDL_PauseAudioDevice(g_deviceIdOut, 1);
-        }
-
-        ImGui::SameLine();
-        ImGui::SliderFloat("Threshold background", &thresholdBackground, 0.1f, 50.0f) && (recalculate = true);
-        ImGui::SameLine();
-        ImGui::SliderInt("History Size", &historySize, 512, 1024*16) && (recalculate = true);
-        ImGui::SameLine();
-        if (ImGui::Button("Recalculate") || recalculate) {
+        if (recalculateKeyPresses) {
             findKeyPresses(getView(waveform, 0), keyPresses, waveformThreshold, waveformMax, thresholdBackground, historySize, true);
-            recalculate = false;
+            recalculateKeyPresses = false;
         }
-
-        static std::string filename = std::string(fnameInput) + ".keys";
-        ImGui::SameLine();
-        ImGui::Text("%s", filename.c_str());
-
-        ImGui::SameLine();
-        if (ImGui::Button("Save")) {
-            saveKeyPresses(filename.c_str(), keyPresses);
-        }
-
-        ImGui::SameLine();
-        if (ImGui::Button("Load")) {
-            loadKeyPresses(filename.c_str(), getView(waveform, 0), keyPresses);
-        }
-
-        ImGui::SameLine();
-        ImGui::DragInt("Key width", &params.keyPressWidth_samples, 8, 0, kSampleRate/10);
-        ImGui::SameLine();
-        ImGui::DragInt("Peak offset", &params.offsetFromPeak_samples, 8, -kSampleRate/10, kSampleRate/10);
-        ImGui::SameLine();
-        ImGui::DragInt("Align window", &params.alignWindow_samples, 8, 0, kSampleRate/10);
-
-        ImGui::PopItemWidth();
 
         if (nview != nviewPrev) {
             generateLowResWaveform(waveform, waveformLowRes, std::max(1.0f, nview/wsize.x));
@@ -946,14 +1078,18 @@ bool prepareAudioOut(const TParameters & params) {
 int main(int argc, char ** argv) {
     srand(time(0));
 
-    printf("Usage: %s recrod.kbd n-gram-dir [letter.mask] [-pN]\n", argv[0]);
+    printf("Usage: %s recrod.kbd n-gram-dir [letter.mask] [-pN] [-cN] [-CN]\n", argv[0]);
     printf("    -pN - select playback device N\n");
+    printf("    -cN - select capture device N\n");
+    printf("    -CN - select number N of capture channels to use\n");
     if (argc < 3) {
         return -1;
     }
 
     auto argm = parseCmdArguments(argc, argv);
     int playbackId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
+    int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
+    int nChannels = argm["C"].empty() ? 0 : std::stoi(argm["C"]);
 
     stateUI.params.playbackId = playbackId;
 
@@ -962,18 +1098,54 @@ int main(int argc, char ** argv) {
         return -2;
     }
 
+    AudioLogger::Callback cbAudio = [&](const AudioLogger::Record & frames) {
+        stateCapture.recordNew.insert(
+                stateCapture.recordNew.end(),
+                frames.begin(),
+                frames.end());
+
+        stateCapture.flags.updateRecord = true;
+        stateCapture.update();
+
+        g_doRecord = true;
+
+        return;
+    };
+
     g_doInit = [&]() {
         if (prepareAudioOut(stateUI.params) == false) {
             printf("Error: failed to initialize audio playback\n");
             return false;
         }
 
+        AudioLogger::Parameters parameters;
+        parameters.callback = cbAudio;
+        parameters.captureId = captureId;
+        parameters.nChannels = nChannels;
+        parameters.sampleRate = kSampleRate;
+        parameters.freqCutoff_Hz = kFreqCutoff_Hz;
+
+        if (audioLogger.install(std::move(parameters)) == false) {
+            fprintf(stderr, "Failed to initialize audio capture\n");
+        } else {
+            audioLogger.pause();
+            stateUI.audioCapture = true;
+
+            printf("[+] Audio capture initilized succesfully\n");
+        }
+
         return true;
     };
 
     printf("[+] Loading recording from '%s'\n", argv[1]);
-    if (readFromFile<TSampleF>(argv[1], stateUI.waveformInput) == false) {
+    if (readFromFile<TSampleF>(argv[1], stateUI.waveformOriginal) == false) {
         printf("Specified file '%s' does not exist\n", argv[1]);
+        return -4;
+    }
+
+    printf("[+] Converting waveform to i16 format ...\n");
+    if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
+        printf("Conversion failed\n");
         return -4;
     }
 
@@ -1054,6 +1226,23 @@ int main(int argc, char ** argv) {
             }
         }
 
+        if (stateCapture.changed()) {
+            auto stateCaptureNew = stateCapture.get();
+
+            if (stateCaptureNew.flags.updateRecord) {
+                for (auto & frame : stateCaptureNew.recordNew) {
+                    for (auto & sample : frame) {
+                        stateUI.waveformOriginal.push_back(sample);
+                    }
+                }
+            }
+
+            if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
+                fprintf(stderr, "error : recording failed\n");
+            }
+        }
+
+
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
@@ -1098,7 +1287,7 @@ int main(int argc, char ** argv) {
         return true;
     };
 
-    std::thread worker([&]() {
+    std::thread workerCore([&]() {
         while (finishApp == false) {
             if (stateUI.changed()) {
                 auto stateUINew = stateUI.get();
@@ -1254,7 +1443,7 @@ int main(int argc, char ** argv) {
     }
 #endif
 
-    worker.join();
+    workerCore.join();
 
     printf("[+] Terminated\n");
 

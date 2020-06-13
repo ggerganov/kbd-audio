@@ -54,8 +54,9 @@ using TPlaybackDataI16          = TPlaybackDataT<TSampleI16>;
 
 // - float samples
 
+using TWaveformF    = TWaveformT<TSampleF>;
 using TKeyWaveformF = std::vector<TSampleF>;
-using TKeyHistoryF = std::vector<TKeyWaveformF>;
+using TKeyHistoryF  = std::vector<TKeyWaveformF>;
 
 // structs
 struct stMatch {
@@ -115,6 +116,9 @@ template <typename T>
 float toSeconds(T t0, T t1) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1000.0f;
 }
+
+template <typename TSampleSrc, typename TSampleDst>
+bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst);
 
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res);
