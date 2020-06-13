@@ -133,6 +133,8 @@ struct stStateUI {
     float windowHeightSimilarity = 0;
 
     bool openAboutWindow = false;
+    bool loadRecord = false;
+    bool loadKeyPresses = false;
 
     std::string fnameRecord = "default.kbd";
     std::string fnameKeyPressess = "default.kbd.keys";
@@ -903,57 +905,59 @@ bool renderResults(stStateUI & stateUI) {
             }
             if (result.clMap.empty() == false) {
                 ImGui::SameLine();
-                int n = result.clusters.size();
+                int n = std::min(result.clusters.size(), stateUI.keyPresses.size());
                 auto charSize = ImGui::CalcTextSize("a");
                 auto curPos = ImGui::GetCursorScreenPos();
-                ImGui::InvisibleButton("", ImVec2{charSize.x*n, 1.0f});
-                ImGui::SetCursorScreenPos(curPos);
-                for (int i = 0; i < n; ++i) {
-                    auto cluster = result.clusters[i];
-                    if (result.clMap.find(cluster) == result.clMap.end()) {
-                        ImGui::Text("%c", '?');
-                    } else {
-                        auto let = result.clMap.at(result.clusters[i]);
-
-                        char c = '.';
-                        if (let > 0 && let <= 26) {
-                            c = 'a'+let - 1;
-                        }
-
-                        if (stateUI.keyPresses[i].bind == let - 1) {
-                            ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
-                        } else if (stateUI.suggestions[i] == let) {
-                            ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
+                if (n > 0) {
+                    ImGui::InvisibleButton("", ImVec2{charSize.x*n, 1.0f});
+                    ImGui::SetCursorScreenPos(curPos);
+                    for (int i = 0; i < n; ++i) {
+                        auto cluster = result.clusters[i];
+                        if (result.clMap.find(cluster) == result.clMap.end()) {
+                            ImGui::Text("%c", '?');
                         } else {
-                            ImGui::Text("%c", c);
-                        }
+                            auto let = result.clMap.at(result.clusters[i]);
 
-                        if (ImGui::IsItemHovered()) {
-                            auto p0 = curPos;
-                            auto p1 = p0;
-                            p1.x += charSize.x;
-                            p1.y += charSize.y;
-                            drawList->AddRect(p0, p1, ImGui::ColorConvertFloat4ToU32({0.0f, 1.0f, 0.0f, 1.0f}));
-                            drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({0.0f, 1.0f, 0.0f, 0.6f}));
-                            if (ImGui::IsMouseDown(0)) {
-                                if (let > 0 && let <= 26) {
-                                    stateUI.keyPresses[i].bind = let - 1;
-                                } else {
-                                    stateUI.keyPresses[i].bind = 26;
-                                }
-                                stateUI.flags.applyHints = true;
-                                stateUI.doUpdate = true;
+                            char c = '.';
+                            if (let > 0 && let <= 26) {
+                                c = 'a'+let - 1;
                             }
-                            ImGui::BeginTooltip();
-                            ImGui::Text("Key presss: %d, letter - %d", i, let);
-                            ImGui::Text(" - Left click to set as hint");
-                            ImGui::EndTooltip();
-                        }
-                    }
 
-                    if (i < n - 1) {
-                        curPos.x += charSize.x;
-                        ImGui::SetCursorScreenPos(curPos);
+                            if (stateUI.keyPresses[i].bind == let - 1) {
+                                ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
+                            } else if (stateUI.suggestions[i] == let) {
+                                ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
+                            } else {
+                                ImGui::Text("%c", c);
+                            }
+
+                            if (ImGui::IsItemHovered()) {
+                                auto p0 = curPos;
+                                auto p1 = p0;
+                                p1.x += charSize.x;
+                                p1.y += charSize.y;
+                                drawList->AddRect(p0, p1, ImGui::ColorConvertFloat4ToU32({0.0f, 1.0f, 0.0f, 1.0f}));
+                                drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({0.0f, 1.0f, 0.0f, 0.6f}));
+                                if (ImGui::IsMouseDown(0)) {
+                                    if (let > 0 && let <= 26) {
+                                        stateUI.keyPresses[i].bind = let - 1;
+                                    } else {
+                                        stateUI.keyPresses[i].bind = 26;
+                                    }
+                                    stateUI.flags.applyHints = true;
+                                    stateUI.doUpdate = true;
+                                }
+                                ImGui::BeginTooltip();
+                                ImGui::Text("Key presss: %d, letter - %d", i, let);
+                                ImGui::Text(" - Left click to set as hint");
+                                ImGui::EndTooltip();
+                            }
+                        }
+
+                        if (i < n - 1) {
+                            curPos.x += charSize.x;
+                            ImGui::SetCursorScreenPos(curPos);
+                        }
                     }
                 }
             }
@@ -1274,6 +1278,14 @@ int main(int argc, char ** argv) {
                         finishApp = true;
                     }
                     break;
+                case SDL_DROPFILE:
+                    {
+                        char * path = event.drop.file;
+                        stateUI.fnameRecord = path;
+                        stateUI.loadRecord = true;
+                        SDL_free(path);
+                    }
+                    break;
                 case SDL_WINDOWEVENT:
                     if (event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(guiObjects.window)) {
                         finishApp = true;
@@ -1299,16 +1311,7 @@ int main(int argc, char ** argv) {
                     saveToFile(stateUI.fnameRecord, stateUI.waveformOriginal);
                 }
                 if (ImGui::MenuItem("Load Record")) {
-                    printf("[+] Loading recording from '%s'\n", argv[1]);
-                    if (readFromFile<TSampleF>(argv[1], stateUI.waveformOriginal) == false) {
-                        printf("Specified file '%s' does not exist\n", argv[1]);
-                    } else {
-                        printf("[+] Converting waveform to i16 format ...\n");
-                        if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
-                            printf("Conversion failed\n");
-                        } else {
-                        }
-                    }
+                    stateUI.loadRecord = true;
                 }
 
                 ImGui::Separator();
@@ -1318,7 +1321,7 @@ int main(int argc, char ** argv) {
                     saveKeyPresses(stateUI.fnameKeyPressess.c_str(), stateUI.keyPresses);
                 }
                 if (ImGui::MenuItem("Load Key Presses")) {
-                    loadKeyPresses(stateUI.fnameKeyPressess.c_str(), getView(stateUI.waveformInput, 0), stateUI.keyPresses);
+                    stateUI.loadKeyPresses = true;
                 }
 
                 ImGui::EndMenu();
@@ -1369,6 +1372,26 @@ int main(int argc, char ** argv) {
             }
             ImGui::Text("%s", "");
             ImGui::EndPopup();
+        }
+
+        if (stateUI.loadRecord) {
+            printf("[+] Loading recording from '%s'\n", argv[1]);
+            if (readFromFile<TSampleF>(stateUI.fnameRecord, stateUI.waveformOriginal) == false) {
+                printf("Specified file '%s' does not exist\n", argv[1]);
+            } else {
+                printf("[+] Converting waveform to i16 format ...\n");
+                if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
+                    printf("Conversion failed\n");
+                } else {
+                }
+            }
+
+            stateUI.loadRecord = false;
+        }
+
+        if (stateUI.loadKeyPresses) {
+            loadKeyPresses(stateUI.fnameKeyPressess.c_str(), getView(stateUI.waveformInput, 0), stateUI.keyPresses);
+            stateUI.loadKeyPresses = false;
         }
 
         for (int i = 0; i < IM_ARRAYSIZE(ImGui::GetIO().KeysDown); i++) if (ImGui::IsKeyPressed(i)) {
