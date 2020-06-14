@@ -121,7 +121,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
       ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ... [-cN] [-CN]
 
-  [**Live demo *(WebAssembly threads required)* **](https://ggerganov.github.io/jekyll/update/2018/11/24/keytap.html)
+  [**Live demo *(WebAssembly threads required)* **](https://ggerganov.github.io/keytap)
 
   <a href="https://i.imgur.com/mnRvT1X.gif" target="_blank">![keytap-gui](https://i.imgur.com/FXa60Pr.gif)</a>
 
