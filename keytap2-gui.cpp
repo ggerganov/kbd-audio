@@ -5,6 +5,8 @@
 
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
+#else
+#define EMSCRIPTEN_KEEPALIVE
 #endif
 
 #include "constants.h"
@@ -31,6 +33,8 @@
 #include <condition_variable>
 
 static std::function<bool()> g_doInit;
+static std::function<bool()> g_doReload;
+static std::function<int()> g_getOutputRecordId;
 static std::function<bool()> g_mainUpdate;
 
 void mainUpdate(void *) {
@@ -43,6 +47,16 @@ extern "C" {
     EMSCRIPTEN_KEEPALIVE
         int doInit() {
             return g_doInit();
+        }
+
+    EMSCRIPTEN_KEEPALIVE
+        int reload() {
+            return g_doReload();
+        }
+
+    EMSCRIPTEN_KEEPALIVE
+        int get_output_id() {
+            return g_getOutputRecordId();
         }
 }
 
@@ -147,6 +161,8 @@ struct stStateUI {
     bool openAboutWindow = false;
     bool loadRecord = false;
     bool loadKeyPresses = false;
+
+    int outputRecordId = 0;
 
     std::string fnameRecord = "default.kbd";
     std::string fnameKeyPressess = "default.kbd.keys";
@@ -1176,6 +1192,16 @@ int main(int argc, char ** argv) {
         return true;
     };
 
+    g_doReload = [&]() {
+        stateUI.loadRecord = true;
+
+        return true;
+    };
+
+    g_getOutputRecordId = [&]() {
+        return stateUI.outputRecordId;
+    };
+
     printf("[+] Loading recording from '%s'\n", argv[1]);
     if (readFromFile<TSampleF>(argv[1], stateUI.waveformOriginal) == false) {
         printf("Specified file '%s' does not exist\n", argv[1]);
@@ -1195,10 +1221,10 @@ int main(int argc, char ** argv) {
     if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_trigrams.txt").c_str(), freqMap3) == false) {
         return -5;
     }
-    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_quadgrams.txt").c_str(), freqMap4) == false) {
+    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_trigrams.txt").c_str(), freqMap4) == false) {
         return -5;
     }
-    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_quintgrams.txt").c_str(), freqMap5) == false) {
+    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_trigrams.txt").c_str(), freqMap5) == false) {
         return -5;
     }
     stateCore.freqMap[0] = &freqMap3;
@@ -1325,6 +1351,7 @@ int main(int argc, char ** argv) {
                 ImGui::Separator();
                 if (ImGui::MenuItem("Save Record")) {
                     saveToFile(stateUI.fnameRecord, stateUI.waveformOriginal);
+                    stateUI.outputRecordId++;
                 }
                 if (ImGui::MenuItem("Load Record")) {
                     stateUI.loadRecord = true;

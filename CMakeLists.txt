@@ -38,6 +38,7 @@ endif()
 
 # build types
 
+include(cmake/GitVars.cmake)
 include(cmake/BuildTypes.cmake)
 
 # warnings
@@ -157,13 +158,17 @@ endif()
 add_executable(keytap2-gui keytap2-gui.cpp subbreak2.cpp)
 target_link_libraries(keytap2-gui PRIVATE Core Gui)
 if (EMSCRIPTEN)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/keytap2-gui)
+
     SET_TARGET_PROPERTIES(keytap2-gui PROPERTIES LINK_FLAGS " \
     --preload-file ../data/ \
     ")
+
+    configure_file(${CMAKE_SOURCE_DIR}/index-keytap2-gui-tmpl.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html @ONLY)
+    configure_file(${CMAKE_SOURCE_DIR}/style.css ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/style.css @ONLY)
 endif()
 
 if (NOT EMSCRIPTEN)
-
     add_executable(keytap keytap.cpp)
     target_link_libraries(keytap PRIVATE Core)
 
