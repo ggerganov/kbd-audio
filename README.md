@@ -64,7 +64,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 | **keytap**          | text    | **stable**  |
 | **keytap-gui**      | gui     | **stable**  |
 | **keytap2**         | text    | development |
-| **keytap2-gui**     | gui     | development |
+| **keytap2-gui**     | gui     | **stable** |
 | -                   | *extra* | -           |
 | **guess_qp**        | text    | experiment  |
 | **guess_qp2**       | text    | experiment  |
@@ -127,11 +127,11 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
   ---
 
-* **keytap2-gui** *(work in progress)*
+* **keytap2-gui** record.kbd n-gram-dir [-pN] [-cN] [-CN]
 
-  Detect pressed keys via microphone audio capture. Uses statistical information (n-gram frequencies) about the language. **No training data is required**. The *'recording.kbd'* input file has to be generated via the **record-full** tool and contains the audio data that will be analyzed. The *'n-gram.txt'* file has to contain n-gram probabilities for the corresponding language. 
+  Detect pressed keys via microphone audio capture. Uses statistical information (n-gram frequencies) about the language. **No training data is required**. The *'record.kbd'* input file has to be generated via the **record-full** tool and contains the audio data that will be analyzed. The *'n-gram-dir'* folder file has to contain n-gram probability files for the corresponding language.
 
-      ./keytap2-gui recording.kbd n-gram.txt
+      ./keytap2-gui record.kbd ../data
 
   <a href="https://i.imgur.com/LRnTkPA.jpg" target="_blank">![keytap2-gui](https://i.imgur.com/LRnTkPA.jpg)</a>
 

@@ -50,22 +50,14 @@ endif()
 set (CMAKE_CXX_STANDARD 14)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#-s ASSERTIONS=1 \
-#-s GL_ASSERTIONS=1 \
-#-s GL_DEBUG=1 \
 if (EMSCRIPTEN)
     set (CMAKE_CXX_FLAGS " \
-    -s TOTAL_MEMORY=536870912 \
-    -s FORCE_FILESYSTEM=1 \
     -s WASM=1 \
+    -s USE_SDL=2 \
     -s USE_PTHREADS=1 \
     -s PTHREAD_POOL_SIZE=8 \
-    -s USE_SDL=2 \
-    -s LZ4=1 \
-    -s DISABLE_EXCEPTION_CATCHING=0")
-endif()
-
-if (NOT EMSCRIPTEN)
+    ")
+else()
     find_package(OpenGL REQUIRED)
     find_package(SDL2)
     find_package(FFTW)
@@ -157,14 +149,45 @@ endif()
 
 add_executable(keytap2-gui keytap2-gui.cpp subbreak2.cpp)
 target_link_libraries(keytap2-gui PRIVATE Core Gui)
-if (EMSCRIPTEN)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/keytap2-gui)
 
-    SET_TARGET_PROPERTIES(keytap2-gui PROPERTIES LINK_FLAGS " \
+add_executable(keytap-gui keytap-gui.cpp)
+target_link_libraries(keytap-gui PRIVATE Core Gui)
+
+add_executable(view-full-gui view-full-gui.cpp)
+target_link_libraries(view-full-gui PRIVATE Core Gui)
+
+if (EMSCRIPTEN)
+    # view-full-gui
+    set(TARGET view-full-gui)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${TARGET})
+
+    set_target_properties(${TARGET} PROPERTIES LINK_FLAGS " \
+    -s TOTAL_MEMORY=536870912 \
+    -s LZ4=1 \
+    --preload-file ../chal/record \  \
+    ")
+
+    ## keytap-gui
+    set(TARGET keytap-gui)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${TARGET})
+
+    set_target_properties(${TARGET} PROPERTIES LINK_FLAGS " \
+    -s TOTAL_MEMORY=536870912 \
+    -s FORCE_FILESYSTEM=1 \
+    ")
+
+    # keytap2-gui
+    set(TARGET keytap2-gui)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${TARGET})
+
+    set_target_properties(${TARGET} PROPERTIES LINK_FLAGS " \
+    -s TOTAL_MEMORY=536870912 \
+    -s FORCE_FILESYSTEM=1 \
+    -s LZ4=1 \
     --preload-file ../data/ \
     ")
 
-    configure_file(${CMAKE_SOURCE_DIR}/index-keytap2-gui-tmpl.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html @ONLY)
+    configure_file(${CMAKE_SOURCE_DIR}/index-${TARGET}-tmpl.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html @ONLY)
     configure_file(${CMAKE_SOURCE_DIR}/style.css ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/style.css @ONLY)
 endif()
 
@@ -174,9 +197,6 @@ if (NOT EMSCRIPTEN)
 
     add_executable(keytap2 keytap2.cpp)
     target_link_libraries(keytap2 PRIVATE Core)
-
-    add_executable(keytap-gui keytap-gui.cpp)
-    target_link_libraries(keytap-gui PRIVATE Core Gui)
 
     add_executable(play play.cpp)
     target_link_libraries(play PRIVATE Core)
@@ -192,9 +212,6 @@ if (NOT EMSCRIPTEN)
 
     add_executable(view-gui view-gui.cpp)
     target_link_libraries(view-gui PRIVATE Core Gui)
-
-    add_executable(view-full-gui view-full-gui.cpp)
-    target_link_libraries(view-full-gui PRIVATE Core Gui)
 
     #
     ## Experimental stuff

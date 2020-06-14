@@ -1131,7 +1131,7 @@ bool prepareAudioOut(const TParameters & params) {
 int main(int argc, char ** argv) {
     srand(time(0));
 
-    printf("Usage: %s record.kbd n-gram-dir [letter.mask] [-pN] [-cN] [-CN]\n", argv[0]);
+    printf("Usage: %s record.kbd n-gram-dir [-pN] [-cN] [-CN]\n", argv[0]);
     printf("    -pN - select playback device N\n");
     printf("    -cN - select capture device N\n");
     printf("    -CN - select number N of capture channels to use\n");

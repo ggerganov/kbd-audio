@@ -5,6 +5,8 @@
 
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
+#else
+#define EMSCRIPTEN_KEEPALIVE
 #endif
 
 #include "constants.h"
@@ -71,19 +73,21 @@ void update() {
     g_update();
 }
 
-void mainUpdate() {
+void mainUpdate(void *) {
     g_mainUpdate();
 }
 
 // JS interface
 extern "C" {
-    int doInit() {
-        return init();
-    }
+    EMSCRIPTEN_KEEPALIVE
+        int doInit() {
+            return init();
+        }
 
-    void keyPressedCallback(int key) {
-        g_handleKey(key);
-    }
+    EMSCRIPTEN_KEEPALIVE
+        void keyPressedCallback(int key) {
+            g_handleKey(key);
+        }
 }
 
 int main(int argc, char ** argv) {
@@ -350,7 +354,7 @@ int main(int argc, char ** argv) {
                         que.push_back(i);
 
                         int itest = i - k/2;
-                        if (itest >= (0.5*kSamplesPerWaveformTrain - kSamplesPerFrame) && itest < (0.5*kSamplesPerWaveformTrain + kSamplesPerFrame) && que.front() == itest) {
+                        if (itest >= (0.5*kSamplesPerWaveformTrain - kSamplesPerFrame) && itest < (0.5*kSamplesPerWaveformTrain) && que.front() == itest) {
                             auto acur = _acc(frames, itest);
                             if (acur > thresholdBackground*rbAverage){
                                 positionsToPredict.push_back(itest);
@@ -412,7 +416,7 @@ int main(int argc, char ** argv) {
         if (keyPressed == -1 && isReadyToPredict == false) {
             predictedKey = -1;
             keyPressed = key;
-            audioLogger.record(kBufferSizeTrain_s, 3);
+            audioLogger.record(kBufferSizeTrain_s, 2);
         }
     };
 
@@ -980,7 +984,7 @@ int main(int argc, char ** argv) {
 
     init();
 #ifdef __EMSCRIPTEN__
-    emscripten_set_main_loop(mainUpdate, 60, 1);
+    emscripten_set_main_loop_arg(mainUpdate, NULL, 0, true);
 #else
     while (true) {
         if (g_mainUpdate() == false) break;

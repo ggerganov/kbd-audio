@@ -5,7 +5,8 @@
 
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
-#define IMGUI_IMPL_OPENGL_LOADER_GLEW
+#else
+#define EMSCRIPTEN_KEEPALIVE
 #endif
 
 #include "common.h"
@@ -28,14 +29,17 @@
 static std::function<bool()> g_doInit;
 static std::function<bool()> g_mainUpdate;
 
-void mainUpdate() {
+void mainUpdate(void *) {
     g_mainUpdate();
 }
 
 // JS interface
 
 extern "C" {
-    int doInit() { return g_doInit(); }
+    EMSCRIPTEN_KEEPALIVE
+        int doInit() {
+            return g_doInit();
+        }
 }
 
 // globals
@@ -201,7 +205,9 @@ bool renderWaveform(TParameters & , const TWaveform & waveform) {
         if (g_playbackData.idx >= g_playbackData.waveform.n) {
             g_playbackData.playing = false;
             SDL_ClearQueuedAudio(g_deviceIdOut);
+#ifndef __EMSCRIPTEN__
             SDL_PauseAudioDevice(g_deviceIdOut, 1);
+#endif
         }
 
         ImGui::PopItemWidth();
@@ -347,7 +353,7 @@ int main(int argc, char ** argv) {
     };
 
 #ifdef __EMSCRIPTEN__
-    emscripten_set_main_loop(mainUpdate, 60, 1);
+    emscripten_set_main_loop_arg(mainUpdate, NULL, 0, true);
 #else
     if (g_doInit() == false) {
         printf("Error: failed to initialize audio playback\n");
