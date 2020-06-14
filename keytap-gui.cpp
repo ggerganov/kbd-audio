@@ -3,14 +3,13 @@
  *  \author Georgi Gerganov
  */
 
-
 #ifdef __EMSCRIPTEN__
 #include "emscripten.h"
-#define IMGUI_IMPL_OPENGL_LOADER_GLEW
 #endif
 
 #include "constants.h"
 #include "common.h"
+#include "common-gui.h"
 #include "audio_logger.h"
 
 #include "imgui.h"
@@ -18,16 +17,6 @@
 #include "imgui_impl_opengl3.h"
 
 #include <SDL.h>
-
-#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-#include <GL/gl3w.h>    // Initialize with gl3wInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-#include <GL/glew.h>    // Initialize with glewInit()
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-#include <glad/glad.h>  // Initialize with gladLoadGL()
-#else
-#include IMGUI_IMPL_OPENGL_LOADER_CUSTOM
-#endif
 
 #include <map>
 #include <mutex>
@@ -120,81 +109,6 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
-    int windowSizeX = 800;
-    int windowSizeY = 900;
-
-#if __APPLE__
-    // GL 3.2 Core + GLSL 150
-    const char* glsl_version = "#version 150";
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-#elif __EMSCRIPTEN__
-    const char* glsl_version = "#version 100";
-    //const char* glsl_version = "#version 300 es";
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#else
-    // GL 3.0 + GLSL 130
-    const char* glsl_version = "#version 130";
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#endif
-
-    // Create window with graphics context
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_DisplayMode current;
-    SDL_GetCurrentDisplayMode(0, &current);
-#ifdef __EMSCRIPTEN__
-	SDL_Window* window;
-	SDL_Renderer *renderer;
-    SDL_CreateWindowAndRenderer(windowSizeX, windowSizeY, SDL_WINDOW_OPENGL, &window, &renderer);
-#else
-    SDL_Window* window = SDL_CreateWindow("Keytap", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowSizeX, windowSizeY, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
-#endif
-    SDL_GLContext gl_context = SDL_GL_CreateContext(window);
-    SDL_GL_SetSwapInterval(1); // Enable vsync
-
-    // Initialize OpenGL loader
-#if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-    bool err = gl3wInit() != 0;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-    bool err = glewInit() != GLEW_OK;
-#elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-    bool err = gladLoadGL() == 0;
-#else
-    bool err = false; // If you use IMGUI_IMPL_OPENGL_LOADER_CUSTOM, your loader is likely to requires some form of initialization.
-#endif
-    if (err)
-    {
-        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
-        return 1;
-    }
-
-    // Setup Dear ImGui binding
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-
-    ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-    ImGui_ImplOpenGL3_Init(glsl_version);
-
-    // Setup style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsClassic();
-
-    ImFontConfig fontConfig;
-    //fontConfig.SizePixels = 14.0f;
-    ImGui::GetIO().Fonts->AddFontDefault(&fontConfig);
-
     std::ifstream frecord;
     std::map<int, std::ifstream> fins;
     for (int i = 0; i < argc - 1; ++i) {
@@ -214,6 +128,19 @@ int main(int argc, char ** argv) {
                 return -1;
             }
         }
+    }
+
+#ifdef __EMSCRIPTEN__
+    int windowSizeX = 740;
+    int windowSizeY = 700;
+#else
+    int windowSizeX = 800;
+    int windowSizeY = 900;
+#endif
+
+    Gui::Objects guiObjects;
+    if (Gui::init("View-full", windowSizeX, windowSizeY, guiObjects) == false) {
+        return -6;
     }
 
     TKey keyPressed = -1;
@@ -755,7 +682,7 @@ int main(int argc, char ** argv) {
                     auto offset = std::get<1>(ccs[iwaveform][bestw]);
 
                     //if (std::abs(offset) > 5) continue;
-                    printf("        Adding waveform %d - cc = %g, offset = %ld\n", iwaveform, cc, offset);
+                    printf("        Adding waveform %d - cc = %g, offset = %d\n", iwaveform, cc, (int) offset);
                     ccsum += cc*cc;
                     norm += cc*cc;
                     auto & waveform = history[iwaveform];
@@ -834,15 +761,17 @@ int main(int argc, char ** argv) {
                     finishApp = true;
                     break;
                 case SDL_WINDOWEVENT:
-                    if (event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) finishApp = true;
+                    if (event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(guiObjects.window)) {
+                        finishApp = true;
+                    }
                     break;
             };
         }
 
-        SDL_GetWindowSize(window, &windowSizeX, &windowSizeY);
+        SDL_GetWindowSize(guiObjects.window, &windowSizeX, &windowSizeY);
 
         ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL2_NewFrame(window);
+        ImGui_ImplSDL2_NewFrame(guiObjects.window);
         ImGui::NewFrame();
 
         ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -853,7 +782,7 @@ int main(int argc, char ** argv) {
             ImGui::Text("The more text you type, the higher the chance for correct prediction later.");
             ImGui::Text("Click the 'Predict' button when ready");
             static char buf[1024];
-            ImGui::InputTextMultiline("##TrainingData", buf, 1024, { ImGui::GetContentRegionAvailWidth(), 400 });
+            ImGui::InputTextMultiline("##TrainingData", buf, 1024, { ImGui::GetContentRegionAvailWidth(), 520 });
             if (ImGui::Button("Predict", ImGui::GetContentRegionAvail())) {
                 audioLogger.pause();
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -873,6 +802,7 @@ int main(int argc, char ** argv) {
         } else if (isReadyToPredict == false) {
             ImGui::Text("Training ... Please wait");
         } else {
+#ifndef __EMSCRIPTEN__
             {
                 static char inp[128] = { "record.kbd" };
                 ImGui::InputText("Audio file", inp, 128);
@@ -894,6 +824,7 @@ int main(int argc, char ** argv) {
                     ImGui::EndTooltip();
                 }
             }
+#endif
             ImGui::Text("Last predicted key:       %s (%8.6f)\n", kKeyText.at(predictedKey), predictedCC);
             ImGui::SliderFloat("Threshold CC", &thresholdCC, 0.1f, 1.0f);
             auto tNow = std::chrono::high_resolution_clock::now();
@@ -1042,13 +973,7 @@ int main(int argc, char ** argv) {
 
         ImGui::End();
 
-        ImGui::Render();
-        SDL_GL_MakeCurrent(window, gl_context);
-        glViewport(0, 0, (int) io.DisplaySize.x, (int) io.DisplaySize.y);
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        SDL_GL_SwapWindow(window);
+        Gui::render(guiObjects);
 
         return true;
     };
@@ -1064,15 +989,9 @@ int main(int argc, char ** argv) {
 
     worker.join();
 
-    printf("[+] Terminated");
+    printf("[+] Terminated\n");
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
-    ImGui::DestroyContext();
-
-    SDL_GL_DeleteContext(gl_context);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+    Gui::free(guiObjects);
 
     return 0;
 }

@@ -11,6 +11,8 @@
 #include <mutex>
 #include <fstream>
 #include <deque>
+#include <algorithm>
+#include <condition_variable>
 
 namespace {
 template <typename TSampleInput, typename TSample>
@@ -21,7 +23,8 @@ template <typename TSampleInput, typename TSample>
             fin.read((char *)(buf.data()), size);
             double amax = 0.0f;
             for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
-            for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<TSampleI16>::max()*(buf[i]/amax));
+            double iamax = amax != 0.0 ? 1.0/amax : 1.0;
+            for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<TSampleI16>::max()*(buf[i]*iamax));
         } else if (std::is_same<TSample, TSampleF>::value) {
             res.resize(offset + size/sizeof(TSample));
             fin.read((char *)(res.data() + offset), size);
@@ -32,7 +35,8 @@ template <typename TSampleInput, typename TSample>
     }
 }
 
-float frand() { return ((float)rand())/RAND_MAX; }
+constexpr float iRAND_MAX = 1.0f/float(RAND_MAX);
+float frand() { return ((float)rand())*iRAND_MAX; }
 
 float frandGaussian(float mu, float sigma) {
 	static const float two_pi = 2.0*3.14159265358979323846;
@@ -69,6 +73,46 @@ std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
     return res;
 }
 
+template <typename TSampleSrc, typename TSampleDst>
+bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst) {
+    static_assert(std::is_same<TSampleSrc, TSampleDst>::value == false, "Required different sample types");
+
+    static_assert(std::is_same<TSampleSrc, TSampleF>::value, "Source sample type not supported");
+    static_assert(std::is_same<TSampleDst, TSampleI16>::value, "Destination sample type not supported");
+
+    dst.resize(src.size());
+
+    double amax = 0.0f;
+    for (auto i = 0; i < (int) src.size(); ++i) if (std::abs(src[i]) > amax) amax = std::abs(src[i]);
+    double iamax = amax != 0.0 ? 1.0/amax : 1.0;
+    for (auto i = 0; i < (int) src.size(); ++i) dst[i] = std::round(std::numeric_limits<TSampleDst>::max()*(src[i]*iamax));
+
+    return true;
+}
+
+template bool convert<TSampleF, TSampleI16>(const TWaveformT<TSampleF> & src, TWaveformT<TSampleI16> & dst);
+
+template <typename TSample>
+bool saveToFile(const std::string & fname, TWaveformT<TSample> & waveform) {
+    static_assert(std::is_same<TSample, TSampleF>::value, "Sample type not supported");
+
+    std::ofstream fout(fname, std::ios::binary);
+    if (fout.good() == false) {
+        return false;
+    }
+
+    auto totalSize_bytes = sizeof(TSample)*waveform.size();
+
+    fout.write((char *)(waveform.data()), totalSize_bytes);
+    fout.close();
+
+    printf("Total data saved: %g MB\n", ((float)(totalSize_bytes)/1024.0f/1024.0f));
+
+    return true;
+}
+
+template bool saveToFile<TSampleF>(const std::string & fname, TWaveformT<TSampleF> & waveform);
+
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res) {
     std::ifstream fin(fname, std::ios::binary | std::ios::ate);
@@ -95,6 +139,7 @@ bool readFromFile(const std::string & fname, TWaveformT<TSample> & res) {
 }
 
 template bool readFromFile<TSampleF, TSampleI16>(const std::string & fname, TWaveformT<TSampleI16> & res);
+template bool readFromFile<TSampleF, TSampleF>(const std::string & fname, TWaveformT<TSampleF> & res);
 
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames) {
@@ -394,36 +439,61 @@ bool calculateSimilartyMap(
     res.resize(nPresses);
     for (auto & x : res) x.resize(nPresses);
 
-    for (int i = 0; i < nPresses; ++i) {
-        res[i][i].cc = 1.0f;
-        res[i][i].offset = 0;
+    int nFinished = 0;
+#ifdef __EMSCRIPTEN__
+    int nWorkers = std::max(1, std::min(4, int(std::thread::hardware_concurrency()) - 4));
+#else
+    int nWorkers = std::thread::hardware_concurrency();
+#endif
 
-        auto & waveform0 = keyPresses[i].waveform;
-        auto & pos0      = keyPresses[i].pos;
-        auto & avgcc     = keyPresses[i].ccAvg;
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::vector<std::thread> workers(nWorkers);
+    for (int iw = 0; iw < (int) workers.size(); ++iw) {
+        auto & worker = workers[iw];
+        worker = std::thread([&](int ith) {
+            for (int i = ith; i < nPresses; i += nWorkers) {
+                res[i][i].cc = 1.0f;
+                res[i][i].offset = 0;
 
-        auto samples0 = waveform0.samples;
-        //auto n0       = waveform0.n;
+                const auto & waveform0 = keyPresses[i].waveform;
+                const auto & pos0      = keyPresses[i].pos;
+                auto & avgcc     = keyPresses[i].ccAvg;
 
-        for (int j = 0; j < nPresses; ++j) {
-            if (i == j) continue;
+                const auto samples0 = waveform0.samples;
 
-            auto waveform1 = keyPresses[j].waveform;
-            auto pos1      = keyPresses[j].pos;
+                for (int j = 0; j < nPresses; ++j) {
+                    if (i == j) continue;
 
-            auto samples1 = waveform1.samples;
-            auto ret = findBestCC(TWaveformViewT<T> { samples0 + pos0 + offsetFromPeak_samples,     2*w },
-                                  TWaveformViewT<T> { samples1 + pos1 + offsetFromPeak_samples - a, 2*w + 2*a }, a);
-            auto bestcc     = std::get<0>(ret);
-            auto bestoffset = std::get<1>(ret);
+                    const auto waveform1 = keyPresses[j].waveform;
+                    const auto pos1      = keyPresses[j].pos;
 
-            res[i][j].cc = bestcc;
-            res[i][j].offset = bestoffset;
+                    const auto samples1 = waveform1.samples;
+                    const auto ret = findBestCC(TWaveformViewT<T> { samples0 + pos0 + offsetFromPeak_samples,     2*w },
+                                                TWaveformViewT<T> { samples1 + pos1 + offsetFromPeak_samples - a, 2*w + 2*a }, a);
 
-            avgcc += bestcc;
-        }
-        avgcc /= (nPresses - 1);
+                    const auto bestcc     = std::get<0>(ret);
+                    const auto bestoffset = std::get<1>(ret);
+
+                    res[i][j].cc = bestcc;
+                    res[i][j].offset = bestoffset;
+
+                    avgcc += bestcc;
+                }
+                avgcc /= (nPresses - 1);
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                ++nFinished;
+                cv.notify_one();
+            }
+        }, iw);
+        worker.detach();
     }
+
+    std::unique_lock<std::mutex> lock(mutex);
+    cv.wait(lock, [&]() { return nFinished == nWorkers; });
 
     return true;
 }
@@ -444,10 +514,13 @@ bool findKeyPresses(
         const TWaveformViewT<T> & waveform,
         TKeyPressCollectionT<T> & res,
         TWaveformT<T> & waveformThreshold,
+        TWaveformT<T> & waveformMax,
         double thresholdBackground,
-        int historySize) {
+        int historySize,
+        bool removeLowPower) {
     res.clear();
     waveformThreshold.resize(waveform.n);
+    waveformMax.resize(waveform.n);
 
     int rbBegin = 0;
     double rbAverage = 0.0;
@@ -499,11 +572,33 @@ bool findKeyPresses(
             int64_t itest = i - k/2;
             if (itest >= 2*k && itest < n - 2*k && que.front() == itest) {
                 double acur = waveformAbs[itest];
-                if (acur > thresholdBackground*rbAverage){
+                if (acur > thresholdBackground*rbAverage) {
                     res.emplace_back(TKeyPressDataT<T> { std::move(waveform), itest, 0.0, -1, -1, '?' });
                 }
             }
-            waveformThreshold[itest] = waveformAbs[que.front()];
+            waveformThreshold[itest] = thresholdBackground*rbAverage;
+            waveformMax[itest] = waveformAbs[que.front()];
+        }
+    }
+
+    if (removeLowPower) {
+        while (true) {
+            auto oldn = res.size();
+
+            double avgPower = 0.0;
+            for (const auto & kp : res) {
+                avgPower += waveformAbs[kp.pos];
+            }
+            avgPower /= res.size();
+
+            auto tmp = std::move(res);
+            for (const auto & kp : tmp) {
+                if (waveformAbs[kp.pos] > 0.3*avgPower) {
+                    res.push_back(kp);
+                }
+            }
+
+            if (res.size() == oldn) break;
         }
     }
 
@@ -514,8 +609,10 @@ template bool findKeyPresses<TSampleI16>(
         const TWaveformViewT<TSampleI16> & waveform,
         TKeyPressCollectionT<TSampleI16> & res,
         TWaveformT<TSampleI16> & waveformThreshold,
+        TWaveformT<TSampleI16> & waveformMax,
         double thresholdBackground,
-        int historySize);
+        int historySize,
+        bool removeLowPower);
 
 template<typename T>
 bool saveKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & keyPresses) {
@@ -646,3 +743,58 @@ bool generateLowResWaveform(const TWaveformViewT<T> & waveform, TWaveformT<T> & 
 }
 
 template bool generateLowResWaveform<TSampleI16>(const TWaveformViewT<TSampleI16> & waveform, TWaveformT<TSampleI16> & waveformLowRes, int nWindow);
+
+template<typename T>
+bool adjustKeyPresses(TKeyPressCollectionT<T> & keyPresses, TSimilarityMap & sim) {
+    struct Pair {
+        int i = -1;
+        int j = -1;
+        TValueCC cc = -1.0;
+
+        bool operator < (const Pair & a) const { return cc > a.cc; }
+    };
+
+    bool res = false;
+
+    int n = keyPresses.size();
+
+    std::vector<Pair> ccpairs;
+    for (int i = 0; i < n - 1; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            ccpairs.emplace_back(Pair{i, j, sim[i][j].cc});
+        }
+    }
+
+    int nused = 0;
+    std::vector<bool> used(n, false);
+
+    std::sort(ccpairs.begin(), ccpairs.end());
+
+    int npairs = ccpairs.size();
+    for (int ip = 0; ip < npairs; ++ip) {
+        auto & curpair = ccpairs[ip];
+        int k0 = curpair.i;
+        int k1 = curpair.j;
+        if (used[k0] && used[k1]) continue;
+
+        if (sim[k0][k1].offset != 0) res = true;
+
+        if (used[k1] == false) {
+            keyPresses[k1].pos += sim[k0][k1].offset;
+        } else {
+            keyPresses[k0].pos -= sim[k0][k1].offset;
+        }
+
+        sim[k0][k1].offset = 0;
+        sim[k1][k0].offset = 0;
+
+        if (used[k0] == false) { used[k0] = true; ++nused; }
+        if (used[k1] == false) { used[k1] = true; ++nused; }
+
+        if (nused == n) break;
+    }
+
+    return res;
+}
+
+template bool adjustKeyPresses<TSampleI16>(TKeyPressCollectionT<TSampleI16> & keyPresses, TSimilarityMap & sim);

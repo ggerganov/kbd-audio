@@ -54,8 +54,9 @@ using TPlaybackDataI16          = TPlaybackDataT<TSampleI16>;
 
 // - float samples
 
+using TWaveformF    = TWaveformT<TSampleF>;
 using TKeyWaveformF = std::vector<TSampleF>;
-using TKeyHistoryF = std::vector<TKeyWaveformF>;
+using TKeyHistoryF  = std::vector<TKeyWaveformF>;
 
 // structs
 struct stMatch {
@@ -115,6 +116,12 @@ template <typename T>
 float toSeconds(T t0, T t1) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1000.0f;
 }
+
+template <typename TSampleSrc, typename TSampleDst>
+bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst);
+
+template <typename TSample>
+bool saveToFile(const std::string & fname, TWaveformT<TSample> & waveform);
 
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res);
@@ -184,8 +191,10 @@ bool findKeyPresses(
         const TWaveformViewT<T> & waveform,
         TKeyPressCollectionT<T> & res,
         TWaveformT<T> & waveformThreshold,
+        TWaveformT<T> & waveformMax,
         double thresholdBackground,
-        int historySize);
+        int historySize,
+        bool removeLowPower = false);
 
 template<typename T>
 bool saveKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & keyPresses);
@@ -206,3 +215,6 @@ template<typename T>
 bool generateLowResWaveform(const TWaveformT<T> & waveform, TWaveformT<T> & waveformLowRes, int nWindow) {
     return generateLowResWaveform(getView(waveform, 0), waveformLowRes, nWindow);
 }
+
+template<typename T>
+bool adjustKeyPresses(TKeyPressCollectionT<T> & keyPresses, TSimilarityMap & sim);

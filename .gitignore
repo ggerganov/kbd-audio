@@ -1,5 +1,5 @@
 build*
-data/*
+data_original/*
 chal*
 .DS_Store
 .ycm_extra_conf.py

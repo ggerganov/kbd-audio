@@ -155,7 +155,7 @@ bool AudioLogger::install(Parameters && parameters) {
     }
 
     if (parameters.sampleRate <= 0) {
-        fprintf(stderr, "error : invalid sampleRate = %ld\n", parameters.sampleRate);
+        fprintf(stderr, "error : invalid sampleRate = %d\n", (int) parameters.sampleRate);
         return false;
     }
 
@@ -381,6 +381,8 @@ bool AudioLogger::record(float bufferSize_s, int32_t nPrevFrames) {
 bool AudioLogger::pause() {
     auto & data = getData();
     SDL_PauseAudioDevice(data.deviceIdIn, 1);
+    data.nFramesToRecord.fill(0);
+
     return true;
 }
 

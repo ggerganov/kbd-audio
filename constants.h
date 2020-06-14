@@ -7,10 +7,15 @@
 
 #include <map>
 #include <array>
+#include <vector>
 
+#ifdef __EMSCRIPTEN__
+static constexpr int64_t kSamplesPerFrame = 4096;
+#else
 static constexpr int64_t kSamplesPerFrame = 512;
+#endif
 static constexpr int64_t kMaxSampleRate = 96000;
-static constexpr float   kMaxBufferSize_s = 1.000f;
+static constexpr float   kMaxBufferSize_s = 5.000f;
 static constexpr int32_t kMaxRecords = 16;
 
 static constexpr int32_t ceil_const(float num) {
@@ -35,6 +40,37 @@ static constexpr int64_t kBkgrStep_samples = 16;
 static constexpr int64_t kKeyDuration_samples = 0.005f*kSampleRate;
 
 static constexpr float kFreqCutoff_Hz = 1000.0f;
+
+static std::map<char, std::vector<char>> kNearbyKeys = {
+    { 'a', { 'a', 'q', 'w', 's', 'z', 'x',                               } },
+    { 'b', { 'b', 'f', 'g', 'h', 'v', 'n',                               } },
+    { 'c', { 'c', 's', 'd', 'f', 'x', 'v',                               } },
+    { 'd', { 'd', 'w', 'e', 'r', 's', 'f', 'x', 'c', 'v',                } },
+    //{ 'e', { 'e', 'w', 'r', 's', 'd', 'f', '_'                           } },
+    { 'e', { 'e', '_'                                                    } },
+    { 'f', { 'f', 'e', 'r', 't', 'd', 'g', 'c', 'v', 'b',                } },
+    { 'g', { 'g', 'r', 't', 'y', 'f', 'h', 'v', 'b', 'n',                } },
+    { 'h', { 'h', 't', 'y', 'u', 'g', 'j', 'b', 'n', 'm',                } },
+    { 'i', { 'i', 'u', 'o', 'j', 'k', 'l',                               } },
+    { 'j', { 'j', 'y', 'u', 'i', 'h', 'k', 'n', 'm',                     } },
+    { 'k', { 'k', 'u', 'i', 'o', 'j', 'l', 'm',                          } },
+    { 'l', { 'l', 'i', 'o', 'p', 'k', 'm',                               } },
+    { 'm', { 'm', 'h', 'j', 'k', 'n',                                    } },
+    { 'n', { 'n', 'g', 'h', 'j', 'b', 'm',                               } },
+    { 'o', { 'o', 'i', 'p', 'k', 'l',                                    } },
+    { 'p', { 'p', 'o', 'l',                                              } },
+    { 'q', { 'q', 'w', 'a', 's',                                         } },
+    { 'r', { 'r', 'e', 't', 'd', 'f', 'g',                               } },
+    { 's', { 's', 'q', 'w', 'e', 'a', 'd', 'z', 'x', 'c',                } },
+    { 't', { 't', 'r', 'y', 'f', 'g', 'h',                               } },
+    { 'u', { 'u', 'y', 'i', 'h', 'j', 'k',                               } },
+    { 'v', { 'v', 'd', 'f', 'g', 'c', 'b',                               } },
+    { 'w', { 'w', 'q', 'e', 'a', 's', 'd',                               } },
+    { 'x', { 'x', 'a', 's', 'd', 'z', 'c',                               } },
+    { 'y', { 'y', 't', 'u', 'g', 'h', 'j',                               } },
+    { 'z', { 'z', 'a', 's', 'x',                                         } },
+    { '_', { '_', 'e',                                                   } },
+};
 
 static const std::array<int32_t, 256> kCharToInt = {
     /* { 0,   */   0 /* } */,
