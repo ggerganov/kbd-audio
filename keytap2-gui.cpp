@@ -329,8 +329,8 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
             nview = std::min((int) (1024*kSamplesPerFrame), (int) waveform.size());
         }
     } else {
-        if (nview < 16*kSamplesPerFrame && scrolling == false) {
-            nview = std::min((int) (16*kSamplesPerFrame), (int) waveform.size());
+        if (nview < 4*kSamplesPerFrame && scrolling == false) {
+            nview = std::min((int) (4*kSamplesPerFrame), (int) waveform.size());
         }
     }
 
@@ -1023,15 +1023,15 @@ bool renderSimilarity(const TKeyPressCollection & keyPresses, const TSimilarityM
                         if (i == j) hoveredId = i;
                         if (ImGui::IsMouseDown(0) == false) {
                             ImGui::BeginTooltip();
-                            ImGui::Text("[%3d, %3d]\n", keyPresses[i].cid, keyPresses[j].cid);
+                            //ImGui::Text("[%3d, %3d]\n", keyPresses[i].cid, keyPresses[j].cid);
                             ImGui::Text("[%3d, %3d] = %5.4g\n", i, j, similarityMap[i][j].cc);
-                            for (int k = 0; k < n; ++k) {
-                                if (similarityMap[i][k].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", i, k, (int) similarityMap[i][k].offset);
-                            }
-                            ImGui::Separator();
-                            for (int k = 0; k < n; ++k) {
-                                if (similarityMap[k][i].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", k, i, (int) similarityMap[k][i].offset);
-                            }
+                            //for (int k = 0; k < n; ++k) {
+                            //    if (similarityMap[i][k].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", i, k, (int) similarityMap[i][k].offset);
+                            //}
+                            //ImGui::Separator();
+                            //for (int k = 0; k < n; ++k) {
+                            //    if (similarityMap[k][i].cc > 0.5) ImGui::Text("Offset [%3d, %3d] = %d\n", k, i, (int) similarityMap[k][i].offset);
+                            //}
                             ImGui::EndTooltip();
                         }
                     }
