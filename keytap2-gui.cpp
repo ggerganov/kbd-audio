@@ -1426,6 +1426,7 @@ int main(int argc, char ** argv) {
                 if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
                     printf("Conversion failed\n");
                 } else {
+                    stateUI.nview = -1;
                 }
             }
 
