@@ -440,7 +440,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
                 offset = dragOffset - ImGui::GetMouseDragDelta(0).x*nview/wsize.x;
             }
 
-            if (ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyCtrl) {
+            if ((ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyCtrl) || ImGui::IsMouseDoubleClicked(0)) {
                 int i = 0;
                 int64_t pos = offset + nview*(mpos.x - savePos.x)/wsize.x;
                 for (i = 0; i < (int) keyPresses.size(); ++i) {
@@ -527,7 +527,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
                 drawList->AddRectFilled(p1, p2, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, col }));
 
                 if (isHovered) {
-                    if (ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyCtrl && ignoreDelete == false) {
+                    if (((ImGui::IsMouseReleased(0) && ImGui::GetIO().KeyCtrl) || ImGui::IsMouseDoubleClicked(0)) && ignoreDelete == false) {
                         keyPresses.erase(keyPresses.begin() + i);
                         --i;
                     }
