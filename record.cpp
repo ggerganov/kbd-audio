@@ -86,7 +86,7 @@ int main(int argc, char ** argv) {
             int key = getchar();
             tStart = std::chrono::high_resolution_clock::now();
             keyPressedQueue.push_back(key);
-            if (audioLogger.record(kBufferSizeTrain_s, 3) == false) {
+            if (audioLogger.record(kBufferSizeTrain_s, 2) == false) {
                 fprintf(stderr, "error : failed to record\n");
             }
         }

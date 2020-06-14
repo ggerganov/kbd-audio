@@ -354,7 +354,7 @@ int main(int argc, char ** argv) {
                         que.push_back(i);
 
                         int itest = i - k/2;
-                        if (itest >= (0.5*kSamplesPerWaveformTrain - kSamplesPerFrame) && itest < (0.5*kSamplesPerWaveformTrain) && que.front() == itest) {
+                        if (itest >= (0.5*kSamplesPerWaveformTrain - 0.50*kSamplesPerFrame) && itest < (0.5*kSamplesPerWaveformTrain + 0.5*kSamplesPerFrame) && que.front() == itest) {
                             auto acur = _acc(frames, itest);
                             if (acur > thresholdBackground*rbAverage){
                                 positionsToPredict.push_back(itest);

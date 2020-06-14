@@ -10,7 +10,7 @@
 #include <vector>
 
 #ifdef __EMSCRIPTEN__
-static constexpr int64_t kSamplesPerFrame = 4096;
+static constexpr int64_t kSamplesPerFrame = 2048;
 #else
 static constexpr int64_t kSamplesPerFrame = 512;
 #endif
