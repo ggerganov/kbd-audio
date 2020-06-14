@@ -40,7 +40,10 @@ void mainUpdate() {
 // JS interface
 
 extern "C" {
-    int doInit() { return g_doInit(); }
+    EMSCRIPTEN_KEEPALIVE
+    int doInit() {
+        return g_doInit();
+    }
 }
 
 #ifdef __EMSCRIPTEN__

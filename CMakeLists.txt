@@ -58,8 +58,9 @@ if (EMSCRIPTEN)
     -s GL_ASSERTIONS=1 \
     -s GL_DEBUG=1 \
     -s USE_PTHREADS=1 \
-    -s PTHREAD_POOL_SIZE=8 \
+    -s PTHREAD_POOL_SIZE=4 \
     -s USE_SDL=2 \
+    -s LZ4=1 \
     -s DISABLE_EXCEPTION_CATCHING=0")
 endif()
 
@@ -155,6 +156,11 @@ endif()
 
 add_executable(keytap2-gui keytap2-gui.cpp subbreak2.cpp)
 target_link_libraries(keytap2-gui PRIVATE Core Gui)
+if (EMSCRIPTEN)
+    SET_TARGET_PROPERTIES(keytap2-gui PROPERTIES LINK_FLAGS " \
+    --preload-file ../data/ \
+    ")
+endif()
 
 if (NOT EMSCRIPTEN)
 
