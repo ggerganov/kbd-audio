@@ -440,7 +440,11 @@ bool calculateSimilartyMap(
     for (auto & x : res) x.resize(nPresses);
 
     int nFinished = 0;
+#ifdef __EMSCRIPTEN__
+    int nWorkers = std::max(1, std::min(4, int(std::thread::hardware_concurrency()) - 4));
+#else
     int nWorkers = std::thread::hardware_concurrency();
+#endif
 
     std::mutex mutex;
     std::condition_variable cv;

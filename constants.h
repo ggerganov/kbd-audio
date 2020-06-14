@@ -9,9 +9,13 @@
 #include <array>
 #include <vector>
 
+#ifdef __EMSCRIPTEN__
+static constexpr int64_t kSamplesPerFrame = 4096;
+#else
 static constexpr int64_t kSamplesPerFrame = 512;
+#endif
 static constexpr int64_t kMaxSampleRate = 96000;
-static constexpr float   kMaxBufferSize_s = 1.000f;
+static constexpr float   kMaxBufferSize_s = 5.000f;
 static constexpr int32_t kMaxRecords = 16;
 
 static constexpr int32_t ceil_const(float num) {

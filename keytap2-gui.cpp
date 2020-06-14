@@ -33,7 +33,7 @@
 static std::function<bool()> g_doInit;
 static std::function<bool()> g_mainUpdate;
 
-void mainUpdate() {
+void mainUpdate(void *) {
     g_mainUpdate();
 }
 
@@ -41,14 +41,14 @@ void mainUpdate() {
 
 extern "C" {
     EMSCRIPTEN_KEEPALIVE
-    int doInit() {
-        return g_doInit();
-    }
+        int doInit() {
+            return g_doInit();
+        }
 }
 
 #ifdef __EMSCRIPTEN__
-    int g_windowSizeX = 740;
-    int g_windowSizeY = 700;
+    int g_windowSizeX = 1400;
+    int g_windowSizeY = 900;
 #else
     int g_windowSizeX = 1920;
     int g_windowSizeY = 1200;
@@ -350,6 +350,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         waveformMax = waveform;
     }
 
+#ifndef __EMSCRIPTEN__
     if ((int) keyPresses.size() >= lastKeyPresses + 10) {
         lastKeyPresses = keyPresses.size();
 
@@ -357,6 +358,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         stateUI.flags.recalculateSimilarityMap = true;
         stateUI.doUpdate = true;
     }
+#endif
 
     ImGui::SetNextWindowPos(ImVec2(0, ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 336.0f), ImGuiCond_Always);
@@ -588,10 +590,12 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
                 }
             }
 
-            if (g_playbackData.idx >= g_playbackData.waveform.n) {
+            if (g_playbackData.idx >= g_playbackData.waveform.n - kSamplesPerFrame) {
                 g_playbackData.playing = false;
                 SDL_ClearQueuedAudio(g_deviceIdOut);
+#ifndef __EMSCRIPTEN__
                 SDL_PauseAudioDevice(g_deviceIdOut, 1);
+#endif
             }
 
             ImGui::SameLine();
@@ -1571,7 +1575,7 @@ int main(int argc, char ** argv) {
     });
 
 #ifdef __EMSCRIPTEN__
-    emscripten_set_main_loop(mainUpdate, 60, 1);
+    emscripten_set_main_loop_arg(mainUpdate, NULL, 0, true);
 #else
     if (g_doInit() == false) {
         printf("Error: failed to initialize audio playback\n");
@@ -1581,13 +1585,13 @@ int main(int argc, char ** argv) {
     while (true) {
         if (g_mainUpdate() == false) break;
     }
-#endif
 
     workerCore.join();
 
     printf("[+] Terminated\n");
 
     Gui::free(guiObjects);
+#endif
 
     return 0;
 }
