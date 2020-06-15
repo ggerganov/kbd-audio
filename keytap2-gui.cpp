@@ -161,8 +161,11 @@ struct stStateUI {
     bool openAboutWindow = false;
     bool loadRecord = false;
     bool loadKeyPresses = false;
+    bool rescaleWaveform = true;
 
     int outputRecordId = 0;
+
+    double maxSample = 0.0;
 
     std::string fnameRecord = "default.kbd";
     std::string fnameKeyPressess = "default.kbd.keys";
@@ -211,7 +214,6 @@ struct TripleBuffer : public T {
     bool update(bool force = false) {
         std::lock_guard<std::mutex> lock(mutex);
         hasChanged = true || force;
-        buffer = *this;
         this->flags.clear();
 
         return true;
@@ -239,6 +241,40 @@ private:
 
     mutable std::mutex mutex;
 };
+
+template<> bool TripleBuffer<stStateUI>::update(bool force) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (hasChanged && force == false) return false;
+
+    hasChanged = true;
+
+    buffer.flags = this->flags;
+
+    if (this->flags.recalculateSimilarityMap || this->flags.resetOptimization) {
+        buffer.params = this->params;
+        buffer.keyPresses = this->keyPresses;
+    }
+
+    if (this->flags.changeProcessing) {
+        buffer.processing = this->processing;
+    }
+
+    if (this->flags.applyClusters) {
+        buffer.params = this->params;
+    }
+
+    if (this->flags.applyWEnglishFreq) {
+        buffer.params = this->params;
+    }
+
+    if (this->flags.applyHints) {
+        buffer.keyPresses = this->keyPresses;
+    }
+
+    this->flags.clear();
+
+    return true;
+}
 
 template<> bool TripleBuffer<stStateCore>::update(bool force) {
     std::lock_guard<std::mutex> lock(mutex);
@@ -284,8 +320,8 @@ template<> bool TripleBuffer<stStateCapture>::update(bool force) {
     if (this->flags.updateRecord) {
         buffer.recordNew.insert(
                 buffer.recordNew.end(),
-                this->recordNew.begin(),
-                this->recordNew.end());
+                make_move_iterator(this->recordNew.begin()),
+                make_move_iterator(this->recordNew.end()));
         this->recordNew.clear();
     }
 
@@ -359,7 +395,6 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         if (scrolling == false) {
             offset = waveform.size() - nview;
         }
-        recalculateKeyPresses = true;
 
         waveformLowRes = waveform;
         waveformThreshold = waveform;
@@ -572,9 +607,11 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         if (stateUI.recording == false) {
             if (stateUI.audioCapture) {
                 if (ImGui::Button("   Record")) {
-                    audioLogger.resume();
-                    stateUI.recording = true;
-                    g_doRecord = true;
+                    if (float(stateUI.waveformInput.size()/kSampleRate) < kMaxRecordSize_s) {
+                        audioLogger.resume();
+                        stateUI.recording = true;
+                        g_doRecord = true;
+                    }
                 }
                 {
                     auto savePos = ImGui::GetCursorScreenPos();
@@ -640,7 +677,11 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
             if (ImGui::Button("   Stop Recording")) {
                 audioLogger.pause();
                 g_doRecord = false;
+
+                stateUI.recalculateKeyPresses = true;
+                stateUI.lastSize = stateUI.lastSize - 1;
                 stateUI.recording = false;
+                stateUI.rescaleWaveform = true;
             }
             {
                 auto savePos = ImGui::GetCursorScreenPos();
@@ -659,7 +700,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
             }
 
             ImGui::SameLine();
-            ImGui::Text("Total key presses detected: %d", (int) keyPresses.size());
+            ImGui::Text("Record length: %4.2f s", (float)(stateUI.waveformInput.size())/kSampleRate);
         }
 
         if (recalculateKeyPresses) {
@@ -1148,6 +1189,9 @@ int main(int argc, char ** argv) {
     stateUI.fnameRecord = argv[1];
     stateUI.fnameKeyPressess = stateUI.fnameRecord + ".keys";
 
+    stateUI.waveformInput.reserve(kSamplesPerFrame*kMaxRecordSize_frames);
+    stateUI.waveformOriginal.reserve(kSamplesPerFrame*kMaxRecordSize_frames);
+
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return -2;
@@ -1212,6 +1256,9 @@ int main(int argc, char ** argv) {
             printf("Conversion failed\n");
             return -4;
         }
+
+        stateUI.recalculateKeyPresses = true;
+        stateUI.maxSample = calcAbsMax(stateUI.waveformOriginal);
     }
 
     Cipher::TFreqMap freqMap3;
@@ -1296,17 +1343,17 @@ int main(int argc, char ** argv) {
 
             if (stateCaptureNew.flags.updateRecord) {
                 for (auto & frame : stateCaptureNew.recordNew) {
-                    for (auto & sample : frame) {
-                        stateUI.waveformOriginal.push_back(sample);
-                    }
+                    stateUI.waveformOriginal.insert(stateUI.waveformOriginal.end(), frame.begin(), frame.end());
+                }
+
+                int nold = stateUI.waveformInput.size();
+                float scale = float(std::numeric_limits<TSample>::max())/(stateUI.maxSample == 0.0 ? 1.0f : stateUI.maxSample);
+                stateUI.waveformInput.resize(stateUI.waveformOriginal.size());
+                for (int i = nold; i < (int) stateUI.waveformInput.size(); ++i) {
+                    stateUI.waveformInput[i] = scale*stateUI.waveformOriginal[i];
                 }
             }
-
-            if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
-                fprintf(stderr, "error : recording failed\n");
-            }
         }
-
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -1427,6 +1474,10 @@ int main(int argc, char ** argv) {
                     printf("Conversion failed\n");
                 } else {
                     stateUI.nview = -1;
+                    stateUI.recalculateKeyPresses = true;
+                    stateUI.maxSample = calcAbsMax(stateUI.waveformOriginal);
+                    stateUI.flags.recalculateSimilarityMap = true;
+                    stateUI.doUpdate = true;
                 }
             }
 
@@ -1436,6 +1487,26 @@ int main(int argc, char ** argv) {
         if (stateUI.loadKeyPresses) {
             loadKeyPresses(stateUI.fnameKeyPressess.c_str(), getView(stateUI.waveformInput, 0), stateUI.keyPresses);
             stateUI.loadKeyPresses = false;
+        }
+
+        if (stateUI.rescaleWaveform) {
+            if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
+                fprintf(stderr, "error : recording failed\n");
+            }
+            stateUI.maxSample = calcAbsMax(stateUI.waveformOriginal);
+
+            stateUI.rescaleWaveform = false;
+        }
+
+        if (float(stateUI.waveformInput.size())/kSampleRate >= kMaxRecordSize_s) {
+            stateUI.waveformInput.resize((kMaxRecordSize_frames - 1)*kSamplesPerFrame);
+            audioLogger.pause();
+            g_doRecord = false;
+
+            stateUI.recalculateKeyPresses = true;
+            stateUI.lastSize = stateUI.lastSize - 1;
+            stateUI.recording = false;
+            stateUI.rescaleWaveform = true;
         }
 
         for (int i = 0; i < IM_ARRAYSIZE(ImGui::GetIO().KeysDown); i++) if (ImGui::IsKeyPressed(i)) {

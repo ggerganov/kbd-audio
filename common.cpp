@@ -21,8 +21,7 @@ template <typename TSampleInput, typename TSample>
             std::vector<TSampleInput> buf(size/sizeof(TSampleInput));
             res.resize(offset + size/sizeof(TSampleInput));
             fin.read((char *)(buf.data()), size);
-            double amax = 0.0f;
-            for (auto i = 0; i < (int) buf.size(); ++i) if (std::abs(buf[i]) > amax) amax = std::abs(buf[i]);
+            double amax = calcAbsMax(buf);
             double iamax = amax != 0.0 ? 1.0/amax : 1.0;
             for (auto i = 0; i < (int) buf.size(); ++i) res[offset + i] = std::round(std::numeric_limits<TSampleI16>::max()*(buf[i]*iamax));
         } else if (std::is_same<TSample, TSampleF>::value) {
@@ -82,8 +81,7 @@ bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst) {
 
     dst.resize(src.size());
 
-    double amax = 0.0f;
-    for (auto i = 0; i < (int) src.size(); ++i) if (std::abs(src[i]) > amax) amax = std::abs(src[i]);
+    double amax = calcAbsMax(src);
     double iamax = amax != 0.0 ? 1.0/amax : 1.0;
     for (auto i = 0; i < (int) src.size(); ++i) dst[i] = std::round(std::numeric_limits<TSampleDst>::max()*(src[i]*iamax));
 
@@ -91,6 +89,16 @@ bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst) {
 }
 
 template bool convert<TSampleF, TSampleI16>(const TWaveformT<TSampleF> & src, TWaveformT<TSampleI16> & dst);
+
+template <typename TSample>
+double calcAbsMax(const TWaveformT<TSample> & waveform) {
+    double amax = 0.0f;
+    for (auto i = 0; i < (int) waveform.size(); ++i) if (std::abs(waveform[i]) > amax) amax = std::abs(waveform[i]);
+
+    return amax;
+}
+
+template double calcAbsMax<TSampleF>(const TWaveformT<TSampleF> & waveform);
 
 template <typename TSample>
 bool saveToFile(const std::string & fname, TWaveformT<TSample> & waveform) {

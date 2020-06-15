@@ -10,13 +10,14 @@
 #include <vector>
 
 #ifdef __EMSCRIPTEN__
-static constexpr int64_t kSamplesPerFrame = 2048;
+static constexpr int64_t kSamplesPerFrame = 1024;
 #else
 static constexpr int64_t kSamplesPerFrame = 512;
 #endif
+static constexpr int32_t kMaxRecords = 16;
 static constexpr int64_t kMaxSampleRate = 96000;
 static constexpr float   kMaxBufferSize_s = 5.000f;
-static constexpr int32_t kMaxRecords = 16;
+static constexpr int32_t kMaxRecordSize_s = 180.0f;
 
 static constexpr int32_t ceil_const(float num) {
     return (static_cast<float>(static_cast<int32_t>(num)) == num)
@@ -30,6 +31,7 @@ static constexpr int32_t getBufferSize_frames(int64_t sampleRate, float bufferSi
 }
 
 static constexpr int64_t kSampleRate = 16000;
+static constexpr int32_t kMaxRecordSize_frames = getBufferSize_frames(kSampleRate, kMaxRecordSize_s);
 
 static constexpr float kBufferSizeTrain_s = 0.300;
 static constexpr int32_t kBufferSizeTrain_frames = getBufferSize_frames(kSampleRate, kBufferSizeTrain_s);
