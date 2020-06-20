@@ -1,4 +1,5 @@
-build*
+build*/
+build-vars.h
 data_original/*
 chal*
 .DS_Store

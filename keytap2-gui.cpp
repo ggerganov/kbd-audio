@@ -9,6 +9,7 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
+#include "build-vars.h"
 #include "constants.h"
 #include "common.h"
 #include "common-gui.h"
@@ -159,6 +160,7 @@ struct stStateUI {
     float windowHeightSimilarity = 0;
 
     bool openAboutWindow = false;
+    bool openParametersWindow = false;
     bool loadRecord = false;
     bool loadKeyPresses = false;
     bool rescaleWaveform = true;
@@ -700,7 +702,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
             }
 
             ImGui::SameLine();
-            ImGui::Text("Record length: %4.2f s", (float)(stateUI.waveformInput.size())/kSampleRate);
+            ImGui::Text("Record length: %4.2f s (max : %4.2f s)", (float)(stateUI.waveformInput.size())/kSampleRate, kMaxRecordSize_s);
         }
 
         if (recalculateKeyPresses) {
@@ -1172,6 +1174,7 @@ bool prepareAudioOut(const TParameters & params) {
 int main(int argc, char ** argv) {
     srand(time(0));
 
+    printf("Build: %s, (%s)\n", kGIT_DATE, kGIT_SHA1);
     printf("Usage: %s record.kbd n-gram-dir [-pN] [-cN] [-CN]\n", argv[0]);
     printf("    -pN - select playback device N\n");
     printf("    -cN - select capture device N\n");
@@ -1417,6 +1420,9 @@ int main(int argc, char ** argv) {
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Help")) {
+                if (ImGui::MenuItem("Parameters")) {
+                    stateUI.openParametersWindow = true;
+                }
                 if (ImGui::MenuItem("About")) {
                     stateUI.openAboutWindow = true;
                 }
@@ -1433,10 +1439,10 @@ int main(int argc, char ** argv) {
         if (ImGui::BeginPopupModal("About", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
             ImGui::Text("%s", "");
             {
-                const char * text = "Keytap2 : v0.1 [commit-hash]";
+                const char * text = "Keytap2 : v0.1 [%s]";
                 ImGui::Text("%s", "");
                 ImGui::SameLine(0.5f*ImGui::GetContentRegionAvailWidth() - 0.45f*ImGui::CalcTextSize(text).x);
-                ImGui::Text("%s", text);
+                ImGui::Text(text, kGIT_SHA1);
             }
             ImGui::Text("%s", "");
             {
@@ -1463,6 +1469,34 @@ int main(int argc, char ** argv) {
             ImGui::Text("%s", "");
             ImGui::EndPopup();
         }
+
+        if (stateUI.openParametersWindow) {
+            ImGui::OpenPopup("Parameters");
+            stateUI.openParametersWindow = false;
+        }
+        ImGui::SetNextWindowSize({320, -1}, ImGuiCond_Once);
+        if (ImGui::BeginPopupModal("Parameters", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
+            ImGui::Text("%s", "");
+            ImGui::Text("Sample rate            : %d\n", (int) kSampleRate);
+            ImGui::Text("Samples per frame      : %d\n", (int) kSamplesPerFrame);
+            ImGui::Text("Hardware concurrency   : %d\n", (int) std::thread::hardware_concurrency());
+            ImGui::Text("Max record size        : %g s\n", kMaxRecordSize_s);
+            ImGui::Text("Freq cutoff            : %g Hz\n", kFreqCutoff_Hz);
+            ImGui::Text("Subbreak Processors    : %d\n", stateUI.params.nProcessors());
+            ImGui::Text("%s", "");
+
+            {
+                const char * text = "Close";
+                ImGui::Text("%s", "");
+                ImGui::SameLine(0.5f*ImGui::GetContentRegionAvailWidth() - 0.45f*ImGui::CalcTextSize(text).x);
+                if (ImGui::Button(text)) {
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::Text("%s", "");
+            ImGui::EndPopup();
+        }
+
 
         if (stateUI.loadRecord) {
             printf("[+] Loading recording from '%s'\n", argv[1]);

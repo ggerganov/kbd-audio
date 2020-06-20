@@ -41,6 +41,8 @@ endif()
 include(cmake/GitVars.cmake)
 include(cmake/BuildTypes.cmake)
 
+configure_file(${CMAKE_SOURCE_DIR}/build-vars.h.in ${CMAKE_SOURCE_DIR}/build-vars.h @ONLY)
+
 # warnings
 
 if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
