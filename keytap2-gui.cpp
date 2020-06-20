@@ -140,6 +140,8 @@ struct stStateUI {
 
     int nview = -1;
     int offset = -1;
+    int viewMin = 512;
+    int viewMax = 512;
     int nviewPrev = -1;
     int lastSize = -1;
     int lastKeyPresses = 0;
@@ -355,6 +357,8 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
     bool & recalculateKeyPresses = stateUI.recalculateKeyPresses;
 
     int & nview = stateUI.nview;
+    int & viewMin = stateUI.viewMin;
+    int & viewMax = stateUI.viewMax;
     int & offset = stateUI.offset;
     int & lastSize = stateUI.lastSize;
     int & lastKeyPresses = stateUI.lastKeyPresses;
@@ -373,34 +377,21 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
 
     if (nview < 0) nview = waveform.size();
     if (offset < 0) offset = (waveform.size() - nview)/2;
-    if (nviewPrev < 0) {
-        nviewPrev = nview + 1;
-
-        waveformLowRes = waveform;
-        waveformThreshold = waveform;
-        waveformMax = waveform;
-    }
 
     if (stateUI.recording) {
         if (nview < 1024*kSamplesPerFrame && scrolling == false) {
             nview = std::min((int) (1024*kSamplesPerFrame), (int) waveform.size());
         }
-    } else {
-        if (nview < 4*kSamplesPerFrame && scrolling == false) {
-            nview = std::min((int) (4*kSamplesPerFrame), (int) waveform.size());
-        }
     }
 
     if (lastSize != (int) waveform.size()) {
+        viewMax = waveform.size();
         lastSize = waveform.size();
         nviewPrev = nview + 1;
+
         if (scrolling == false) {
             offset = waveform.size() - nview;
         }
-
-        waveformLowRes = waveform;
-        waveformThreshold = waveform;
-        waveformMax = waveform;
     }
 
 #ifndef __EMSCRIPTEN__
@@ -416,15 +407,16 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
     ImGui::SetNextWindowPos(ImVec2(0, ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Once);
     ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 336.0f), ImGuiCond_Always);
     if (ImGui::Begin("Key Presses", nullptr, ImGuiWindowFlags_NoMove)) {
-        int viewMin = 512;
-        int viewMax = waveform.size();
-
         bool ignoreDelete = false;
 
-        auto wview = getView(waveformLowRes, offset, nview);
-        auto tview = getView(waveformThreshold, offset, nview);
-        auto mview = getView(waveformMax, offset, nview);
         auto wsize = ImVec2(ImGui::GetContentRegionAvailWidth(), 250.0);
+
+        if (nview != nviewPrev) {
+            generateLowResWaveform(waveform, waveformLowRes, std::max(1.0f, nview/wsize.x));
+            nviewPrev = nview;
+        }
+
+        auto wview = getView(waveformLowRes, offset, nview);
 
         auto mpos = ImGui::GetIO().MousePos;
         auto savePos = ImGui::GetCursorScreenPos();
@@ -438,27 +430,34 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 1.0f, 1.0f, 1.0f, 1.0f });
         ImGui::PlotHistogram("##Waveform", plotWaveformInverse, &wview, nview, 0, "Waveform", amin, amax, wsize);
         ImGui::PopStyleColor(2);
+
+        if (waveform.size() == waveformThreshold.size() && waveform.size() == waveformMax.size()) {
+            auto tview = getView(waveformThreshold, offset, nview);
+            auto mview = getView(waveformMax, offset, nview);
+
+            ImGui::SetCursorScreenPos(savePos);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
+            ImGui::PushStyleColor(ImGuiCol_PlotLines, { 1.0f, 1.0f, 0.0f, 0.5f });
+            ImGui::PlotLines("##WaveformThreshold", plotWaveform, &tview, nview, 0, "", amin, amax, wsize);
+            ImGui::PopStyleColor(2);
+            ImGui::SetCursorScreenPos(savePos);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
+            ImGui::PushStyleColor(ImGuiCol_PlotLines, { 1.0f, 1.0f, 0.0f, 0.5f });
+            ImGui::PlotLines("##WaveformThreshold", plotWaveformInverse, &tview, nview, 0, "", amin, amax, wsize);
+            ImGui::PopStyleColor(2);
+            ImGui::SetCursorScreenPos(savePos);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
+            ImGui::PushStyleColor(ImGuiCol_PlotLines, { 0.0f, 1.0f, 0.0f, 0.5f });
+            ImGui::PlotLines("##WaveformMax", plotWaveform, &mview, nview, 0, "", amin, amax, wsize);
+            ImGui::PopStyleColor(2);
+            ImGui::SetCursorScreenPos(savePos);
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
+            ImGui::PushStyleColor(ImGuiCol_PlotLines, { 0.0f, 1.0f, 0.0f, 0.5f });
+            ImGui::PlotLines("##WaveformMax", plotWaveformInverse, &mview, nview, 0, "", amin, amax, wsize);
+            ImGui::PopStyleColor(2);
+        }
         ImGui::SetCursorScreenPos(savePos);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
-        ImGui::PushStyleColor(ImGuiCol_PlotLines, { 1.0f, 1.0f, 0.0f, 0.5f });
-        ImGui::PlotLines("##WaveformThreshold", plotWaveform, &tview, nview, 0, "", amin, amax, wsize);
-        ImGui::PopStyleColor(2);
-        ImGui::SetCursorScreenPos(savePos);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
-        ImGui::PushStyleColor(ImGuiCol_PlotLines, { 1.0f, 1.0f, 0.0f, 0.5f });
-        ImGui::PlotLines("##WaveformThreshold", plotWaveformInverse, &tview, nview, 0, "", amin, amax, wsize);
-        ImGui::PopStyleColor(2);
-        ImGui::SetCursorScreenPos(savePos);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
-        ImGui::PushStyleColor(ImGuiCol_PlotLines, { 0.0f, 1.0f, 0.0f, 0.5f });
-        ImGui::PlotLines("##WaveformMax", plotWaveform, &mview, nview, 0, "", amin, amax, wsize);
-        ImGui::PopStyleColor(2);
-        ImGui::SetCursorScreenPos(savePos);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
-        ImGui::PushStyleColor(ImGuiCol_PlotLines, { 0.0f, 1.0f, 0.0f, 0.5f });
-        ImGui::PlotLines("##WaveformMax", plotWaveformInverse, &mview, nview, 0, "", amin, amax, wsize);
-        ImGui::PopStyleColor(2);
-        ImGui::SetCursorScreenPos(savePos);
+
         ImGui::InvisibleButton("##WaveformIB",wsize);
         if (ImGui::IsItemHovered()) {
             auto w = ImGui::GetIO().MouseWheel;
@@ -708,11 +707,6 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         if (recalculateKeyPresses) {
             findKeyPresses(getView(waveform, 0), keyPresses, waveformThreshold, waveformMax, thresholdBackground, historySize, true);
             recalculateKeyPresses = false;
-        }
-
-        if (nview != nviewPrev) {
-            generateLowResWaveform(waveform, waveformLowRes, std::max(1.0f, nview/wsize.x));
-            nviewPrev = nview;
         }
 
         stateUI.windowHeightKeyPesses = ImGui::GetWindowHeight() + ImGui::GetTextLineHeightWithSpacing();
