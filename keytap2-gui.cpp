@@ -885,6 +885,8 @@ bool renderResults(stStateUI & stateUI) {
 
         ImGui::PopItemWidth();
 
+        ImGui::BeginChild("##currentResults", { 0, 0 }, 1, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+
         ImGui::Separator();
         ImGui::Text(" Suggestions");
         {
@@ -981,6 +983,7 @@ bool renderResults(stStateUI & stateUI) {
         ImGui::Separator();
 
         for (const auto & items : stateUI.results) {
+            ImGui::Separator();
             const auto & id = items.first;
             for (const auto & item : items.second) {
                 const auto & result = item;
@@ -1081,6 +1084,8 @@ bool renderResults(stStateUI & stateUI) {
                 ImGui::PopID();
             }
         }
+
+        ImGui::EndChild();
 
         stateUI.windowHeightResults = ImGui::GetWindowHeight();
     } else {
