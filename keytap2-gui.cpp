@@ -30,6 +30,7 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include <queue>
 #include <functional>
 #include <condition_variable>
 
@@ -92,8 +93,8 @@ struct stParameters {
     int32_t alignWindow_samples     = 256;
 
     std::vector<int>    valuesClusters = { 50, };
-    std::vector<float>  valuesPNonAlphabetic = { 0.05, 0.05, 0.05, };
-    std::vector<float>  valuesWEnglishFreq = { 50.0 };
+    std::vector<float>  valuesPNonAlphabetic = { 0.05, 0.02, 0.01, };
+    std::vector<float>  valuesWEnglishFreq = { 20.0 };
 
     int32_t nProcessors() const {
         return valuesClusters.size()*valuesPNonAlphabetic.size()*valuesWEnglishFreq.size();
@@ -128,7 +129,7 @@ struct stStateUI {
         void clear() { memset(this, 0, sizeof(Flags)); }
     } flags;
 
-    bool autoHint = true;
+    bool autoHint = false;
     bool processing = true;
     bool recording = false;
     bool audioCapture = false;
@@ -181,7 +182,12 @@ struct stStateUI {
     TSimilarityMap similarityMap;
 
     Cipher::THint suggestions;
-    std::map<int, Cipher::TResult> results;
+
+    struct ProcessorResults : std::vector<Cipher::TResult> {
+        int id = 0;
+    };
+
+    std::map<int, ProcessorResults> results;
 };
 
 struct stStateCore {
@@ -720,7 +726,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
 
 bool renderResults(stStateUI & stateUI) {
     ImGui::SetNextWindowPos(ImVec2(0, stateUI.windowHeightKeyPesses), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, (12 + stateUI.results.size())*ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, (12 + stateUI.results.size()*kTopResultsPerProcessor)*ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Always);
     if (ImGui::Begin("Results", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
         auto drawList = ImGui::GetWindowDrawList();
 
@@ -748,28 +754,34 @@ bool renderResults(stStateUI & stateUI) {
 
             ImGui::SameLine();
             if (ImGui::Button("Reset")) { // c
+                stateUI.results.clear();
+                if (stateUI.autoHint) {
+                    for (auto & keyPress : stateUI.keyPresses) {
+                        keyPress.bind = -1;
+                    }
+                }
                 stateUI.flags.resetOptimization = true;
                 stateUI.doUpdate = true;
             }
 
-            ImGui::SameLine();
-            if (ImGui::Button("Apply Suggestions")) {
-                int n = stateUI.suggestions.size();
-                for (int i = 0; i < n; ++i) {
-                    if (stateUI.suggestions[i] < 0) {
-                        stateUI.keyPresses[i].bind = -1;
-                        continue;
-                    }
-                    if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
-                        stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
-                    } else {
-                        stateUI.keyPresses[i].bind = 26;
-                    }
-                }
+            //ImGui::SameLine();
+            //if (ImGui::Button("Apply Suggestions")) {
+            //    int n = stateUI.suggestions.size();
+            //    for (int i = 0; i < n; ++i) {
+            //        if (stateUI.suggestions[i] < 0) {
+            //            stateUI.keyPresses[i].bind = -1;
+            //            continue;
+            //        }
+            //        if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
+            //            stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
+            //        } else {
+            //            stateUI.keyPresses[i].bind = 26;
+            //        }
+            //    }
 
-                stateUI.flags.applyHints = true;
-                stateUI.doUpdate = true;
-            }
+            //    stateUI.flags.applyHints = true;
+            //    stateUI.doUpdate = true;
+            //}
 
             ImGui::SameLine();
             if (ImGui::Button("Clear Hints")) {
@@ -808,42 +820,60 @@ bool renderResults(stStateUI & stateUI) {
             auto id1 = (stateUI.results.begin()->second.id/stateUI.params.cipher.nMHIters)%nPerAutoHint;
             if (stateUI.processing) stateUI.results.begin()->second.id++;
             ImGui::SameLine();
-            ImGui::ProgressBar(float(id1)/nPerAutoHint, { 100.0, ImGui::GetTextLineHeightWithSpacing() });
-            if (stateUI.processing && stateUI.autoHint && id0 == 0 && id1 == 0) {
-                int n = stateUI.suggestions.size();
-                for (int i = 0; i < n; ++i) {
-                    if (frand() > 0.5) {
-                        stateUI.keyPresses[i].bind = -1;
-                        continue;
-                    }
-                    if (stateUI.suggestions[i] < 0) {
-                        stateUI.keyPresses[i].bind = -1;
-                        continue;
-                    }
-
-                    if (frand() > 0.5) {
-                        if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
-                            stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
-                        } else {
-                            stateUI.keyPresses[i].bind = 26;
-                        }
-                    } else {
-                        char c0 = (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) ?
-                            'a' + stateUI.suggestions[i] - 1 : '_';
-
-                        int idx = rand()%kNearbyKeys.at(c0).size();
-                        char c1 = kNearbyKeys.at(c0)[idx];
-
-                        if (c1 == '_') {
-                            stateUI.keyPresses[i].bind = 26;
-                        } else {
-                            stateUI.keyPresses[i].bind = c1 - 'a';
-                        }
+            auto progress = float(id1)/nPerAutoHint;
+            ImGui::ProgressBar(progress, { 100.0, ImGui::GetTextLineHeightWithSpacing() });
+            if (stateUI.processing && id0 == 0 && id1 == 0) {
+                for (auto & result : stateUI.results) {
+                    for (auto & item : result.second) {
+                        item.p *= 1.01;
                     }
                 }
-                stateUI.flags.applyHints = true;
-                stateUI.flags.applyWEnglishFreq = true;
-                stateUI.doUpdate = true;
+                if (stateUI.autoHint && stateUI.results.begin()->second.id > 10000) {
+                    int n = stateUI.suggestions.size();
+                    for (int i = 0; i < n; ++i) {
+                        if (frand() > 0.2) {
+                            stateUI.keyPresses[i].bind = -1;
+                            continue;
+                        }
+                        if (stateUI.suggestions[i] < 0) {
+                            stateUI.keyPresses[i].bind = -1;
+                            continue;
+                        }
+
+                        //if (stateUI.suggestions[i] == 0 || stateUI.suggestions[i] == 5) {
+                        //    stateUI.keyPresses[i].bind = rand()%2 == 0 ? 26 : 4;
+                        //    continue;
+                        //}
+
+                        //if (stateUI.suggestions[i] == 0 || stateUI.suggestions[i] == 5) {
+                        //    stateUI.keyPresses[i].bind = -1;
+                        //    continue;
+                        //}
+
+                        if (frand() > 0.0) {
+                            if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
+                                stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
+                            } else {
+                                stateUI.keyPresses[i].bind = 26;
+                            }
+                        } else {
+                            char c0 = (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) ?
+                                'a' + stateUI.suggestions[i] - 1 : '_';
+
+                            int idx = rand()%kNearbyKeys.at(c0).size();
+                            char c1 = kNearbyKeys.at(c0)[idx];
+
+                            if (c1 == '_') {
+                                stateUI.keyPresses[i].bind = 26;
+                            } else {
+                                stateUI.keyPresses[i].bind = c1 - 'a';
+                            }
+                        }
+                    }
+                    stateUI.flags.applyHints = true;
+                    stateUI.flags.applyWEnglishFreq = true;
+                    stateUI.doUpdate = true;
+                }
             }
         }
 
@@ -950,87 +980,106 @@ bool renderResults(stStateUI & stateUI) {
         ImGui::Text("%2s. %8s", "#", "Prob");
         ImGui::Separator();
 
-        for (const auto & item : stateUI.results) {
-            const auto & id = item.first;
-            const auto & result = item.second;
-            ImGui::PushID(id);
-            ImGui::Text("%2d. %8.3f", id, result.p);
-            if (ImGui::IsItemHovered()) {
-                ImGui::BeginTooltip();
-                ImGui::Text("Processor   %d", item.first);
-                ImGui::Text("Cluster-to-letter map:");
-                {
-                    int i = 0;
-                    for (auto& pair : item.second.clMap) {
-                        char c = '_';
-                        if (pair.second > 0 && pair.second <= 26) {
-                            c = 'a' + pair.second - 1;
-                        }
-                        ImGui::Text("%3d: %c  ", pair.first, c);
-                        if (++i % 10 != 0) ImGui::SameLine();
-                    }
-                }
-                ImGui::EndTooltip();
-            }
-            if (result.clMap.empty() == false) {
-                ImGui::SameLine();
-                int n = std::min(result.clusters.size(), stateUI.keyPresses.size());
-                auto charSize = ImGui::CalcTextSize("a");
-                auto curPos = ImGui::GetCursorScreenPos();
-                if (n > 0) {
-                    ImGui::InvisibleButton("", ImVec2{charSize.x*n, 1.0f});
-                    ImGui::SetCursorScreenPos(curPos);
-                    for (int i = 0; i < n; ++i) {
-                        auto cluster = result.clusters[i];
-                        if (result.clMap.find(cluster) == result.clMap.end()) {
-                            ImGui::Text("%c", '?');
-                        } else {
-                            auto let = result.clMap.at(result.clusters[i]);
+        for (const auto & items : stateUI.results) {
+            const auto & id = items.first;
+            for (const auto & item : items.second) {
+                const auto & result = item;
 
-                            char c = '.';
-                            if (let > 0 && let <= 26) {
-                                c = 'a'+let - 1;
+                ImGui::PushID(id);
+                ImGui::Text("%2d. %8.3f", id, result.p);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("Processor   %d", id);
+                    ImGui::Text("Cluster-to-letter map:");
+                    {
+                        int i = 0;
+                        for (auto& pair : result.clMap) {
+                            char c = '_';
+                            if (pair.second > 0 && pair.second <= 26) {
+                                c = 'a' + pair.second - 1;
                             }
-
-                            if (stateUI.keyPresses[i].bind == let - 1) {
-                                ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
-                            } else if (stateUI.suggestions[i] == let) {
-                                ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
+                            ImGui::Text("%3d: %c  ", pair.first, c);
+                            if (++i % 10 != 0) ImGui::SameLine();
+                        }
+                    }
+                    ImGui::EndTooltip();
+                }
+                if (result.clMap.empty() == false) {
+                    ImGui::SameLine();
+                    int n = std::min(result.clusters.size(), stateUI.keyPresses.size());
+                    auto charSize = ImGui::CalcTextSize("a");
+                    auto curPos = ImGui::GetCursorScreenPos();
+                    if (n > 0) {
+                        ImGui::InvisibleButton("", ImVec2{charSize.x*n, 1.0f});
+                        ImGui::SetCursorScreenPos(curPos);
+                        for (int i = 0; i < n; ++i) {
+                            auto cluster = result.clusters[i];
+                            if (result.clMap.find(cluster) == result.clMap.end()) {
+                                ImGui::Text("%c", '?');
                             } else {
-                                ImGui::Text("%c", c);
-                            }
+                                auto let = result.clMap.at(result.clusters[i]);
 
-                            if (ImGui::IsItemHovered()) {
-                                auto p0 = curPos;
-                                auto p1 = p0;
-                                p1.x += charSize.x;
-                                p1.y += charSize.y;
-                                drawList->AddRect(p0, p1, ImGui::ColorConvertFloat4ToU32({0.0f, 1.0f, 0.0f, 1.0f}));
-                                drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({0.0f, 1.0f, 0.0f, 0.6f}));
-                                if (ImGui::IsMouseDown(0)) {
-                                    if (let > 0 && let <= 26) {
-                                        stateUI.keyPresses[i].bind = let - 1;
-                                    } else {
-                                        stateUI.keyPresses[i].bind = 26;
-                                    }
-                                    stateUI.flags.applyHints = true;
-                                    stateUI.doUpdate = true;
+                                char c = '.';
+                                if (let > 0 && let <= 26) {
+                                    c = 'a'+let - 1;
                                 }
-                                ImGui::BeginTooltip();
-                                ImGui::Text("Key presss: %d, letter - %d", i, let);
-                                ImGui::Text(" - Left click to set as hint");
-                                ImGui::EndTooltip();
-                            }
-                        }
 
-                        if (i < n - 1) {
-                            curPos.x += charSize.x;
-                            ImGui::SetCursorScreenPos(curPos);
+                                if (stateUI.keyPresses[i].bind == let - 1) {
+                                    ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
+                                } else if (stateUI.suggestions[i] == let) {
+                                    ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
+                                } else {
+                                    ImGui::Text("%c", c);
+                                }
+
+                                if (ImGui::IsItemHovered()) {
+                                    auto p0 = curPos;
+                                    auto p1 = p0;
+                                    p1.x += charSize.x;
+                                    p1.y += charSize.y;
+                                    drawList->AddRect(p0, p1, ImGui::ColorConvertFloat4ToU32({0.0f, 1.0f, 0.0f, 1.0f}));
+                                    drawList->AddRectFilled(p0, p1, ImGui::ColorConvertFloat4ToU32({0.0f, 1.0f, 0.0f, 0.6f}));
+                                    if (ImGui::IsMouseDown(0) && ImGui::GetIO().KeyCtrl) {
+                                        for (int j = 0; j < n; ++j) {
+                                            auto let2 = result.clMap.at(result.clusters[j]);
+                                            if (let2 > 0 && let2 <= 26) {
+                                                if (stateUI.keyPresses[j].bind == 26) {
+                                                    stateUI.keyPresses[j].bind = -1;
+                                                }
+                                            } else {
+                                                stateUI.keyPresses[j].bind = 26;
+                                            }
+                                        }
+                                        stateUI.flags.applyHints = true;
+                                        stateUI.doUpdate = true;
+                                    } else if (ImGui::IsMouseDown(0)) {
+                                        if (let > 0 && let <= 26) {
+                                            stateUI.keyPresses[i].bind = let - 1;
+                                        } else {
+                                            stateUI.keyPresses[i].bind = 26;
+                                        }
+                                        stateUI.flags.applyHints = true;
+                                        stateUI.doUpdate = true;
+                                    } else if (ImGui::IsMouseDown(1)) {
+                                        stateUI.keyPresses[i].bind = -1;
+                                    }
+                                    ImGui::BeginTooltip();
+                                    ImGui::Text("Key presss: %d, letter - %d", i, let);
+                                    ImGui::Text(" - Left click to set as hint");
+                                    ImGui::Text(" - Ctrl + left click to set only the spaces as hint");
+                                    ImGui::EndTooltip();
+                                }
+                            }
+
+                            if (i < n - 1) {
+                                curPos.x += charSize.x;
+                                ImGui::SetCursorScreenPos(curPos);
+                            }
                         }
                     }
                 }
+                ImGui::PopID();
             }
-            ImGui::PopID();
         }
 
         stateUI.windowHeightResults = ImGui::GetWindowHeight();
@@ -1265,10 +1314,10 @@ int main(int argc, char ** argv) {
     if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_trigrams.txt").c_str(), freqMap3) == false) {
         return -5;
     }
-    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_trigrams.txt").c_str(), freqMap4) == false) {
+    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_quadgrams.txt").c_str(), freqMap4) == false) {
         return -5;
     }
-    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_trigrams.txt").c_str(), freqMap5) == false) {
+    if (Cipher::loadFreqMap((std::string(argv[2]) + "/./english_quintgrams.txt").c_str(), freqMap5) == false) {
         return -5;
     }
     stateCore.freqMap[0] = &freqMap3;
@@ -1303,7 +1352,24 @@ int main(int argc, char ** argv) {
             for (int i = 0; i < stateCoreNew.params.nProcessors(); ++i) {
                 if (stateCoreNew.flags.updateResult[i]) {
                     recalcSuggestions = true;
-                    stateUI.results[i] = stateCoreNew.processors[i].getResult();
+                    if (stateCoreNew.processors[i].getResult().id != stateUI.results[i].id) {
+                        stateUI.results[i].id = stateCoreNew.processors[i].getResult().id;
+                        if (stateUI.results[i].size() < kTopResultsPerProcessor) {
+                            stateUI.results[i].push_back(stateCoreNew.processors[i].getResult());
+                        } else if (stateCoreNew.processors[i].getResult().p > stateUI.results[i].back().p) {
+                            stateUI.results[i].back() = stateCoreNew.processors[i].getResult();
+
+                            int k = kTopResultsPerProcessor - 1;
+                            while (k > 0) {
+                                if (stateUI.results[i][k-1].p < stateUI.results[i][k].p) {
+                                    std::swap(stateUI.results[i][k-1], stateUI.results[i][k]);
+                                } else {
+                                    break;
+                                }
+                                --k;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1315,15 +1381,16 @@ int main(int argc, char ** argv) {
                     int c = 0;
                     std::map<int, int> cnt;
                     for (const auto & result : stateUI.results) {
-                        if (result.second.clMap.find(result.second.clusters[i]) == result.second.clMap.end()) continue;
-                        if (i <= (int) result.second.clusters.size()) {
-                            ++cnt[result.second.clMap.at(result.second.clusters[i])];
+                        const auto & item = result.second.front();
+                        if (item.clMap.find(item.clusters[i]) == item.clMap.end()) continue;
+                        if (i <= (int) item.clusters.size()) {
+                            ++cnt[item.clMap.at(item.clusters[i])];
                             ++c;
                         }
                     }
                     bool hasSuggestion = false;
                     for (auto & s : cnt) {
-                        if (s.second > c/2) {
+                        if (s.second > 0.5*c) {
                             stateUI.suggestions[i] = s.first;
                             hasSuggestion = true;
                         }
@@ -1657,6 +1724,8 @@ int main(int argc, char ** argv) {
             }
 
             if (stateCore.processing && stateCore.keyPresses.size() >= 3) {
+                static auto tStart = t_ms();
+
                 {
                     int n = stateCore.keyPresses.size();
                     stateCore.params.cipher.hint.clear();
@@ -1695,6 +1764,9 @@ int main(int argc, char ** argv) {
 
                 std::unique_lock<std::mutex> lock(mutex);
                 cv.wait(lock, [&]() { return nFinished == nWorkers; });
+
+                auto tEnd = t_ms();
+                printf("Performance: %g iters/sec\n", 1000.0*stateCore.processors[0].getIters()/(tEnd - tStart));
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }

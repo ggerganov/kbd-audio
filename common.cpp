@@ -58,6 +58,10 @@ float frandGaussian(float mu, float sigma) {
 	return z0 * sigma + mu;
 }
 
+uint64_t t_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count(); // duh ..
+}
+
 std::map<std::string, std::string> parseCmdArguments(int argc, char ** argv) {
     int last = argc;
     std::map<std::string, std::string> res;

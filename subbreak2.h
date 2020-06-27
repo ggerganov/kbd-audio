@@ -18,6 +18,10 @@ namespace Cipher {
     using TProb = double;
     using TGramLen = int32_t;
     using THint = std::vector<int32_t>;
+    using TPlainText = std::vector<TLetter>;
+    using TLetterCount = std::vector<int>;
+    using TClusterCount = std::vector<int>;
+    using TClusterPos = std::vector<std::vector<int>>;
 
     struct TParameters {
         // clustering params
@@ -38,7 +42,6 @@ namespace Cipher {
         // Metropolis–Hastings params
         int nMHInitialIters = 100;
         int nMHIters = 100;
-        int nMHImprovementsPerSubbreak = 1;
 
         // language model
         bool includeSpaces = true;
@@ -107,6 +110,11 @@ namespace Cipher {
             const TFreqMap & freqMap,
             TResult & result);
 
+    bool subbreak1(
+            const TParameters & params,
+            const TFreqMap & freqMap,
+            TResult & result);
+
     bool generateClustersInitialGuess(
             const TParameters & params,
             const TSimilarityMap & ccMap,
@@ -146,6 +154,7 @@ namespace Cipher {
 
         bool compute();
 
+        int getIters() const { return m_nMHInitialIters; }
         const TResult & getResult() const;
         const TSimilarityMap & getSimilarityMap() const;
 
@@ -157,7 +166,6 @@ namespace Cipher {
         TSimilarityMap m_logMapInv;
 
         int m_nMHInitialIters = 0;
-        int m_nMHImprovements = 0;
         double m_pCur = 0.0f;
 
         TResult m_curResult;

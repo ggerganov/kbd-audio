@@ -100,6 +100,8 @@ struct stPlaybackData {
 float frand();
 float frandGaussian(float mu, float sigma);
 
+uint64_t t_ms();
+
 template<typename T>
 stWaveformView<T> getView(const TWaveformT<T> & waveform, int64_t idx) {
     return { waveform.data() + idx, (int64_t) waveform.size() - idx };
