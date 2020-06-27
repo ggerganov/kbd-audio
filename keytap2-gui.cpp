@@ -1742,6 +1742,19 @@ int main(int argc, char ** argv) {
                     }
                 }
 
+#ifdef __EMSCRIPTEN__
+                static int iter = 0;
+                {
+                    int p = iter%stateCore.params.nProcessors();
+                    stateCore.processors[p].setHint(stateCore.params.cipher.hint);
+                    stateCore.processors[p].compute();
+
+                    stateCore.flags.updateResult[p] = true;
+                    stateCore.update();
+
+                    ++iter;
+                }
+#else
                 int nFinished = 0;
                 int nWorkers = std::min(stateCore.params.nProcessors(), (int) std::thread::hardware_concurrency()/2);
 
@@ -1770,9 +1783,10 @@ int main(int argc, char ** argv) {
 
                 std::unique_lock<std::mutex> lock(mutex);
                 cv.wait(lock, [&]() { return nFinished == nWorkers; });
+#endif
 
                 auto tEnd = t_ms();
-                printf("Performance: %g iters/sec\n", 1000.0*stateCore.processors[0].getIters()/(tEnd - tStart));
+                //printf("Performance: %g iters/sec\n", 1000.0*stateCore.processors[0].getIters()/(tEnd - tStart));
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
