@@ -1309,7 +1309,7 @@ namespace Cipher {
 
             auto itera = besta;
 
-            int nswaps = 10;
+            int nswaps = 3;
             for (int i = 0; i < nswaps; ++i) {
                 int a0 = rand()%params.maxClusters;
                 int a1 = rand()%params.maxClusters;
@@ -1323,10 +1323,10 @@ namespace Cipher {
 
             auto iterp = calcScore0(params, freqMap, clusters, itera);
             auto cura = itera;
-            for (int i = 0; i < 1; ++i) {
+            for (int i = 0; i < 5; ++i) {
                 int a0 = rand()%params.maxClusters;
                 int a1 = rand()%params.maxClusters;
-                while (a0 == a1) {
+                while (a0 == a1 || fixed[a0] || fixed[a1]) {
                     a0 = rand()%params.maxClusters;
                     a1 = rand()%params.maxClusters;
                 }
@@ -1761,7 +1761,7 @@ namespace Cipher {
                 m_pCur = pNew;
 
                 if (++m_nMHInitialIters > m_params.nMHInitialIters) {
-                    m_curResult.p *= 1.0001;
+                    m_curResult.p *= 1.00001;
                     auto saveHint = m_params.hint;
                     for (auto & hint : m_params.hint) {
                         if (hint < 0) continue;
