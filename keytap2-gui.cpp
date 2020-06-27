@@ -725,8 +725,9 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
 }
 
 bool renderResults(stStateUI & stateUI) {
+    float curHeight = std::min(g_windowSizeY - stateUI.windowHeightKeyPesses - 100.0f, (12 + stateUI.results.size()*kTopResultsPerProcessor)*ImGui::GetTextLineHeightWithSpacing());
     ImGui::SetNextWindowPos(ImVec2(0, stateUI.windowHeightKeyPesses), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, (12 + stateUI.results.size()*kTopResultsPerProcessor)*ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, curHeight), ImGuiCond_Always);
     if (ImGui::Begin("Results", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
         auto drawList = ImGui::GetWindowDrawList();
 
@@ -885,7 +886,7 @@ bool renderResults(stStateUI & stateUI) {
 
         ImGui::PopItemWidth();
 
-        ImGui::BeginChild("##currentResults", { 0, 0 }, 1, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+        ImGui::BeginChild("##currentResults", { 0, 0 }, 1, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar);
 
         ImGui::Separator();
         ImGui::Text(" Suggestions");

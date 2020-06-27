@@ -14,7 +14,7 @@ static constexpr int64_t kSamplesPerFrame = 2048;
 #else
 static constexpr int64_t kSamplesPerFrame = 512;
 #endif
-static constexpr int32_t kTopResultsPerProcessor = 8;
+static constexpr int32_t kTopResultsPerProcessor = 4;
 static constexpr int32_t kMaxRecords = 16;
 static constexpr int64_t kMaxSampleRate = 96000;
 static constexpr float   kMaxBufferSize_s = 5.000f;
