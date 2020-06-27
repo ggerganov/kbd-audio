@@ -1,9 +1,27 @@
+html {
+    margin: 0px;
+    height: 100%;
+}
 body {
-    margin: 0;
+    margin: 0px;
+    height: 100%;
     color: rgba(255, 255, 255, 1.00);
     background-color: black;
     -webkit-font-smoothing: subpixel-antialiased;
     font-smoothing: subpixel-antialiased;
+}
+#main-controls {
+    margin: 0;
+    padding: 0;
+    height: 96%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+#description {
+    margin: 10px;
+    padding: 10px;
+}
+.text-body {
+    color: rgba(255, 255, 255, 1.00);
 }
 .cell-version {
     padding-left: 4px;

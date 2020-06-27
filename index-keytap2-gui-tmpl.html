@@ -32,17 +32,41 @@
         <link rel="stylesheet" href="style.css">
     </head>
     <body>
-        <div>
-            <div align="center">
-                <button onClick="doInit()" id="butInit" style="width:60px;height:30px;" disabled>Init</button>
+        <div id="main-controls">
+            <div id="description">
+                <h2> Keytap2 - acousitc keyboard eavesdropping based on language n-gram frequencies</h2>
+
+                <span class="text-body">
+                    This is a proof-of-concept of an attack for recovering the contents of an unknown text just by analyzing the audio from the keyboard strokes.<br>
+                    No prior training is required.
+
+                    <br><br>
+
+                    Assumptions and requirements:
+                    <ul>
+                        <li>The text is in English</li>
+                        <li>At least 100 characters of meaningful text are typed</li>
+                        <li>Only letters ("a" - "z") and the "Space" keys are pressed (i.e. no Backspace, Shift, numbers, etc.)</li>
+                        <li>Noisy mechanical keyboard</li>
+                        <li>Microphone in the nearby vicinity of the keyboard</li>
+                    </ul>
+
+                    <br>
+
+                    To run this program in the browser you will need support for pthreads with WebAssembly (i.e. Chrome or Firefox Nightly).<br>
+                    To enable WebAssembly pthreads and SharedArrayBuffer support, check this <a href="https://github.com/kripken/emscripten/wiki/Pthreads-with-WebAssembly/">page</a>.<br>
+                    <br>
+                    Press the "Init" button to start:
+                </span>
+
+                <div align="center">
+                    <button onClick="doInit()" id="butInit" style="width:60px;height:30px;" disabled>Init</button>
+                </div>
             </div>
+            <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" hidden></canvas>
         </div>
 
-        <div id="main-controls" align="center" hidden>
-            <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
-        </div>
-
-        <div class="cell-version">
+        <div id="footer" class="cell-version">
             <span>
                 Build time: <span class="nav-link">@GIT_DATE@</span> |
                 Commit hash: <a class="nav-link" href="https://github.com/ggerganov/kbd-audio/commit/@GIT_SHA1@">@GIT_SHA1@</a> |
@@ -70,6 +94,17 @@
 
             var oldOutputId = 0;
 
+            window.setInterval(function(){
+                    if (isInitialized == false) return;
+                    var w = window,
+                        d = document,
+                        e = d.documentElement,
+                        g = d.getElementsByTagName('body')[0],
+                        x = w.innerWidth || e.clientWidth || g.clientWidth,
+                        y = w.innerHeight|| e.clientHeight|| g.clientHeight;
+                    Module._set_window_size(0.99*x, y - 1.40*document.getElementById('footer').clientHeight);
+            }, 500);
+
             function checkLoop() {
                 var outputId = Module._get_output_id();
                 if (outputId != oldOutputId) {
@@ -94,7 +129,7 @@
                 });
 
                 setTimeout(checkLoop, 100);
-                //window.requestAnimationFrame(renderFrame);                                                                                                      
+                //window.requestAnimationFrame(renderFrame);
             }
 
             function doInit() {
@@ -111,18 +146,18 @@
                 let mediaInput = navigator.mediaDevices.getUserMedia( constraints );
 
                 if (isInitialized == false) {
-                    Module._doInit();
+                    Module._do_init();
                     document.getElementById("butInit").disabled = true;
-                    document.getElementById("butInit").hidden = true;
+                    document.getElementById("description").hidden = true;
                     isInitialized = true;
                 }
 
-                var x = document.getElementById("main-controls");
+                var x = document.getElementById("canvas");
                 x.hidden = false;
             }
 
             //function renderFrame() {
-            //    window.requestAnimationFrame(renderFrame);                                                                                                      
+            //    window.requestAnimationFrame(renderFrame);
             //}
 
             function dropHandler(event) {
@@ -153,7 +188,7 @@
                     FS.write(stream, buf, 0, buf.length, 0);
                     FS.close(stream);
 
-                    Module._reload();
+                    Module._do_reload();
                 }
                 reader.readAsArrayBuffer(file);
             }
@@ -214,6 +249,7 @@
             };
 
         </script>
+
         <script async type="text/javascript" src="keytap2-gui.js"></script>
     </body>
 </html>

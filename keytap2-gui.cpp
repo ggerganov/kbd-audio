@@ -36,6 +36,7 @@
 
 static std::function<bool()> g_doInit;
 static std::function<bool()> g_doReload;
+static std::function<void(int, int)> g_setWindowSize;
 static std::function<int()> g_getOutputRecordId;
 static std::function<bool()> g_mainUpdate;
 
@@ -47,13 +48,18 @@ void mainUpdate(void *) {
 
 extern "C" {
     EMSCRIPTEN_KEEPALIVE
-        int doInit() {
+        int do_init() {
             return g_doInit();
         }
 
     EMSCRIPTEN_KEEPALIVE
-        int reload() {
+        int do_reload() {
             return g_doReload();
+        }
+
+    EMSCRIPTEN_KEEPALIVE
+        void set_window_size(int sizeX, int sizeY) {
+            g_setWindowSize(sizeX, sizeY);
         }
 
     EMSCRIPTEN_KEEPALIVE
@@ -1335,6 +1341,10 @@ int main(int argc, char ** argv) {
         return -6;
     }
 
+    g_setWindowSize = [&](int sizeX, int sizeY) {
+        SDL_SetWindowSize(guiObjects.window, sizeX, sizeY);
+    };
+
     printf("[+] Loaded recording: of %d samples (sample size = %d bytes)\n", (int) stateUI.waveformInput.size(), (int) sizeof(TSample));
     printf("    Size in memory:          %g MB\n", (float)(sizeof(TSample)*stateUI.waveformInput.size())/1024/1024);
     printf("    Sample size:             %d\n", (int) sizeof(TSample));
@@ -1506,7 +1516,7 @@ int main(int argc, char ** argv) {
         if (ImGui::BeginPopupModal("About", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
             ImGui::Text("%s", "");
             {
-                const char * text = "Keytap2 : v0.1 [%s]";
+                const char * text = "Keytap2 : v0.1 [%s]    ";
                 ImGui::Text("%s", "");
                 ImGui::SameLine(0.5f*ImGui::GetContentRegionAvailWidth() - 0.45f*ImGui::CalcTextSize(text).x);
                 ImGui::Text(text, kGIT_SHA1);
