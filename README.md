@@ -19,6 +19,8 @@ Check this blog post for more details:
 The **keytap2** tool is another interesting tool for recovering text from audio. It does not require training data - instead it uses statistical information about the frequencies of the letters and n-grams in the English language.
 Online version of the tool is available [here](https://keytap2.ggerganov.com).
 
+[Video: short demo of Keytap2 in action](https://www.youtube.com/watch?v=jNtw17S6SR0)
+
 [CTF: can you guess the text being typed?](https://ggerganov.github.io/keytap-challenge/)
 
 ## Build instructions
