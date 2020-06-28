@@ -1744,7 +1744,6 @@ namespace Cipher {
     bool Processor::compute() {
         auto clustersNew = m_curResult.clusters;
 
-        m_pCur *= 1.00001;
         for (int iter = 0; iter < m_params.nMHIters; ++iter) {
             clustersNew = m_curResult.clusters;
             Cipher::mutateClusters(m_params, clustersNew);
@@ -1761,7 +1760,7 @@ namespace Cipher {
                 m_pCur = pNew;
 
                 if (++m_nMHInitialIters > m_params.nMHInitialIters) {
-                    m_curResult.p *= 1.00001;
+                    m_curResult.p *= 1.0001;
                     auto saveHint = m_params.hint;
                     for (auto & hint : m_params.hint) {
                         if (hint < 0) continue;
@@ -1773,10 +1772,11 @@ namespace Cipher {
                     m_params.hint = saveHint;
                 }
             } else {
-                auto x = m_params.nSubbreakIterations;
-                m_params.nSubbreakIterations = 10;
-                Cipher::subbreak(m_params, *m_freqMap, m_curResult);
-                m_params.nSubbreakIterations = x;
+                m_pCur *= 1.00001;
+                //auto x = m_params.nSubbreakIterations;
+                //m_params.nSubbreakIterations = 100;
+                //Cipher::subbreak(m_params, *m_freqMap, m_curResult);
+                //m_params.nSubbreakIterations = x;
             }
 
             ++m_curResult.id;
