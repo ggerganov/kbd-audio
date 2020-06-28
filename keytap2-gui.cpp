@@ -164,6 +164,7 @@ struct stStateUI {
     TWaveform waveformMax;
 
     // window sizes
+    float windowHeightTitleBar = 0;
     float windowHeightKeyPesses = 0;
     float windowHeightResults = 0;
     float windowHeightSimilarity = 0;
@@ -416,12 +417,16 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
     }
 #endif
 
-    ImGui::SetNextWindowPos(ImVec2(0, ImGui::GetTextLineHeightWithSpacing()), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 336.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(0, stateUI.windowHeightTitleBar), ImGuiCond_Once);
+    if (stateUI.windowHeightKeyPesses == 0.0f) {
+        ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, 250.0f), ImGuiCond_Always);
+    } else {
+        ImGui::SetNextWindowSize(ImVec2(g_windowSizeX, stateUI.windowHeightKeyPesses), ImGuiCond_Always);
+    }
     if (ImGui::Begin("Key Presses", nullptr, ImGuiWindowFlags_NoMove)) {
         bool ignoreDelete = false;
 
-        auto wsize = ImVec2(ImGui::GetContentRegionAvailWidth(), 250.0);
+        auto wsize = ImVec2(ImGui::GetContentRegionAvailWidth(), ImGui::GetContentRegionAvail().y - 3*ImGui::GetTextLineHeightWithSpacing());
 
         if (nview != nviewPrev) {
             generateLowResWaveform(waveform, waveformLowRes, std::max(1.0f, nview/wsize.x));
@@ -721,9 +726,9 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
             recalculateKeyPresses = false;
         }
 
-        stateUI.windowHeightKeyPesses = ImGui::GetWindowHeight() + ImGui::GetTextLineHeightWithSpacing();
+        stateUI.windowHeightKeyPesses = ImGui::GetWindowHeight();
     } else {
-        stateUI.windowHeightKeyPesses = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetTextLineHeightWithSpacing();
+        stateUI.windowHeightKeyPesses = ImGui::GetTextLineHeightWithSpacing();
     }
     ImGui::End();
 
@@ -731,8 +736,8 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
 }
 
 bool renderResults(stStateUI & stateUI) {
-    float curHeight = std::min(g_windowSizeY - stateUI.windowHeightKeyPesses - 100.0f, (12 + stateUI.results.size()*kTopResultsPerProcessor)*ImGui::GetTextLineHeightWithSpacing());
-    ImGui::SetNextWindowPos(ImVec2(0, stateUI.windowHeightKeyPesses), ImGuiCond_Always);
+    float curHeight = std::min(g_windowSizeY - stateUI.windowHeightTitleBar - stateUI.windowHeightKeyPesses, (12 + stateUI.results.size()*kTopResultsPerProcessor)*ImGui::GetTextLineHeightWithSpacing());
+    ImGui::SetNextWindowPos(ImVec2(0, stateUI.windowHeightTitleBar + stateUI.windowHeightKeyPesses), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, curHeight), ImGuiCond_Always);
     if (ImGui::Begin("Results", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
         auto drawList = ImGui::GetWindowDrawList();
@@ -1104,7 +1109,7 @@ bool renderResults(stStateUI & stateUI) {
 }
 
 bool renderSimilarity(const TKeyPressCollection & keyPresses, const TSimilarityMap & similarityMap) {
-    int offsetY = stateUI.windowHeightKeyPesses + stateUI.windowHeightResults;
+    int offsetY = stateUI.windowHeightTitleBar + stateUI.windowHeightKeyPesses + stateUI.windowHeightResults;
     ImGui::SetNextWindowPos(ImVec2(0, offsetY), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, g_windowSizeY - offsetY), ImGuiCond_Always);
     if (ImGui::Begin("Similarity", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
@@ -1173,6 +1178,10 @@ bool renderSimilarity(const TKeyPressCollection & keyPresses, const TSimilarityM
         }
 
         ImGui::EndChild();
+
+        stateUI.windowHeightSimilarity = ImGui::GetWindowHeight();
+    } else {
+        stateUI.windowHeightSimilarity = ImGui::GetTextLineHeightWithSpacing();
     }
     ImGui::End();
     return false;
@@ -1468,6 +1477,8 @@ int main(int argc, char ** argv) {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame(guiObjects.window);
         ImGui::NewFrame();
+
+        stateUI.windowHeightTitleBar = ImGui::GetTextLineHeightWithSpacing();
 
         if (ImGui::BeginMainMenuBar())
         {
