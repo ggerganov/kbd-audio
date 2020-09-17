@@ -37,7 +37,7 @@ Dependencies:
 
  - **FFTW3** *(optional)* - some of the helper tools perform Fourier transformations [fftw](http://www.fftw.org)
 
-**Linux and Mac OS**
+**Linux, FreeBSD and Mac OS**
 
     git clone https://github.com/ggerganov/kbd-audio
     cd kbd-audio
