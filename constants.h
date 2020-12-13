@@ -8,6 +8,7 @@
 #include <map>
 #include <array>
 #include <vector>
+#include <cstdint>
 
 #ifdef __EMSCRIPTEN__
 static constexpr int64_t kSamplesPerFrame = 2048;
