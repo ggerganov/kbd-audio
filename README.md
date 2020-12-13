@@ -21,6 +21,8 @@ Online version of the tool is available [here](https://keytap2.ggerganov.com).
 
 [Video: short demo of Keytap2 in action](https://www.youtube.com/watch?v=jNtw17S6SR0)
 
+[Implementation details](https://github.com/ggerganov/kbd-audio/discussions/31)
+
 [CTF: can you guess the text being typed?](https://ggerganov.github.io/keytap-challenge/)
 
 ## Build instructions
