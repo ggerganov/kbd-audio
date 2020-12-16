@@ -24,6 +24,19 @@ The **keytap2** tool is another interesting tool for recovering text from audio.
 
 [CTF: can you guess the text being typed?](https://ggerganov.github.io/keytap-challenge/)
 
+### What people say about Keytap
+
+*"This works incredibly well.\
+I hope you realize what you've created (and made available to every person in the world)."* -- ffpip
+
+*"I just tried it and it works incredibly well. It kind of makes me want to stop using a mechanical keyboard."* -- Karawebnetwork
+
+*"This attack and Van Eck phreaking are why Edward Snowden, while typing passwords and other sensitive information, would pull a blanket over himself and his laptop."* -- aarchi
+
+*"This is what mechanical keyboard users deserve"* -- super guy
+
+*"fuck.."* -- Lluis Franco
+
 ## Build instructions
 
 Dependencies:
