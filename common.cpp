@@ -32,30 +32,118 @@ template <typename TSampleInput, typename TSample>
         }
         return true;
     }
+
+// FFT routines taken from https://stackoverflow.com/a/37729648/4039976
+
+int log2(int N) {
+    int k = N, i = 0;
+    while(k) {
+        k >>= 1;
+        i++;
+    }
+    return i - 1;
+}
+
+int reverse(int N, int n) {
+    int j, p = 0;
+    for(j = 1; j <= log2(N); j++) {
+        if(n & (1 << (log2(N) - j)))
+            p |= 1 << (j - 1);
+    }
+    return p;
+}
+
+void ordina(float * f1, int N) {
+    float f2[2*2048];
+    for (int i = 0; i < N; i++) {
+        int ir = reverse(N, i);
+        f2[2*i + 0] = f1[2*ir + 0];
+        f2[2*i + 1] = f1[2*ir + 1];
+    }
+    for (int j = 0; j < N; j++) {
+        f1[2*j + 0] = f2[2*j + 0];
+        f1[2*j + 1] = f2[2*j + 1];
+    }
+}
+
+void transform(float * f, int N) {
+    ordina(f, N);    //first: reverse order
+    float * W;
+    W = (float *)malloc(N*sizeof(float));
+    W[2*1 + 0] = cos(-2.*M_PI/N);
+    W[2*1 + 1] = sin(-2.*M_PI/N);
+    W[2*0 + 0] = 1;
+    W[2*0 + 1] = 0;
+    for (int i = 2; i < N / 2; i++) {
+        W[2*i + 0] = cos(-2.*i*M_PI/N);
+        W[2*i + 1] = sin(-2.*i*M_PI/N);
+    }
+    int n = 1;
+    int a = N / 2;
+    for(int j = 0; j < log2(N); j++) {
+        for(int i = 0; i < N; i++) {
+            if(!(i & n)) {
+                int wi = (i * a) % (n * a);
+                int fi = i + n;
+                float a = W[2*wi + 0];
+                float b = W[2*wi + 1];
+                float c = f[2*fi + 0];
+                float d = f[2*fi + 1];
+                float temp[2] = { f[2*i + 0], f[2*i + 1] };
+                float Temp[2] = { a*c - b*d, b*c + a*d };
+                f[2*i + 0]  = temp[0] + Temp[0];
+                f[2*i + 1]  = temp[1] + Temp[1];
+                f[2*fi + 0] = temp[0] - Temp[0];
+                f[2*fi + 1] = temp[1] - Temp[1];
+            }
+        }
+        n *= 2;
+        a = a / 2;
+    }
+    free(W);
+}
+
+void FFT(float * f, int N, float d) {
+    transform(f, N);
+    for (int i = 0; i < N; i++) {
+        f[2*i + 0] *= d;
+        f[2*i + 1] *= d;
+    }
+}
+
+void FFT(float * src, float * dst, int N, float d) {
+    for (int i = 0; i < N; ++i) {
+        dst[2*i + 0] = src[i];
+        dst[2*i + 1] = 0.0f;
+    }
+    FFT(dst, N, d);
+}
+
 }
 
 constexpr float iRAND_MAX = 1.0f/float(RAND_MAX);
 float frand() { return ((float)rand())*iRAND_MAX; }
 
 float frandGaussian(float mu, float sigma) {
-	static const float two_pi = 2.0*3.14159265358979323846;
+    static const float two_pi = 2.0*3.14159265358979323846;
 
-	thread_local float z1;
-	thread_local bool generate;
-	generate = !generate;
+    thread_local float z1;
+    thread_local bool generate;
+    generate = !generate;
 
-	if (!generate)
-	   return z1 * sigma + mu;
+    if (!generate) {
+        return z1 * sigma + mu;
+    }
 
-	float u1 = frand();
+    float u1 = frand();
     float u2 = frand();
 
     float t = sqrt(-2.0f * log(1.0f - u1));
 
-	float z0 = t*cos(two_pi*u2);
-	z1 = t*sin(two_pi*u2);
+    float z0 = t*cos(two_pi*u2);
+    z1 = t*sin(two_pi*u2);
 
-	return z0 * sigma + mu;
+    return z0 * sigma + mu;
 }
 
 uint64_t t_ms() {
@@ -344,7 +432,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
     TOffset cbesto = -1;
     TValueCC cbestcc = -1.0f;
 
-    for (int o = -alignWindow; o < alignWindow; ++o) {
+    for (int o = -alignWindow; o <= alignWindow; ++o) {
         auto cc = calcCC(waveform0, waveform1, sum0, sum02, is00, is0 + o, is1 + o);
         if (cc > cbestcc) {
             cbesto = o;
@@ -366,7 +454,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
             TOffset cbesto = -1;
             TValueCC cbestcc = -1.0f;
 
-            for (int o = -alignWindow + i; o < alignWindow; o += nWorkers) {
+            for (int o = -alignWindow + i; o <= alignWindow; o += nWorkers) {
                 auto cc = calcCC(waveform0, waveform1, sum0, sum02, is00, is0 + o, is1 + o);
                 if (cc > cbestcc) {
                     cbesto = o;
@@ -413,7 +501,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
     auto sum0  = std::get<0>(ret);
     auto sum02 = std::get<1>(ret);
 
-    for (int o = 0; o < 2*alignWindow; ++o) {
+    for (int o = 0; o <= 2*alignWindow; ++o) {
         auto cc = calcCC(waveform0, { samples1 + o, n0 }, sum0, sum02);
         if (cc > bestcc) {
             besto = o - alignWindow;
@@ -458,6 +546,48 @@ bool calculateSimilartyMap(
     int nWorkers = std::thread::hardware_concurrency();
 #endif
 
+    int nFFTSize = 2*keyPressWidth_samples;
+    std::vector<std::vector<float>> fftsIn(nPresses);
+    std::vector<std::vector<float>> fftsOut(nPresses);
+    std::vector<std::vector<float>> ffts(nPresses);
+    for (int i = 0; i < nPresses; ++i) {
+        fftsIn[i].resize(nFFTSize);
+        const auto & waveform0 = keyPresses[i].waveform;
+        const auto & pos0      = keyPresses[i].pos;
+        const auto samples0 = waveform0.samples;
+
+        for (int j = 0; j < nFFTSize; ++j) {
+            fftsIn[i][j] = samples0[pos0 + offsetFromPeak_samples - w + j];
+        }
+
+        fftsOut[i].resize(2*nFFTSize);
+        FFT(fftsIn[i].data(), fftsOut[i].data(), nFFTSize, 1.0);
+
+        ffts[i].resize(nFFTSize);
+        for (int j = 0; j < nFFTSize; ++j) {
+            auto rr = fftsOut[i][2*j + 0];
+            auto ii = fftsOut[i][2*j + 1];
+            ffts[i][j] = sqrt(rr*rr + ii*ii);
+        }
+        for (int j = 1; j < nFFTSize/2; ++j) {
+            ffts[i][j] += ffts[i][nFFTSize - j];
+        }
+    }
+
+    {
+        const auto & waveform0 = keyPresses[0].waveform;
+        const auto & pos0      = keyPresses[0].pos;
+        const auto samples0 = waveform0.samples;
+
+        printf("pos0 = %d, offsetFromPeak_samples = %d, w = %d\n", pos0, offsetFromPeak_samples, w);
+
+        std::ofstream fout("dump.raw");
+        for (int i = 0; i < nFFTSize; ++i) {
+            fout << ffts[0][i] <<  std::endl;
+        }
+        fout.close();
+    }
+
     std::mutex mutex;
     std::condition_variable cv;
     std::vector<std::thread> workers(nWorkers);
@@ -484,7 +614,11 @@ bool calculateSimilartyMap(
                     const auto ret = findBestCC(TWaveformViewT<T> { samples0 + pos0 + offsetFromPeak_samples - w,     2*w },
                                                 TWaveformViewT<T> { samples1 + pos1 + offsetFromPeak_samples - w - a, 2*w + 2*a }, a);
 
-                    const auto bestcc     = std::get<0>(ret);
+                    const auto ret2 = findBestCC(TWaveformViewT<float> { ffts[i].data(), nFFTSize/2 },
+                                                 TWaveformViewT<float> { ffts[j].data(), nFFTSize/2 }, 0);
+
+                    // warning : multipes CC
+                    const auto bestcc     = std::get<0>(ret)*std::max(0.0, std::get<0>(ret2));
                     const auto bestoffset = std::get<1>(ret);
 
                     res[i][j].cc = bestcc;
