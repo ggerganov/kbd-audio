@@ -481,8 +481,8 @@ bool calculateSimilartyMap(
                     const auto pos1      = keyPresses[j].pos;
 
                     const auto samples1 = waveform1.samples;
-                    const auto ret = findBestCC(TWaveformViewT<T> { samples0 + pos0 + offsetFromPeak_samples,     2*w },
-                                                TWaveformViewT<T> { samples1 + pos1 + offsetFromPeak_samples - a, 2*w + 2*a }, a);
+                    const auto ret = findBestCC(TWaveformViewT<T> { samples0 + pos0 + offsetFromPeak_samples - w,     2*w },
+                                                TWaveformViewT<T> { samples1 + pos1 + offsetFromPeak_samples - w - a, 2*w + 2*a }, a);
 
                     const auto bestcc     = std::get<0>(ret);
                     const auto bestoffset = std::get<1>(ret);
