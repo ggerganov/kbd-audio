@@ -1673,7 +1673,8 @@ int main(int argc, char ** argv) {
                                 stateCore.keyPresses,
                                 stateCore.similarityMap);
 
-                        if (adjustKeyPresses(stateCore.keyPresses, stateCore.similarityMap)) {
+                        int nTries = 3;
+                        while (adjustKeyPresses(stateCore.keyPresses, stateCore.similarityMap) && --nTries) {
                             calculateSimilartyMap(
                                     stateUINew.params.keyPressWidth_samples,
                                     stateUINew.params.alignWindow_samples,
