@@ -11,20 +11,11 @@
         <meta name="twitter:description" content="Emscripten port of keytap2" />
         <meta name="twitter:image" content="https://keytap2.ggerganov.com/keytap2.png" />
 
-        <link rel="apple-touch-icon" sizes="57x57" href="/apple-icon-57x57.png">
-        <link rel="apple-touch-icon" sizes="60x60" href="/apple-icon-60x60.png">
-        <link rel="apple-touch-icon" sizes="72x72" href="/apple-icon-72x72.png">
-        <link rel="apple-touch-icon" sizes="76x76" href="/apple-icon-76x76.png">
-        <link rel="apple-touch-icon" sizes="114x114" href="/apple-icon-114x114.png">
-        <link rel="apple-touch-icon" sizes="120x120" href="/apple-icon-120x120.png">
-        <link rel="apple-touch-icon" sizes="144x144" href="/apple-icon-144x144.png">
-        <link rel="apple-touch-icon" sizes="152x152" href="/apple-icon-152x152.png">
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon-180x180.png">
-        <link rel="icon" type="image/png" sizes="192x192"  href="/android-icon-192x192.png">
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-        <link rel="manifest" href="/manifest.json">
+        <link rel="manifest" href="/site.webmanifest">
+
         <meta name="msapplication-TileColor" content="#ffffff">
         <meta name="msapplication-TileImage" content="/ms-icon-144x144.png">
         <meta name="theme-color" content="#ffffff">
@@ -38,7 +29,11 @@
 
                 <span class="text-body">
                     This is a proof-of-concept of an attack for recovering the contents of an unknown text just by analyzing the audio from the keyboard strokes.<br>
-                    No prior training is required.
+                    <b>No prior training is required.</b>
+
+                    <br><br>
+
+                    This tool runs entirely in your browser. No data is sent or stored to a server.
 
                     <br><br>
 
@@ -48,19 +43,29 @@
                         <li>At least 100 characters of meaningful text are typed</li>
                         <li>Only letters ("a" - "z") and the "Space" keys are pressed (i.e. no Backspace, Shift, numbers, etc.)</li>
                         <li>Noisy mechanical keyboard</li>
-                        <li>Microphone in the nearby vicinity of the keyboard</li>
+                        <li>Microphone in the vicinity of the keyboard</li>
                     </ul>
 
                     <br>
 
+                    Here is a video demonstrating this type of attack: <a class="nav-link2" href="https://youtu.be/jNtw17S6SR0">Demo (~5 min YouTube video)</a>
+
+                    <br><br>
+
+                    For training-based acoustic eavesdropping, make sure to checkout <a class="nav-link2" href="https://ggerganov.github.io/keytap">Keytap</a>
+
+                    <br><br>
+
                     To run this program in the browser you will need support for pthreads with WebAssembly (i.e. Chrome or Firefox Nightly).<br>
-                    To enable WebAssembly pthreads and SharedArrayBuffer support, check this <a href="https://github.com/kripken/emscripten/wiki/Pthreads-with-WebAssembly/">page</a>.<br>
+                    To enable WebAssembly pthreads and SharedArrayBuffer support, check this <a class="nav-link2" href="https://github.com/kripken/emscripten/wiki/Pthreads-with-WebAssembly/">page</a>.<br>
                     <br>
                     Press the "Init" button to start:
                 </span>
 
                 <div align="center">
                     <button onClick="doInit()" id="butInit" style="width:60px;height:30px;" disabled>Init</button>
+                    <br><br>
+                    <div class="nav-link2" id="download-info">Downloading WASM module and n-gram stats. Please wait ...</div>
                 </div>
             </div>
             <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" hidden></canvas>
@@ -73,7 +78,7 @@
                 Commit subject: <span class="nav-link">@GIT_COMMIT_SUBJECT@</span> |
             </span>
         </div>
-        <div class="cell-about">
+        <div id="footer2" class="cell-about">
             <a class="nav-link" href="https://github.com/ggerganov/kbd-audio"><span class="d-none d-sm-inline">View on GitHub </span>
                 <svg version="1.1" width="16" height="16" viewBox="0 0 16 16" class="octicon octicon-mark-github" aria-hidden="true"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path></svg>
             </a>
@@ -95,6 +100,10 @@
             var oldOutputId = 0;
 
             window.setInterval(function(){
+                    if (isMobile) {
+                        document.getElementById("footer").innerHTML = '';
+                        document.getElementById("footer2").innerHTML = '';
+                    }
                     if (isInitialized == false) return;
                     var w = window,
                         d = document,
@@ -117,6 +126,7 @@
 
             function init() {
                 document.getElementById("butInit").disabled = false;
+                document.getElementById("download-info").innerHTML = "WASM module initialized!";
 
                 document.getElementById("canvas").addEventListener("dragover", (event) => {
                     event.preventDefault();
@@ -241,10 +251,11 @@
                     console.log("status: " + text);
                 },
                 monitorRunDependencies: function(left) {
-                    // no run dependencies to log
                 }
             };
             window.onerror = function() {
+                document.getElementById("download-info").innerHTML = "Failed to initialize the WASM module. Your browser might not be supported.";
+                document.getElementById('download-info').style.color='red';
                 console.log("onerror: " + event);
             };
 

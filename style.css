@@ -13,7 +13,7 @@ body {
 #main-controls {
     margin: 0;
     padding: 0;
-    height: 96%;
+    height: 95%;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 #description {
@@ -41,6 +41,10 @@ body {
 .nav-link {
     text-decoration: none;
     color: rgba(255, 255, 255, 1.0);
+}
+.nav-link2 {
+    text-decoration: none;
+    color: rgba(0, 255, 0, 1.0);
 }
 svg {
     -webkit-filter: invert(100%); /* safari 6.0 - 9.0 */
