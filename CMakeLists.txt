@@ -59,6 +59,12 @@ if (EMSCRIPTEN)
     -s USE_PTHREADS=1 \
     -s PTHREAD_POOL_SIZE=8 \
     ")
+elseif(MINGW)
+    find_package(PkgConfig REQUIRED)
+    pkg_search_module(SDL2 REQUIRED sdl2)
+
+    set(OPENGL_INCLUDE_DIR "")
+    set(OPENGL_LIBRARIES "opengl32")
 else()
     find_package(OpenGL REQUIRED)
     find_package(SDL2)
@@ -109,6 +115,11 @@ target_link_libraries(Core PRIVATE
     ${SDL2_LIBRARIES}
     ${COREFOUNDATION_LIBRARY}
     )
+
+# todo : this is ugly, what's the proper way?
+if (MINGW)
+    target_link_libraries(Core PRIVATE stdc++)
+endif()
 
 if (EMSCRIPTEN)
     add_library(Gui STATIC
@@ -207,8 +218,11 @@ if (NOT EMSCRIPTEN)
     add_executable(play-full play-full.cpp)
     target_link_libraries(play-full PRIVATE Core)
 
-    add_executable(record record.cpp)
-    target_link_libraries(record PRIVATE Core)
+    if (NOT MINGW)
+        # todo : need to find termios.h alternative for Windows
+        add_executable(record record.cpp)
+        target_link_libraries(record PRIVATE Core)
+    endif()
 
     add_executable(record-full record-full.cpp)
     target_link_libraries(record-full PRIVATE Core)
