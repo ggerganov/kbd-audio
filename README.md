@@ -48,10 +48,13 @@ Dependencies:
 
        [Mac OS with brew]
        $ brew install sdl2
+       
+       [MSYS2]
+       $ pacman -S git cmake make mingw-w64-x86_64-dlfcn mingw-w64-x86_64-gcc mingw-w64-x86_64-SDL2
 
  - **FFTW3** *(optional)* - some of the helper tools perform Fourier transformations [fftw](http://www.fftw.org)
 
-**Linux, FreeBSD and Mac OS**
+**Linux, FreeBSD, Mac OS, Windows (MSYS2 + MinGW)**
 
     git clone https://github.com/ggerganov/kbd-audio
     cd kbd-audio
@@ -59,10 +62,6 @@ Dependencies:
     mkdir build && cd build
     cmake ..
     make
-
-**Windows**
-
-    (todo, PRs welcome)
 
 ## Tools
 
