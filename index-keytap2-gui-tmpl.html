@@ -124,9 +124,17 @@
                 setTimeout(checkLoop, 100);
             }
 
+            function onkeydown(event) {
+                if (event.keyCode >= 112 && event.keyCode <= 123) {
+                    event.stopImmediatePropagation();
+                }
+            }
+
             function init() {
                 document.getElementById("butInit").disabled = false;
                 document.getElementById("download-info").innerHTML = "WASM module initialized!";
+
+                window.addEventListener('keydown', onkeydown, true);
 
                 document.getElementById("canvas").addEventListener("dragover", (event) => {
                     event.preventDefault();
