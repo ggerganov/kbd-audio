@@ -814,7 +814,7 @@ bool renderResults(stStateUI & stateUI) {
                 out.open("C:\\results.txt");
                 if(out.is_open()){                   
                     out << strftime << std::endl; 
-                    stateUI.results;                    
+                                        
                 }                
                 stateUI.processing = true;
                 stateUI.flags.changeProcessing = true;
