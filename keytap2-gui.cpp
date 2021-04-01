@@ -813,9 +813,9 @@ bool renderResults(stStateUI & stateUI) {
                 std::ofstream out;
                 out.open("C:\\results.txt");
                 if(out.is_open()){                   
-                    out << strftime << "\n" << "";
-                }
-                std::cout << "\nend of saving results" << std::endl;
+                    out << strftime << std::endl; 
+                    stateUI.results;                    
+                }                
                 stateUI.processing = true;
                 stateUI.flags.changeProcessing = true;
                 stateUI.doUpdate = true;
