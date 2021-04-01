@@ -803,6 +803,23 @@ bool renderResults(stStateUI & stateUI) {
                 stateUI.flags.applyHints = true;
                 stateUI.doUpdate = true;
             }
+            ImGui::SameLine();
+            if (ImGui::Button("Save results")) {
+                for (auto & keyPress : stateUI.keyPresses) {
+                    keyPress.bind = -1;
+                }
+                stateUI.processing = false;
+                stateUI.flags.changeProcessing = true;
+                std::ofstream out;
+                out.open("C:\\results.txt");
+                if(out.is_open()){                   
+                    out << strftime << "\n" << "";
+                }
+                std::cout << "\nend of saving results" << std::endl;
+                stateUI.processing = true;
+                stateUI.flags.changeProcessing = true;
+                stateUI.doUpdate = true;
+            }
         } else {
             if (stateUI.calculatingSimilarityMap) {
                 ImGui::SameLine();
