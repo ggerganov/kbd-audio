@@ -142,6 +142,7 @@ struct stStateUI {
     bool calculatingSimilarityMap = false;
     bool autosave = false; // переменная для автосохранения
     bool save = false; // переменная для единовременного сохранения
+    bool std::strftime = false; // для сохранения системного времени
         
     // key presses window
     bool scrolling = false;
