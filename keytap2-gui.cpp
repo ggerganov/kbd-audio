@@ -140,10 +140,7 @@ struct stStateUI {
     bool recording = false;
     bool audioCapture = false;
     bool calculatingSimilarityMap = false;
-    bool autosave = false; // переменная для автосохранения
-    //bool save = false; // переменная для единовременного сохранения
-    //bool std::strftime = false; // для сохранения системного времени
-        
+
     // key presses window
     bool scrolling = false;
     bool recalculateKeyPresses = false;
@@ -778,25 +775,26 @@ bool renderResults(stStateUI & stateUI) {
                 stateUI.flags.resetOptimization = true;
                 stateUI.doUpdate = true;
             }
-            /*
-            ImGui::SameLine();
-            if (ImGui::Button("Apply Suggestions")) {
-                int n = stateUI.suggestions.size();
-                for (int i = 0; i < n; ++i) {
-                    if (stateUI.suggestions[i] < 0) {
-                        stateUI.keyPresses[i].bind = -1;
-                        continue;
-                    }
-                    if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
-                        stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
-                    } else {
-                        stateUI.keyPresses[i].bind = 26;
-                    }
-                }
-                stateUI.flags.applyHints = true;
-                stateUI.doUpdate = true;
-            }
-            */
+
+            //ImGui::SameLine();
+            //if (ImGui::Button("Apply Suggestions")) {
+            //    int n = stateUI.suggestions.size();
+            //    for (int i = 0; i < n; ++i) {
+            //        if (stateUI.suggestions[i] < 0) {
+            //            stateUI.keyPresses[i].bind = -1;
+            //            continue;
+            //        }
+            //        if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
+            //            stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
+            //        } else {
+            //            stateUI.keyPresses[i].bind = 26;
+            //        }
+            //    }
+
+            //    stateUI.flags.applyHints = true;
+            //    stateUI.doUpdate = true;
+            //}
+
             ImGui::SameLine();
             if (ImGui::Button("Clear Hints")) {
                 for (auto & keyPress : stateUI.keyPresses) {
@@ -805,27 +803,6 @@ bool renderResults(stStateUI & stateUI) {
                 stateUI.flags.applyHints = true;
                 stateUI.doUpdate = true;
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Save results")) {
-                for (auto & keyPress : stateUI.keyPresses) {
-                    keyPress.bind = -1;
-                }
-                saveKeyPresses(stateUI.fnameKeyPressess.c_str(), stateUI.keyPresses);
-                /*
-                stateUI.processing = false;
-                stateUI.flags.changeProcessing = true;
-                std::ofstream out;
-                out.open("C:\\results.txt");
-                if(out.is_open()){                   
-                    out << strftime << std::endl;       
-                    out << saveKeyPresses(stateUI.fnameKeyPressess.c_str(), stateUI.keyPresses) << std::endl;
-                }                
-                stateUI.processing = true;
-                */
-                stateUI.flags.changeProcessing = true;
-                stateUI.doUpdate = true;
-            }
-            
         } else {
             if (stateUI.calculatingSimilarityMap) {
                 ImGui::SameLine();
