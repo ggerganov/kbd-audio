@@ -1,0 +1,76 @@
+name: CI
+on: [push]
+
+jobs:
+    ubuntu-18_04-gcc:
+        runs-on: ubuntu-18.04
+
+        strategy:
+            matrix:
+                build: [Debug, Release]
+
+        steps:
+            - name: Clone
+              uses: actions/checkout@v1
+              with:
+                  submodules: true
+
+            - name: Dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install build-essential xorg-dev libglu1-mesa-dev
+                  sudo apt-get install cmake;
+                  sudo apt-get install libsdl2-dev;
+            - name: Configure
+              run: cmake . -DCMAKE_BUILD_TYPE=${{ matrix.build }}
+
+            - name: Build
+              run: make
+
+    ubuntu-18_04-clang:
+        runs-on: ubuntu-18.04
+
+        strategy:
+            matrix:
+                build: [Debug, Release]
+
+        steps:
+            - name: Clone
+              uses: actions/checkout@v1
+              with:
+                  submodules: true
+
+            - name: Dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install build-essential xorg-dev libglu1-mesa-dev
+                  sudo apt-get install cmake;
+                  sudo apt-get install libsdl2-dev;
+            - name: Configure
+              run: cmake . -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
+
+            - name: Build
+              run: make
+
+    macOS-10_14-clang:
+        runs-on: macOS-10.14
+
+        strategy:
+            matrix:
+                build: [Debug, Release]
+
+        steps:
+            - name: Clone
+              uses: actions/checkout@v1
+              with:
+                  submodules: true
+
+            - name: Dependencies
+              run: |
+                  brew update
+                  brew install sdl2
+            - name: Configure
+              run: cmake . -DCMAKE_BUILD_TYPE=${{ matrix.build }}
+
+            - name: Build
+              run: make
