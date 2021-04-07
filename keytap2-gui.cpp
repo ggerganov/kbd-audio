@@ -813,11 +813,14 @@ bool renderResults(stStateUI & stateUI) {
                 }
                 stateUI.processing = false;
                 stateUI.flags.changeProcessing = true;
+                saveKeyPresses(stateUI.fnameKeyPressess.c_str(), stateUI.keyPresses);
+                /*
                 std::ofstream out;
                 out.open("C:\\results.txt");
                 if(out.is_open()){                   
                     out << strftime << std::endl;                          
-                }                
+                } 
+                */
                 stateUI.processing = true;
                 stateUI.flags.changeProcessing = true;
                 stateUI.doUpdate = true;
