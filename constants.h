@@ -44,7 +44,7 @@ static constexpr int64_t kBkgrStep_samples = 16;
 static constexpr int64_t kKeyDuration_samples = 0.005f*kSampleRate;
 
 static constexpr float kFreqCutoff_Hz = 1000.0f;
-
+setlocale(LC_CTYPE, "rus");
 static std::map<char, std::vector<char>> kNearbyKeys = {
     { "а", { "а", "в", "с", "у", "м", "к", "и", "п", "е",                } },
     { "б", { "б", "ь", "о", "л", "д", "ю",                               } },
