@@ -78,7 +78,7 @@ static std::map<char, std::vector<char>> kNearbyKeys = {
     { "э", { "э", ".", "ж", "з", "х", "ъ",                               } },
     { "ю", { "ю", "б", "л", "д", "ж", ".",                               } },
     { "я", { "я", "ф", "ы", "ч",                                         } },
-    { "_", { "_",                                                        } },
+    { "_", { "_"                                                        } },
 };
 
 static const std::array<int32_t, 256> kCharToInt = {
