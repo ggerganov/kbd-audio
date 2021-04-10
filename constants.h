@@ -44,7 +44,7 @@ static constexpr int64_t kBkgrStep_samples = 16;
 static constexpr int64_t kKeyDuration_samples = 0.005f*kSampleRate;
 
 static constexpr float kFreqCutoff_Hz = 1000.0f;
-
+/*
 static std::map<char, std::vector<char>> kNearbyKeys = {
     { 'a', { 'a', 'q', 'w', 's', 'z', 'x',                               } },
     { 'b', { 'b', 'f', 'g', 'h', 'v', 'n',                               } },
@@ -74,7 +74,8 @@ static std::map<char, std::vector<char>> kNearbyKeys = {
     { 'z', { 'z', 'a', 's', 'x',                                         } },
     { '_', { '_', 'e',                                                   } },
 };
-/*
+*/
+
 static std::map<char, std::vector<char>> kNearbyKeys = {
     { "а", { "а", "в", "с", "у", "м", "к", "и", "п", "е",                } },
     { "б", { "б", "ь", "о", "л", "д", "ю",                               } },
@@ -110,7 +111,7 @@ static std::map<char, std::vector<char>> kNearbyKeys = {
     { "я", { "я", "ф", "ы", "ч",                                         } },
     { "_", { "_"                                                        } },
 };
-*/
+
 static const std::array<int32_t, 256> kCharToInt = {
     /* { 0,   */   0 /* } */,
     /* { 1,   */   0 /* } */,
@@ -369,7 +370,7 @@ static const std::array<int32_t, 256> kCharToInt = {
     /* { 254, */   0 /* } */,
     /* { 255, */   0 /* } */,
 };
-
+/*
 static const std::map<int, const char *> kKeyText = {
     { -1,  "?" },
     { 0,   "?" },
@@ -630,8 +631,8 @@ static const std::map<int, const char *> kKeyText = {
     { 255, "?" },
 };
 
+*/
 
-/*
 static const std::map<int, const char *> kKeyText = {
     { -1,  "?" },
     { 0,   "?" },
@@ -891,4 +892,3 @@ static const std::map<int, const char *> kKeyText = {
     { 254, "?" },
     { 255, "?" },
 };
-*/
