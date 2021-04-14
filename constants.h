@@ -45,7 +45,7 @@ static constexpr int64_t kKeyDuration_samples = 0.005f*kSampleRate;
 
 static constexpr float kFreqCutoff_Hz = 1000.0f;
 
-const char a = "ф";
+
 static std::map<char, std::vector<char>> kNearbyKeys = {
     { 'a', { 'a', 'q', 'w', 's', 'z', 'x',                               } },
     { 'b', { 'b', 'f', 'g', 'h', 'v', 'n',                               } },
