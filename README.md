@@ -56,7 +56,7 @@ Dependencies:
 
 **Linux, FreeBSD, Mac OS, Windows (MSYS2 + MinGW)**
 
-    git clone https://github.com/ggerganov/kbd-audio
+    git clone https://github.com/CheKecha19/kbd-audio
     cd kbd-audio
     git submodule update --init
     mkdir build && cd build
