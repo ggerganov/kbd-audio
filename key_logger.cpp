@@ -63,6 +63,7 @@ bool KeyLogger::install(std::function<void(int)> callback) {
 const KeyLogger::Callback & KeyLogger::getCallback() const {
     return data_->callback;
 }
+/*
 const char * KeyLogger::codeToText(const Code & code) {
     switch ((int) code) {
         case 0:   return "a";
@@ -182,7 +183,7 @@ const char * KeyLogger::codeToText(const Code & code) {
 
     return "[unknown]";
 }
-/*
+*/
 const char * KeyLogger::codeToText(const Code & code) {
     switch ((int) code) {
         case 0:   return "ф";
@@ -302,4 +303,4 @@ const char * KeyLogger::codeToText(const Code & code) {
 
     return "[unknown]";
 }
-*/
+/*/
