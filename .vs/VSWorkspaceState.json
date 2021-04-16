@@ -1,7 +1,9 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\imgui",
+    "\\imgui\\examples"
   ],
-  "SelectedNode": "\\imgui_examples.sln",
+  "SelectedNode": "\\imgui\\imgui_draw.cpp",
   "PreviewInSolutionExplorer": false
 }
