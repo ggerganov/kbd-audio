@@ -46,7 +46,7 @@ static constexpr int64_t kKeyDuration_samples = 0.005f*kSampleRate;
 static constexpr float kFreqCutoff_Hz = 1000.0f;
 
 
-static std::map<char, wchar_t> m{
+static std::map<char,  wchar_t> m = {
     {'f', "а"},
     {',', "б"},
     {'d', "в"},
