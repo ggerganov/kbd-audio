@@ -6,3 +6,4 @@ chal*
 .ycm_extra_conf.py
 .clangd
 compile_commands.json
+/.vs/kbd-audio-rus/v16/Browse.VC.opendb
