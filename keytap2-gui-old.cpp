@@ -744,7 +744,7 @@ bool renderClusters(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
             ImGui::SliderFloat("Threshold", &params.thresholdClustering, 0.0f, 1.0f);
         }
         if (params.approach == Approach::NonExactSubstitutionCipher0) {
-            ImGui::SliderInt("Min Clusters", &params.cipher.minClusters, 2, 27);
+            ImGui::SliderInt("Min Clusters", &params.cipher.minClusters, 2, 33);
             ImGui::SliderInt("Max Clusters", &params.cipher.maxClusters, 3, 80);
             ImGui::SliderFloat("English letter frequency weight", &params.cipher.wEnglishFreq, 0.0f, 20.0f);
             ImGui::SliderFloat("Language model weight", &params.cipher.wLanguageModel, 0.0f, 2.0f);
@@ -764,7 +764,7 @@ bool renderClusters(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
             }
 
             int nIters = 1e4;
-            int nUnique = 27;
+            int nUnique = 33;
             std::string enc = "";
             std::string decrypted = "";
 
@@ -786,7 +786,7 @@ bool renderClusters(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
             guessSpaces(oldFreqMap, enc, decrypted, nIters, hint);
             for (int i = 0; i < n; ++i) {
                 if (decrypted[i] < 'a' || decrypted[i] > 'z') {
-                    keyPresses[i].bind = 26;
+                    keyPresses[i].bind = 32;
                 }
             }
         }
@@ -831,13 +831,13 @@ bool renderClusters(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
             ImGui::SameLine();
             ImGui::PushItemWidth(100.0);
             char buf[2] = "-";
-            buf[0] = keyPresses[i].bind >= 0 ? (keyPresses[i].bind < 26 ? keyPresses[i].bind + 'a' : '+') : '-';
+            buf[0] = keyPresses[i].bind >= 0 ? (keyPresses[i].bind < 32 ? keyPresses[i].bind + 'a' : '+') : '-';
             if (ImGui::BeginCombo("##bind", buf, 0)) {
                 if (ImGui::Selectable("-", keyPresses[i].bind < 0)) {
                     keyPresses[i].bind = -1;
                 }
                 if (ImGui::Selectable("+", keyPresses[i].bind < 0)) {
-                    keyPresses[i].bind = 26;
+                    keyPresses[i].bind = 32;
                 }
                 for (int j = 'a'; j <= 'z'; ++j) {
                     char buf2[2] = { (char) j, 0 };
@@ -853,7 +853,7 @@ bool renderClusters(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
             auto cw = ImGui::CalcTextSize("a");
             for (int j = std::max(0, i - w); j <= std::min(n - 1, i + w); ++j) {
                 if (j == i && keyPresses[j].bind >= 0) {
-                    if (keyPresses[j].bind == 26) {
+                    if (keyPresses[j].bind == 32) {
                         ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", '.');
                     } else {
                         ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", keyPresses[j].bind + 'a');
@@ -945,7 +945,7 @@ bool renderSolution(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
                 decrypted = "";
                 for (int i = 0; i < n; ++i) {
                     keyPresses[i].cid = clusters[i];
-                    if (clMap[clusters[i]] > 0 && clMap[clusters[i]] <= 26) {
+                    if (clMap[clusters[i]] > 0 && clMap[clusters[i]] <= 32) {
                         keyPresses[i].predicted = 'a' + clMap[clusters[i]]-1;
                         printf("%c", 'a'+clMap[clusters[i]]-1);
                         decrypted += 'a'+clMap[clusters[i]]-1;
@@ -969,7 +969,7 @@ bool renderSolution(TParameters & params, const Cipher::TFreqMap & freqMap, TKey
             }
         } else {
             static int nIters = 1e4;
-            static int nUnique = 27;
+            static int nUnique = 33;
             static std::string enc = "";
 
             ImGui::SliderInt("Iterations", &nIters, 0, 1e5);

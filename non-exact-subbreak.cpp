@@ -61,7 +61,7 @@ for sear3ches made through apple prod6u4cts such as the Safa=ri browser a0nd Sir
     TClusters enc;
     Cipher::encryptExact(params, plain, enc);
 
-    params.maxClusters = 27;
+    params.maxClusters = 33;
     for (auto & c : enc) {
         params.maxClusters = std::max(params.maxClusters, c + 1);
     }

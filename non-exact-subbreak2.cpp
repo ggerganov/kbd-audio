@@ -32,7 +32,7 @@ for searches made through Apple products such as the Safari browser and Siri.
     TClusters enc;
     Cipher::encryptExact(params, plain, enc);
 
-    params.maxClusters = 27;
+    params.maxClusters = 33;
     for (auto & c : enc) {
         params.maxClusters = std::max(params.maxClusters, c + 1);
     }

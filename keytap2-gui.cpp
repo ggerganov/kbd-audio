@@ -863,20 +863,20 @@ bool renderResults(stStateUI & stateUI) {
                         //}
 
                         if (frand() > 0.0) {
-                            if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
+                            if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 32) {
                                 stateUI.keyPresses[i].bind = stateUI.suggestions[i] - 1;
                             } else {
-                                stateUI.keyPresses[i].bind = 26;
+                                stateUI.keyPresses[i].bind = 32;
                             }
                         } else {
-                            char c0 = (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) ?
+                            char c0 = (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 32) ?
                                 'a' + stateUI.suggestions[i] - 1 : '_';
 
                             int idx = rand()%kNearbyKeys.at(c0).size();
                             char c1 = kNearbyKeys.at(c0)[idx];
 
                             if (c1 == '_') {
-                                stateUI.keyPresses[i].bind = 26;
+                                stateUI.keyPresses[i].bind = 32;
                             } else {
                                 stateUI.keyPresses[i].bind = c1 - 'a';
                             }
@@ -915,7 +915,7 @@ bool renderResults(stStateUI & stateUI) {
                         ImGui::Text(" ");
                     } else {
                         c = '_';
-                        if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 26) {
+                        if (stateUI.suggestions[i] > 0 && stateUI.suggestions[i] <= 32) {
                             c = 'a'+stateUI.suggestions[i] - 1;
                         }
                         ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
@@ -947,7 +947,7 @@ bool renderResults(stStateUI & stateUI) {
                         ImGui::Text(".");
                     } else {
                         char c = '_';
-                        if (stateUI.keyPresses[i].bind >= 0 && stateUI.keyPresses[i].bind < 26) {
+                        if (stateUI.keyPresses[i].bind >= 0 && stateUI.keyPresses[i].bind < 32) {
                             c = 'a'+stateUI.keyPresses[i].bind;
                         }
                         ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 1.0f }, "%c", c);
@@ -971,7 +971,7 @@ bool renderResults(stStateUI & stateUI) {
                             stateUI.doUpdate = true;
                         }
 
-                        for (int k = 0; k < 26; ++k) {
+                        for (int k = 0; k < 32; ++k) {
                             if (ImGui::IsKeyPressed(4 + k)) {
                                 stateUI.keyPresses[i].bind = k;
                             }
@@ -1010,7 +1010,7 @@ bool renderResults(stStateUI & stateUI) {
                         int i = 0;
                         for (auto& pair : result.clMap) {
                             char c = '_';
-                            if (pair.second > 0 && pair.second <= 26) {
+                            if (pair.second > 0 && pair.second <= 32) {
                                 c = 'a' + pair.second - 1;
                             }
                             ImGui::Text("%3d: %c  ", pair.first, c);
@@ -1035,7 +1035,7 @@ bool renderResults(stStateUI & stateUI) {
                                 auto let = result.clMap.at(result.clusters[i]);
 
                                 char c = '.';
-                                if (let > 0 && let <= 26) {
+                                if (let > 0 && let <= 32) {
                                     c = 'a'+let - 1;
                                 }
 
@@ -1057,21 +1057,21 @@ bool renderResults(stStateUI & stateUI) {
                                     if (ImGui::IsMouseDown(0) && ImGui::GetIO().KeyCtrl) {
                                         for (int j = 0; j < n; ++j) {
                                             auto let2 = result.clMap.at(result.clusters[j]);
-                                            if (let2 > 0 && let2 <= 26) {
-                                                if (stateUI.keyPresses[j].bind == 26) {
+                                            if (let2 > 0 && let2 <= 32) {
+                                                if (stateUI.keyPresses[j].bind == 32) {
                                                     stateUI.keyPresses[j].bind = -1;
                                                 }
                                             } else {
-                                                stateUI.keyPresses[j].bind = 26;
+                                                stateUI.keyPresses[j].bind = 32;
                                             }
                                         }
                                         stateUI.flags.applyHints = true;
                                         stateUI.doUpdate = true;
                                     } else if (ImGui::IsMouseDown(0)) {
-                                        if (let > 0 && let <= 26) {
+                                        if (let > 0 && let <= 32) {
                                             stateUI.keyPresses[i].bind = let - 1;
                                         } else {
-                                            stateUI.keyPresses[i].bind = 26;
+                                            stateUI.keyPresses[i].bind = 32;
                                         }
                                         stateUI.flags.applyHints = true;
                                         stateUI.doUpdate = true;

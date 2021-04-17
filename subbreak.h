@@ -21,7 +21,7 @@ using TGramLen = int;
 using TFreqMap = std::tuple<TGramLen, std::vector<TProb>>;
 using TAlphabet = std::vector<char>;
 
-int kN = 27;
+int kN = 33;
 double pMin = -100;
 std::array<int32_t, 256> myCharToInt = ::kCharToInt;
 
@@ -114,11 +114,11 @@ TAlphabet getAlphabetRandom(const std::vector<int> & hint = {}) {
         for (int i = 0; i <= kN; ++i) res.push_back(i);
     } else {
         std::map<int, bool> used;
-        for (auto & h : hint) if (h >= 1 && h <= 27) used[h] = true;
+        for (auto & h : hint) if (h >= 1 && h <= 33) used[h] = true;
         res.push_back(0);
         int curi = 1;
         for (int i = 1; i <= kN; ++i) {
-            if (hint[i] < 1 || hint[i] > 27) {
+            if (hint[i] < 1 || hint[i] > 33) {
                 while (used[curi]) ++curi;
                 res.push_back(curi);
                 ++curi;
@@ -136,7 +136,7 @@ TAlphabet getAlphabetRandom(const std::vector<int> & hint = {}) {
 bool encrypt(const std::string & plain, TAlphabet & alphabet, std::string & enc) {
     myCharToInt = kCharToInt;
     {
-        int k = 26;
+        int k = 32;
         for (auto & p : plain) {
             if (k == kN) break;
             if (myCharToInt[p] == 0) {
@@ -189,7 +189,7 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
             return -1e100;
         }
         auto c = txt[i1++];
-        if (c > 0 && c <= 26) {
+        if (c > 0 && c <= 32) {
             curc <<= 5;
             curc += c;
             --k;
@@ -208,7 +208,7 @@ TProb calcScore0(const TFreqMap & freqMap, const std::string & txt) {
         while (true) {
             if (i1 >= len) goto finish;
             auto c = txt[i1++];
-            if (c > 0 && c <= 26) {
+            if (c > 0 && c <= 32) {
                 curc <<= 5;
                 curc += c;
                 break;
@@ -283,7 +283,7 @@ TProb calcScoreForSpaces(const TFreqMap & freqMap, const std::string & txt) {
             return -1e100;
         }
         auto c = txt[i1++];
-        if (c > 0 && c <= 26) {
+        if (c > 0 && c <= 32) {
             curc <<= 5;
             curc += c;
             curc &= mask;
@@ -300,7 +300,7 @@ TProb calcScoreForSpaces(const TFreqMap & freqMap, const std::string & txt) {
         while (true) {
             if (i1 >= len) goto finish;
             auto c = txt[i1++];
-            if (c > 0 && c <= 26) {
+            if (c > 0 && c <= 32) {
                 curc <<= 5;
                 curc += c;
                 curc &= mask;
@@ -325,7 +325,7 @@ auto calcScore = calcScore0;
 
 void printText(const std::string & t) {
     for (auto & c : t) {
-        if (c >= 1 && c <= 26) printf("%c", 'a' + c - 1); else printf(".");
+        if (c >= 1 && c <= 32) printf("%c", 'a' + c - 1); else printf(".");
     }
     printf("\n");
 }
@@ -334,7 +334,7 @@ void printText(const std::string & t, std::string & res) {
     res = t;
     int i = 0;
     for (auto & c : t) {
-        if (c >= 1 && c <= 26) res[i] = 'a' + c - 1; else res[i] = ' ';
+        if (c >= 1 && c <= 32) res[i] = 'a' + c - 1; else res[i] = ' ';
         ++i;
     }
 }
@@ -363,11 +363,11 @@ bool decrypt(const TFreqMap & freqMap, const std::string & enc, std::string & re
         }
 
         auto itera = besta;
-		int nswaps = kN > 26 ? 3 : 0;
+		int nswaps = kN > 32 ? 3 : 0;
         for (int i = 0; i < nswaps; ++i) {
             int a0 = rand()%lena + 1;
             int a1 = rand()%lena + 1;
-            while (a0 == a1 || a0 > 26 || a1 <= 26) {
+            while (a0 == a1 || a0 > 32 || a1 <= 32) {
                 a0 = rand()%lena + 1;
                 a1 = rand()%lena + 1;
             }
@@ -456,11 +456,11 @@ bool guessSpaces(const TFreqMap & freqMap, const std::string & enc, std::string 
         }
 
         auto itera = besta;
-		int nswaps = kN > 26 ? 3 : 0;
+		int nswaps = kN > 32 ? 3 : 0;
         for (int i = 0; i < nswaps; ++i) {
             int a0 = rand()%lena + 1;
             int a1 = rand()%lena + 1;
-            while (a0 == a1 || a0 > 26 || a1 <= 26) {
+            while (a0 == a1 || a0 > 32 || a1 <= 32) {
                 a0 = rand()%lena + 1;
                 a1 = rand()%lena + 1;
             }
