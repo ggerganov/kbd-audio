@@ -14,7 +14,17 @@
 
 namespace {
 
-    static const std::array<float, 27> kEnglishLetterFreq = {
+
+
+
+    ////“”“ ¡Àﬂ“‹ œ≈–≈—◊»“¿“‹ ›“» ≈¡”◊»≈ ◊¿—“Œ“€ Õ¿’”… ƒÀﬂ  ¿∆ƒŒ… ≈¡¿“‹ ¡” ¬€
+
+
+
+
+
+
+    static const std::array<float, 33> kEnglishLetterFreq = {
         0.000, // space
         8.167, // a
         1.492, // b
@@ -44,7 +54,7 @@ namespace {
         0.074,
     };
 
-    static const std::array<float, 27> kEnglishLetterWithSpacesFreq = {
+    static const std::array<float, 33> kEnglishLetterWithSpacesFreq = {
         11.505, // space
         7.228,  // a
         1.320,  // b
@@ -140,64 +150,64 @@ namespace {
         /* { 62,  */   0 /* } */,
         /* { 63,  */   0 /* } */,
         /* { 64,  */   0 /* } */,
-        /* { 65,  */   1 /* } */,
-        /* { 66,  */   2 /* } */,
-        /* { 67,  */   3 /* } */,
-        /* { 68,  */   4 /* } */,
-        /* { 69,  */   5 /* } */,
-        /* { 70,  */   6 /* } */,
-        /* { 71,  */   7 /* } */,
-        /* { 72,  */   8 /* } */,
-        /* { 73,  */   9 /* } */,
-        /* { 74,  */  10 /* } */,
-        /* { 75,  */  11 /* } */,
-        /* { 76,  */  12 /* } */,
-        /* { 77,  */  13 /* } */,
-        /* { 78,  */  14 /* } */,
-        /* { 79,  */  15 /* } */,
-        /* { 80,  */  16 /* } */,
-        /* { 81,  */  17 /* } */,
-        /* { 82,  */  18 /* } */,
-        /* { 83,  */  19 /* } */,
-        /* { 84,  */  20 /* } */,
-        /* { 85,  */  21 /* } */,
-        /* { 86,  */  22 /* } */,
-        /* { 87,  */  23 /* } */,
-        /* { 88,  */  24 /* } */,
-        /* { 89,  */  25 /* } */,
-        /* { 90,  */  26 /* } */,
+        /* { 65,  */   0 /* } */,
+        /* { 66,  */   0 /* } */,
+        /* { 67,  */   0 /* } */,
+        /* { 68,  */   0 /* } */,
+        /* { 69,  */   0 /* } */,
+        /* { 70,  */   0 /* } */,
+        /* { 71,  */   0 /* } */,
+        /* { 72,  */   0 /* } */,
+        /* { 73,  */   0 /* } */,
+        /* { 74,  */   0 /* } */,
+        /* { 75,  */   0 /* } */,
+        /* { 76,  */   0 /* } */,
+        /* { 77,  */   0 /* } */,
+        /* { 78,  */   0 /* } */,
+        /* { 79,  */   0 /* } */,
+        /* { 80,  */   0 /* } */,
+        /* { 81,  */   0 /* } */,
+        /* { 82,  */   0 /* } */,
+        /* { 83,  */   0 /* } */,
+        /* { 84,  */   0 /* } */,
+        /* { 85,  */   0 /* } */,
+        /* { 86,  */   0 /* } */,
+        /* { 87,  */   0 /* } */,
+        /* { 88,  */   0 /* } */,
+        /* { 89,  */   0 /* } */,
+        /* { 90,  */   0 /* } */,
         /* { 91,  */   0 /* } */,
         /* { 92,  */   0 /* } */,
         /* { 93,  */   0 /* } */,
         /* { 94,  */   0 /* } */,
         /* { 95,  */   0 /* } */,
         /* { 96,  */   0 /* } */,
-        /* { 97,  */   1 /* } */,
-        /* { 98,  */   2 /* } */,
-        /* { 99,  */   3 /* } */,
-        /* { 100, */   4 /* } */,
-        /* { 101, */   5 /* } */,
-        /* { 102, */   6 /* } */,
-        /* { 103, */   7 /* } */,
-        /* { 104, */   8 /* } */,
-        /* { 105, */   9 /* } */,
-        /* { 106, */  10 /* } */,
-        /* { 107, */  11 /* } */,
-        /* { 108, */  12 /* } */,
-        /* { 109, */  13 /* } */,
-        /* { 110, */  14 /* } */,
-        /* { 111, */  15 /* } */,
-        /* { 112, */  16 /* } */,
-        /* { 113, */  17 /* } */,
-        /* { 114, */  18 /* } */,
-        /* { 115, */  19 /* } */,
-        /* { 116, */  20 /* } */,
-        /* { 117, */  21 /* } */,
-        /* { 118, */  22 /* } */,
-        /* { 119, */  23 /* } */,
-        /* { 120, */  24 /* } */,
-        /* { 121, */  25 /* } */,
-        /* { 122, */  26 /* } */,
+        /* { 97,  */   0 /* } */,
+        /* { 98,  */   0 /* } */,
+        /* { 99,  */   0 /* } */,
+        /* { 100, */   0 /* } */,
+        /* { 101, */   0 /* } */,
+        /* { 102, */   0 /* } */,
+        /* { 103, */   0 /* } */,
+        /* { 104, */   0 /* } */,
+        /* { 105, */   0 /* } */,
+        /* { 106, */   0 /* } */,
+        /* { 107, */   0 /* } */,
+        /* { 108, */   0 /* } */,
+        /* { 109, */   0 /* } */,
+        /* { 110, */   0 /* } */,
+        /* { 111, */   0 /* } */,
+        /* { 112, */   0 /* } */,
+        /* { 113, */   0 /* } */,
+        /* { 114, */   0 /* } */,
+        /* { 115, */   0 /* } */,
+        /* { 116, */   0  /* } */,
+        /* { 117, */   0 /* } */,
+        /* { 118, */   0 /* } */,
+        /* { 119, */   0 /* } */,
+        /* { 120, */   0 /* } */,
+        /* { 121, */   0 /* } */,
+        /* { 122, */   0 /* } */,
         /* { 123, */   0 /* } */,
         /* { 124, */   0 /* } */,
         /* { 125, */   0 /* } */,
@@ -267,70 +277,70 @@ namespace {
         /* { 189, */   0 /* } */,
         /* { 190, */   0 /* } */,
         /* { 191, */   0 /* } */,
-        /* { 192, */   0 /* } */,
-        /* { 193, */   0 /* } */,
-        /* { 194, */   0 /* } */,
-        /* { 195, */   0 /* } */,
-        /* { 196, */   0 /* } */,
-        /* { 197, */   0 /* } */,
-        /* { 198, */   0 /* } */,
-        /* { 199, */   0 /* } */,
-        /* { 200, */   0 /* } */,
-        /* { 201, */   0 /* } */,
-        /* { 202, */   0 /* } */,
-        /* { 203, */   0 /* } */,
-        /* { 204, */   0 /* } */,
-        /* { 205, */   0 /* } */,
-        /* { 206, */   0 /* } */,
-        /* { 207, */   0 /* } */,
-        /* { 208, */   0 /* } */,
-        /* { 209, */   0 /* } */,
-        /* { 210, */   0 /* } */,
-        /* { 211, */   0 /* } */,
-        /* { 212, */   0 /* } */,
-        /* { 213, */   0 /* } */,
-        /* { 214, */   0 /* } */,
-        /* { 215, */   0 /* } */,
-        /* { 216, */   0 /* } */,
-        /* { 217, */   0 /* } */,
-        /* { 218, */   0 /* } */,
-        /* { 219, */   0 /* } */,
-        /* { 220, */   0 /* } */,
-        /* { 221, */   0 /* } */,
-        /* { 222, */   0 /* } */,
-        /* { 223, */   0 /* } */,
-        /* { 224, */   0 /* } */,
-        /* { 225, */   0 /* } */,
-        /* { 226, */   0 /* } */,
-        /* { 227, */   0 /* } */,
-        /* { 228, */   0 /* } */,
-        /* { 229, */   0 /* } */,
-        /* { 230, */   0 /* } */,
-        /* { 231, */   0 /* } */,
-        /* { 232, */   0 /* } */,
-        /* { 233, */   0 /* } */,
-        /* { 234, */   0 /* } */,
-        /* { 235, */   0 /* } */,
-        /* { 236, */   0 /* } */,
-        /* { 237, */   0 /* } */,
-        /* { 238, */   0 /* } */,
-        /* { 239, */   0 /* } */,
-        /* { 240, */   0 /* } */,
-        /* { 241, */   0 /* } */,
-        /* { 242, */   0 /* } */,
-        /* { 243, */   0 /* } */,
-        /* { 244, */   0 /* } */,
-        /* { 245, */   0 /* } */,
-        /* { 246, */   0 /* } */,
-        /* { 247, */   0 /* } */,
-        /* { 248, */   0 /* } */,
-        /* { 249, */   0 /* } */,
-        /* { 250, */   0 /* } */,
-        /* { 251, */   0 /* } */,
-        /* { 252, */   0 /* } */,
-        /* { 253, */   0 /* } */,
-        /* { 254, */   0 /* } */,
-        /* { 255, */   0 /* } */,
+        /* { 192, */   1 /* } */,
+        /* { 193, */   2 /* } */,
+        /* { 194, */   3 /* } */,
+        /* { 195, */   4 /* } */,
+        /* { 196, */   5 /* } */,
+        /* { 197, */   6 /* } */,
+        /* { 198, */   7 /* } */,
+        /* { 199, */   8 /* } */,
+        /* { 200, */   9 /* } */,
+        /* { 201, */   10 /* } */,
+        /* { 202, */   11/* } */,
+        /* { 203, */   12 /* } */,
+        /* { 204, */   13 /* } */,
+        /* { 205, */   14/* } */,
+        /* { 206, */   15 /* } */,
+        /* { 207, */   16/* } */,
+        /* { 208, */   17 /* } */,
+        /* { 209, */   18 /* } */,
+        /* { 210, */   19 /* } */,
+        /* { 211, */   20 /* } */,
+        /* { 212, */   21 /* } */,
+        /* { 213, */   22 /* } */,
+        /* { 214, */   23 /* } */,
+        /* { 215, */   24 /* } */,
+        /* { 216, */   25 /* } */,
+        /* { 217, */   26 /* } */,
+        /* { 218, */   27 /* } */,
+        /* { 219, */   28 /* } */,
+        /* { 220, */   29 /* } */,
+        /* { 221, */   30 /* } */,
+        /* { 222, */   31 /* } */,
+        /* { 223, */   32 /* } */,
+        /* { 224, */   1 /* } */,
+        /* { 225, */   2 /* } */,
+        /* { 226, */   3 /* } */,
+        /* { 227, */   4 /* } */,
+        /* { 228, */   5 /* } */,
+        /* { 229, */   6 /* } */,
+        /* { 230, */   7 /* } */,
+        /* { 231, */   8 /* } */,
+        /* { 232, */   9 /* } */,
+        /* { 233, */   10 /* } */,
+        /* { 234, */   11/* } */,
+        /* { 235, */   12 /* } */,
+        /* { 236, */   13 /* } */,
+        /* { 237, */   14/* } */,
+        /* { 238, */   15 /* } */,
+        /* { 239, */   16/* } */,
+        /* { 240, */   17 /* } */,
+        /* { 241, */   18 /* } */,
+        /* { 242, */   19 /* } */,
+        /* { 243, */   20 /* } */,
+        /* { 244, */   21 /* } */,
+        /* { 245, */   22 /* } */,
+        /* { 246, */   23 /* } */,
+        /* { 247, */   24 /* } */,
+        /* { 248, */   25 /* } */,
+        /* { 249, */   26 /* } */,
+        /* { 250, */   27 /* } */,
+        /* { 251, */   28 /* } */,
+        /* { 252, */   29 /* } */,
+        /* { 253, */   30 /* } */,
+        /* { 254, */   31 /* } */,
+        /* { 255, */   32 /* } */,
     };
 
 // generate k random distinct ints in [0..n)
@@ -392,7 +402,7 @@ void calcHelpers(
     nLetters = 0;
     for (int i = 0; i < n; ++i) {
         plainText[i] = clMap.at(clusters[i]);
-        if (plainText[i] > 0 && plainText[i] <= 26) {
+        if (plainText[i] > 0 && plainText[i] <= 32) {
             ++letterCount[plainText[i]];
             ++nLetters;
         } else if (params.includeSpaces) {
@@ -404,13 +414,13 @@ void calcHelpers(
     letterFreqCost = 0.0;
     {
         auto & freq = params.includeSpaces ? kEnglishLetterWithSpacesFreq : kEnglishLetterFreq;
-        for (int i = 0; i < 27; ++i) {
+        for (int i = 0; i < 33; ++i) {
             float curf = 0.01*freq[i] - ((float)(letterCount[i]))/((float)(nLetters));
             letterFreqCost += curf*curf;
         }
     }
 
-    letterFreqCost /= 27.0;
+    letterFreqCost /= 33.0;
     letterFreqCost = sqrt(letterFreqCost);
 }
 
@@ -443,13 +453,13 @@ void updateHelpers(
     letterFreqCost = 0.0;
     {
         auto & freq = params.includeSpaces ? kEnglishLetterWithSpacesFreq : kEnglishLetterFreq;
-        for (int i = 0; i < 27; ++i) {
+        for (int i = 0; i < 33; ++i) {
             float curf = 0.01*freq[i] - ((float)(letterCount[i]))/((float)(nLetters));
             letterFreqCost += curf*curf;
         }
     }
 
-    letterFreqCost /= 27.0;
+    letterFreqCost /= 33.0;
     letterFreqCost = sqrt(letterFreqCost);
 }
 
@@ -524,7 +534,7 @@ namespace Cipher {
     bool encryptExact(const TParameters & , const std::string & text, TClusters & clusters) {
         auto myCharToLetter = kCharToLetter;
 
-		int k = 26;
+		int k = 32;
         {
             for (auto & p : text) {
                 if (myCharToLetter[p] == 0) {
@@ -680,12 +690,12 @@ namespace Cipher {
         const auto & prob = freqMap.prob;
 
         int nlet = 0;
-        std::array<int, 27> letCount;
+        std::array<int, 33> letCount;
         letCount.fill(0);
         std::vector<TLetter> plain(n);
         for (int i = 0; i < n; ++i) {
             plain[i] = clMap.at(txt[i]);
-            if (plain[i] > 0 && plain[i] <= 26) {
+            if (plain[i] > 0 && plain[i] <= 32) {
                 ++letCount[plain[i]];
                 ++nlet;
             } else if (params.includeSpaces) {
@@ -697,13 +707,13 @@ namespace Cipher {
         float letFreqCost = 0.0;
         {
             auto & freq = params.includeSpaces ? kEnglishLetterWithSpacesFreq : kEnglishLetterFreq;
-            for (int i = 0; i < 27; ++i) {
+            for (int i = 0; i < 33; ++i) {
                 float curf = 0.01*freq[i] - ((float)(letCount[i]))/((float)(nlet));
                 letFreqCost += curf*curf;
             }
         }
 
-        letFreqCost /= 27.0;
+        letFreqCost /= 33.0;
         letFreqCost = sqrt(letFreqCost);
         //printf("letFreqCost = %g\n", letFreqCost);
 
@@ -717,7 +727,7 @@ namespace Cipher {
         while (k > 0) {
             if (i1 >= n) return -1e100;
             auto c = plain[i1++];
-            if (c > 0 && c <= 26) {
+            if (c > 0 && c <= 32) {
                 curc <<= 5;
                 curc += c;
                 --k;
@@ -733,7 +743,7 @@ namespace Cipher {
             while (true) {
                 if (i1 >= n) return res/n - params.wEnglishFreq*letFreqCost;
                 auto c = plain[i1++];
-                if (c > 0 && c <= 26) {
+                if (c > 0 && c <= 32) {
                     curc <<= 5;
                     curc += c;
                     break;
@@ -769,7 +779,7 @@ namespace Cipher {
         while (k > 0) {
             if (i1 >= n) return -1e100;
             auto c = plain[i1++];
-            if (c > 0 && c <= 26) {
+            if (c > 0 && c <= 32) {
                 curc <<= 5;
                 curc += c;
                 --k;
@@ -785,7 +795,7 @@ namespace Cipher {
             while (true) {
                 if (i1 >= n) return res/n - params.wEnglishFreq*letFreqCost;
                 auto c = plain[i1++];
-                if (c > 0 && c <= 26) {
+                if (c > 0 && c <= 32) {
                     curc <<= 5;
                     curc += c;
                     break;
@@ -1016,7 +1026,7 @@ namespace Cipher {
             if (iter%5000 == 0) {
                 printf("Iter %5d : temp = %16.4f, cost0 = %8.4f\n", iter, temp, cost0);
                 for (int i = 0; i < n; ++i) {
-                    if (clMap[clusters[i]] > 0 && clMap[clusters[i]] <= 26) {
+                    if (clMap[clusters[i]] > 0 && clMap[clusters[i]] <= 32) {
                         printf("%c", 'a'+clMap[clusters[i]]-1);
                     } else {
                         printf(".");
@@ -1045,9 +1055,9 @@ namespace Cipher {
                 while (fixed[i2]) {
                     i2 = rand()%params.maxClusters;
                 }
-                int letterNew = rand()%27;
+                int letterNew = rand()%33;
                 while (clMap[i2] == letterNew) {
-                    letterNew = rand()%27;
+                    letterNew = rand()%33;
                 }
 
                 clMap[i2] = letterNew;
@@ -1095,7 +1105,7 @@ namespace Cipher {
             printf("%d - %c\n", cl.first, 'a' + cl.second - 1);
         }
 
-        for (int i = 0; i < 27; ++i) {
+        for (int i = 0; i < 33; ++i) {
             printf("    %c - ", 'a' + i - 1);
             for (auto & cl : clMap) {
                 if (cl.second == i) {
@@ -1231,9 +1241,9 @@ namespace Cipher {
                     i1 = rand()%params.maxClusters;
                 }
                 i1l = clMap[i1];
-                int letterNew = rand()%27;
+                int letterNew = rand()%33;
                 while (clMap[i1] == letterNew) {
-                    letterNew = rand()%27;
+                    letterNew = rand()%33;
                 }
 
                 clMap[i1] = letterNew;
@@ -1265,7 +1275,7 @@ namespace Cipher {
         clMap.clear();
 
         for (int i = 0; i < params.maxClusters; ++i) {
-            clMap[i] = rand()%27;
+            clMap[i] = rand()%33;
         }
 
         std::map<int, std::vector<int>> options;
@@ -1682,7 +1692,7 @@ namespace Cipher {
 
     void printText(const TClusters & t) {
         for (auto & c : t) {
-            if (c >= 1 && c <= 26) printf("%c", 'a' + c - 1); else printf(".");
+            if (c >= 1 && c <= 32) printf("%c", 'a' + c - 1); else printf(".");
         }
         printf("\n");
     }
@@ -1690,7 +1700,7 @@ namespace Cipher {
     void printText(const TClusters & t, const TClusterToLetterMap & clMap) {
         for (auto & cc : t) {
 			auto c = clMap.at(cc);
-            if (c >= 1 && c <= 26) printf("%c", 'a' + c - 1); else printf(".");
+            if (c >= 1 && c <= 32) printf("%c", 'a' + c - 1); else printf(".");
         }
         printf("\n");
     }
