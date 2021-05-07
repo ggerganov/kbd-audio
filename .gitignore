@@ -2,6 +2,7 @@ build*/
 build-vars.h
 data_original/*
 chal*
+.cache
 .DS_Store
 .ycm_extra_conf.py
 .clangd
