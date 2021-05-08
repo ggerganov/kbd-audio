@@ -971,6 +971,12 @@ bool renderResults(stStateUI & stateUI) {
                             stateUI.doUpdate = true;
                         }
 
+                        if (ImGui::IsMouseDown(2)) {
+                            stateUI.keyPresses[i].bind = 26;
+                            stateUI.flags.applyHints = true;
+                            stateUI.doUpdate = true;
+                        }
+
                         for (int k = 0; k < 26; ++k) {
                             if (ImGui::IsKeyPressed(4 + k)) {
                                 stateUI.keyPresses[i].bind = k;
@@ -981,6 +987,7 @@ bool renderResults(stStateUI & stateUI) {
                         ImGui::Text("Key press: %d", i);
                         ImGui::Text(" - Left click to focus");
                         ImGui::Text(" - Right click to remove hint");
+                        ImGui::Text(" - Middle click to put a space as hint");
                         ImGui::EndTooltip();
                     }
                     if (i < n - 1) {
