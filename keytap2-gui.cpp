@@ -1414,6 +1414,7 @@ int main(int argc, char ** argv) {
                     std::map<int, int> cnt;
                     for (const auto & result : stateUI.results) {
                         const auto & item = result.second.front();
+                        if (n != (int) item.clusters.size()) continue;
                         if (item.clMap.find(item.clusters[i]) == item.clMap.end()) continue;
                         if (i <= (int) item.clusters.size()) {
                             ++cnt[item.clMap.at(item.clusters[i])];
