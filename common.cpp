@@ -219,7 +219,7 @@ std::tuple<int64_t, int64_t> calcSum(const TWaveformViewT<T> & waveform) {
     auto n       = waveform.n;
 
     for (int is = 0; is < n; ++is) {
-        auto a0 = samples[is];
+        int32_t a0 = samples[is];
         sum += a0;
         sum2 += a0*a0;
     }
@@ -298,8 +298,8 @@ TValueCC calcCC(
     auto n = std::min(n0, n1);
 
     for (int64_t is = 0; is < n; ++is) {
-        auto a0 = samples0[is];
-        auto a1 = samples1[is];
+        int32_t a0 = samples0[is];
+        int32_t a1 = samples1[is];
 
         sum1 += a1;
         sum12 += a1*a1;
