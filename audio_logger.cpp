@@ -234,7 +234,7 @@ bool AudioLogger::install(Parameters && parameters) {
 
     parameters.nChannels = obtainedSpec.channels;
 
-    switch (parameters.FirstOrderHighPass) {
+    switch (parameters.filter) {
         case AudioLogger::Parameters::EFilter::None:
             {
             }
@@ -288,7 +288,7 @@ bool AudioLogger::addFrame(const Sample * stream) {
         curFrame[i] = x*norm;
     }
 
-    switch (data.parameters.FirstOrderHighPass) {
+    switch (data.parameters.filter) {
         case AudioLogger::Parameters::EFilter::None:
             {
             }

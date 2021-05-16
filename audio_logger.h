@@ -46,7 +46,7 @@ class AudioLogger {
                 SecondOrderButterworthHighPass,
             };
 
-            EFilter filter = SecondOrderButterworthHighPass;
+            EFilter filter = FirstOrderHighPass;
 
             float freqCutoff_Hz = -1.0f;
         };
