@@ -1695,7 +1695,7 @@ int main(int argc, char ** argv) {
 
                         stateCore.flags.calculatingSimilarityMap = false;
                         stateCore.flags.updateSimilarityMap = true;
-                        stateCore.update();
+                        stateCore.update(true);
                     }
 
                     int n = stateCore.params.nProcessors();
