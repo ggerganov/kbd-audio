@@ -344,7 +344,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
     TOffset cbesto = -1;
     TValueCC cbestcc = -1.0f;
 
-    for (int o = -alignWindow; o < alignWindow; ++o) {
+    for (int o = -alignWindow; o <= alignWindow; ++o) {
         auto cc = calcCC(waveform0, waveform1, sum0, sum02, is00, is0 + o, is1 + o);
         if (cc > cbestcc) {
             cbesto = o;
@@ -366,7 +366,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
             TOffset cbesto = -1;
             TValueCC cbestcc = -1.0f;
 
-            for (int o = -alignWindow + i; o < alignWindow; o += nWorkers) {
+            for (int o = -alignWindow + i; o <= alignWindow; o += nWorkers) {
                 auto cc = calcCC(waveform0, waveform1, sum0, sum02, is00, is0 + o, is1 + o);
                 if (cc > cbestcc) {
                     cbesto = o;
@@ -413,7 +413,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
     auto sum0  = std::get<0>(ret);
     auto sum02 = std::get<1>(ret);
 
-    for (int o = 0; o < 2*alignWindow; ++o) {
+    for (int o = 0; o <= 2*alignWindow; ++o) {
         auto cc = calcCC(waveform0, { samples1 + o, n0 }, sum0, sum02);
         if (cc > bestcc) {
             besto = o - alignWindow;
@@ -470,7 +470,8 @@ bool calculateSimilartyMap(
 
                 const auto & waveform0 = keyPresses[i].waveform;
                 const auto & pos0      = keyPresses[i].pos;
-                auto & avgcc     = keyPresses[i].ccAvg;
+
+                auto & avgcc = keyPresses[i].ccAvg;
 
                 const auto samples0 = waveform0.samples;
 
