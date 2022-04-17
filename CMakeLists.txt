@@ -54,10 +54,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (EMSCRIPTEN)
     set (CMAKE_CXX_FLAGS " \
-    -s WASM=1 \
     -s USE_SDL=2 \
-    -s USE_PTHREADS=1 \
-    -s PTHREAD_POOL_SIZE=8 \
     ")
 elseif(MINGW)
     find_package(PkgConfig REQUIRED)
@@ -178,7 +175,7 @@ if (EMSCRIPTEN)
     set_target_properties(${TARGET} PROPERTIES LINK_FLAGS " \
     -s TOTAL_MEMORY=536870912 \
     -s LZ4=1 \
-    --preload-file ../chal/record \  \
+    --preload-file ${PROJECT_SOURCE_DIR}/chal/record@/ \  \
     ")
 
     ## keytap-gui
@@ -198,7 +195,7 @@ if (EMSCRIPTEN)
     -s TOTAL_MEMORY=536870912 \
     -s FORCE_FILESYSTEM=1 \
     -s LZ4=1 \
-    --preload-file ../data/ \
+    --preload-file ${PROJECT_SOURCE_DIR}/data@/ \
     ")
 
     configure_file(${CMAKE_SOURCE_DIR}/index-${TARGET}-tmpl.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html @ONLY)

@@ -23,7 +23,6 @@
 #include <cstdio>
 #include <string>
 #include <vector>
-#include <thread>
 #include <functional>
 
 static std::function<bool()> g_doInit;
