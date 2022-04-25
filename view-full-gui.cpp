@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <thread>
 #include <functional>
 
 static std::function<bool()> g_doInit;
@@ -270,8 +271,10 @@ bool prepareAudioOut(const TParameters & params) {
 }
 
 int main(int argc, char ** argv) {
-    printf("Usage: %s input.kbd [-pN]\n", argv[0]);
+    printf("Usage: %s input.kbd [-pN] [-FN] [-fN]\n", argv[0]);
     printf("    -pN - select playback device N\n");
+    printf("    -FN - select filter type, (0 - none, 1 - first order high-pass, 2 - second order high-pass)\n");
+    printf("    -fN - cutoff frequency in Hz\n");
     printf("\n");
 
     printf("Usage: %s record.kbd\n", argv[0]);
@@ -279,8 +282,10 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
-    auto argm = parseCmdArguments(argc, argv);
-    int playbackId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
+    const auto argm = parseCmdArguments(argc, argv);
+    const int playbackId    = argm.count("p") == 0 ? 0 : std::stoi(argm.at("p"));
+    const int filterId      = argm.count("F") == 0 ? EAudioFilter::FirstOrderHighPass : std::stoi(argm.at("F"));
+    const int freqCutoff_Hz = argm.count("f") == 0 ? kFreqCutoff_Hz : std::stoi(argm.at("f"));
 
     TParameters params;
     TWaveform waveformInput;
@@ -296,10 +301,22 @@ int main(int argc, char ** argv) {
         return prepareAudioOut(params);
     };
 
-    printf("[+] Loading recording from '%s'\n", argv[1]);
-    if (readFromFile<TSampleF>(argv[1], waveformInput) == false) {
-        printf("Specified file '%s' does not exist\n", argv[1]);
-        return -3;
+    {
+        TWaveformF waveformInputF;
+        printf("[+] Loading recording from '%s'\n", argv[1]);
+        if (readFromFile<TSampleF>(argv[1], waveformInputF) == false) {
+            printf("Specified file '%s' does not exist\n", argv[1]);
+            return -1;
+        } else {
+            printf("[+] Filtering waveform with filter type = %d and cutoff frequency = %d Hz\n", filterId, freqCutoff_Hz);
+            ::filter(waveformInputF, (EAudioFilter) filterId, freqCutoff_Hz, kSampleRate);
+
+            printf("[+] Converting waveform to i16 format ...\n");
+            if (convert(waveformInputF, waveformInput) == false) {
+                printf("Conversion failed\n");
+                return -4;
+            }
+        }
     }
 
     Gui::Objects guiObjects;

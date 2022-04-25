@@ -50,3 +50,22 @@ svg {
     -webkit-filter: invert(100%); /* safari 6.0 - 9.0 */
     filter: invert(100%);
 }
+#output {
+	width: 100%;
+	height: 100%;
+	margin: 0 auto;
+	margin-top: 10px;
+	border-left: 0px;
+	border-right: 0px;
+	padding-left: 0px;
+	padding-right: 0px;
+	display: block;
+	background-color: black;
+	color: white;
+	font-size:10px;
+	font-family: 'Lucida Console', Monaco, monospace;
+	outline: none;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: scroll;
+}

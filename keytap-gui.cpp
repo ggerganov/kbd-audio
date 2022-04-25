@@ -12,7 +12,7 @@
 #include "constants.h"
 #include "common.h"
 #include "common-gui.h"
-#include "audio_logger.h"
+#include "audio-logger.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl.h"

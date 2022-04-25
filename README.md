@@ -24,6 +24,13 @@ The **keytap2** tool is another interesting tool for recovering text from audio.
 
 [CTF: can you guess the text being typed?](https://ggerganov.github.io/keytap-challenge/)
 
+### Keytap3
+
+This version introduces significant algorithm improvements and better n-gram statistics. The attack is now fully
+automated and and does not require any manual intervation during the decoding process.
+
+[Check if your keyboard is vulnerable to Keytap](https://keytap3.ggerganov.com)
+
 ### What people say about Keytap
 
 *"This works incredibly well.\
@@ -48,7 +55,7 @@ Dependencies:
 
        [Mac OS with brew]
        $ brew install sdl2
-       
+
        [MSYS2]
        $ pacman -S git cmake make mingw-w64-x86_64-dlfcn mingw-w64-x86_64-gcc mingw-w64-x86_64-SDL2
 
@@ -75,17 +82,20 @@ Short summary of the available tools. If the status of the tool is not **stable*
 | **play-full**       | text    | **stable**  |
 | **view-gui**        | gui     | **stable**  |
 | **view-full-gui**   | gui     | **stable**  |
+| **key-detector**    | text    | **stable**  |
 | **keytap**          | text    | **stable**  |
 | **keytap-gui**      | gui     | **stable**  |
-| **keytap2**         | text    | development |
-| **keytap2-gui**     | gui     | **stable** |
+| **keytap2-gui**     | gui     | **stable**  |
+| **keytap3**         | text    | **stable**  |
 | -                   | *extra* | -           |
-| **guess_qp**        | text    | experiment  |
-| **guess_qp2**       | text    | experiment  |
-| **key_detector**    | text    | experiment  |
+| **guess-qp**        | text    | experiment  |
+| **guess-qp2**       | text    | experiment  |
+| **keytap3-multi**   | text    | experiment  |
 | **scale**           | text    | experiment  |
 | **subreak**         | text    | experiment  |
-| **key_average_gui** | gui     | experiment  |
+| **key-average-gui** | gui     | experiment  |
+| **keytap2**         | text    | experiment  |
+| **keytap3-gui**     | gui     | experiment  |
 
 ## Tool details
 
@@ -148,6 +158,16 @@ Short summary of the available tools. If the status of the tool is not **stable*
       ./keytap2-gui record.kbd ../data
 
   <a href="https://i.imgur.com/nPlLEDN.jpg" target="_blank">![keytap2-gui](https://i.imgur.com/nPlLEDN.jpg)</a>
+
+  ---
+
+* **keytap3**
+
+  Fully automated recovery of unknown text from audio recordings.
+
+      ./keytap3 input.kbd ../data [-cN] [-CN] [-pF] [-tF] [-FN] [-fN]
+
+  Online demo: https://keytap3.ggerganov.com
 
   ---
 

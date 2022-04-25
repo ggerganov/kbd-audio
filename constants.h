@@ -15,7 +15,7 @@ static constexpr int64_t kSamplesPerFrame = 2048;
 #else
 static constexpr int64_t kSamplesPerFrame = 512;
 #endif
-static constexpr int32_t kTopResultsPerProcessor = 4;
+static constexpr int32_t kTopResultsPerProcessor = 1;
 static constexpr int32_t kMaxRecords = 16;
 static constexpr int64_t kMaxSampleRate = 96000;
 static constexpr float   kMaxBufferSize_s = 5.000f;
@@ -43,15 +43,15 @@ static constexpr uint64_t kBkgrRingBufferSize = 4*1024;
 static constexpr int64_t kBkgrStep_samples = 16;
 static constexpr int64_t kKeyDuration_samples = 0.005f*kSampleRate;
 
-static constexpr float kFreqCutoff_Hz = 1000.0f;
+static constexpr float kFreqCutoff_Hz = 100.0f;
 
 static std::map<char, std::vector<char>> kNearbyKeys = {
     { 'a', { 'a', 'q', 'w', 's', 'z', 'x',                               } },
     { 'b', { 'b', 'f', 'g', 'h', 'v', 'n',                               } },
     { 'c', { 'c', 's', 'd', 'f', 'x', 'v',                               } },
     { 'd', { 'd', 'w', 'e', 'r', 's', 'f', 'x', 'c', 'v',                } },
-    //{ 'e', { 'e', 'w', 'r', 's', 'd', 'f', '_'                           } },
-    { 'e', { 'e', '_'                                                    } },
+    { 'e', { 'e', 'w', 'r', 's', 'd', 'f',                               } },
+    //{ 'e', { 'e', '_'                                                    } },
     { 'f', { 'f', 'e', 'r', 't', 'd', 'g', 'c', 'v', 'b',                } },
     { 'g', { 'g', 'r', 't', 'y', 'f', 'h', 'v', 'b', 'n',                } },
     { 'h', { 'h', 't', 'y', 'u', 'g', 'j', 'b', 'n', 'm',                } },

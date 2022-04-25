@@ -5,7 +5,7 @@
 
 #include "constants.h"
 #include "common.h"
-#include "audio_logger.h"
+#include "audio-logger.h"
 
 #include <map>
 #include <mutex>
@@ -586,7 +586,7 @@ int main(int argc, char ** argv) {
                 }
 #endif
 
-                if (ccsum*norm < 0.50f || (1.0f/norm < nWaveforms/3)) {
+                if (ccsum*norm < 0.50f || (1.0f/norm < nWaveforms/3.0)) {
                     failedToTrain.push_back(key);
                 }
 

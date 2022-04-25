@@ -5,7 +5,7 @@
 
 #include "constants.h"
 #include "common.h"
-#include "audio_logger.h"
+#include "audio-logger.h"
 
 #include <fstream>
 #include <chrono>
@@ -54,6 +54,7 @@ int main(int argc, char ** argv) {
     parameters.captureId = captureId;
     parameters.nChannels = nChannels;
     parameters.sampleRate = kSampleRate;
+    parameters.filter = EAudioFilter::None;
     parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
     if (audioLogger.install(std::move(parameters)) == false) {

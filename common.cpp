@@ -14,6 +14,18 @@
 #include <algorithm>
 #include <condition_variable>
 
+#ifndef pi
+#define  pi 3.1415926535897932384626433832795
+#endif
+
+#ifndef sqrt2
+#define sqrt2 (2.0 * 0.707106781186547524401)
+#endif
+
+#ifndef sqrt2over2
+#define  sqrt2over2  0.707106781186547524401
+#endif
+
 namespace {
 template <typename TSampleInput, typename TSample>
     bool readWaveform(std::ifstream & fin, TWaveformT<TSample> & res, int32_t offset, std::streamsize size) {
@@ -93,6 +105,39 @@ bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst) {
 }
 
 template bool convert<TSampleF, TSampleI16>(const TWaveformT<TSampleF> & src, TWaveformT<TSampleI16> & dst);
+
+template <typename TSample>
+void filter(TWaveformT<TSample> & waveform, EAudioFilter filter, float freqCutoff_Hz, int64_t sampleRate) {
+    switch (filter) {
+        case EAudioFilter::None:
+            {
+                return;
+            }
+            break;
+        case EAudioFilter::FirstOrderHighPass:
+            {
+                auto filterCoefficients = ::calculateCoefficientsFirstOrderHighPass(freqCutoff_Hz, sampleRate);
+                for (auto & s : waveform) {
+                    s = ::filterFirstOrderHighPass(filterCoefficients, s);
+                }
+                return;
+            }
+            break;
+        case EAudioFilter::SecondOrderButterworthHighPass:
+            {
+                auto filterCoefficients = ::calculateCoefficientsSecondOrderButterworthHighPass(freqCutoff_Hz, sampleRate);
+                for (auto & s : waveform) {
+                    s = ::filterSecondOrderButterworthHighPass(filterCoefficients, s);
+                }
+                return;
+            }
+            break;
+    }
+
+    fprintf(stderr, "Unknown filter type: %d\n", filter);
+}
+
+template void filter<TSampleF>(TWaveformT<TSampleF> & waveform, EAudioFilter filter, float freqCutoff_Hz, int64_t sampleRate);
 
 template <typename TSample>
 double calcAbsMax(const TWaveformT<TSample> & waveform) {
@@ -195,6 +240,65 @@ bool readFromFile(const std::string & fname, TWaveformT<TSample> & res, TTrainKe
 template bool readFromFile<TSampleF, TSampleI16>(const std::string & fname, TWaveformT<TSampleI16> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames);
 
 //
+// filters
+//
+
+TFilterCoefficients calculateCoefficientsFirstOrderHighPass(int fc, int fs) {
+    TFilterCoefficients res;
+
+    float th = 2.0 * pi * fc / fs;
+    float g = cos(th) / (1.0 + sin(th));
+    res.a0 = (1.0 + g) / 2.0;
+    res.a1 = -((1.0 + g) / 2.0);
+    res.a2 = 0.0;
+    res.b1 = -g;
+    res.b2 = 0.0;
+
+    return res;
+}
+
+TFilterCoefficients calculateCoefficientsSecondOrderButterworthHighPass(int fc, int fs) {
+    TFilterCoefficients res;
+
+    float c = tan(pi*fc / fs);
+    res.a0 = 1.0 / (1.0 + sqrt2*c + pow(c, 2.0));
+    res.a1 = -2.0 * res.a0;
+    res.a2 = res.a0;
+    res.b1 = 2.0 * res.a0*(pow(c, 2.0) - 1.0);
+    res.b2 = res.a0 * (1.0 - sqrt2*c + pow(c, 2.0));
+
+    return res;
+}
+
+TSampleF filterFirstOrderHighPass(TFilterCoefficients & coefficients, TSampleF sample) {
+    TSampleF xn = sample;
+    TSampleF yn =
+        coefficients.a0*xn + coefficients.a1*coefficients.xnz1 + coefficients.a2*coefficients.xnz2 -
+                             coefficients.b1*coefficients.ynz1 - coefficients.b2*coefficients.ynz2;
+
+    coefficients.xnz2 = coefficients.xnz1;
+    coefficients.xnz1 = xn;
+    coefficients.ynz2 = coefficients.ynz1;
+    coefficients.ynz1 = yn;
+
+    return yn;
+}
+
+TSampleF filterSecondOrderButterworthHighPass(TFilterCoefficients & coefficients, TSampleF sample) {
+    TSampleF xn = sample;
+    TSampleF yn =
+        coefficients.a0*xn + coefficients.a1*coefficients.xnz1 + coefficients.a2*coefficients.xnz2 -
+                             coefficients.b1*coefficients.ynz1 - coefficients.b2*coefficients.ynz2;
+
+    coefficients.xnz2 = coefficients.xnz1;
+    coefficients.xnz1 = xn;
+    coefficients.ynz2 = coefficients.ynz1;
+    coefficients.ynz1 = yn;
+
+    return yn;
+}
+
+//
 // calcCC
 //
 
@@ -208,6 +312,25 @@ std::tuple<double, double> calcSum(const TKeyWaveformF & waveform, int is0, int 
     }
 
     return std::tuple<double, double>(sum, sum2);
+}
+
+template<>
+std::tuple<int64_t, int64_t> calcSum(const TWaveformViewT<TSampleMI16> & waveform) {
+    int64_t sum = 0;
+    int64_t sum2 = 0;
+
+    auto samples = waveform.samples;
+    auto n       = waveform.n;
+
+    for (int is = 0; is < n; ++is) {
+        for (int j = 0; j < TSampleMI16::N; j++) {
+            int32_t a0 = samples[is][j];
+            sum += a0;
+            sum2 += a0*a0;
+        }
+    }
+
+    return std::tuple<int64_t, int64_t>(sum, sum2);
 }
 
 template<typename T>
@@ -267,6 +390,53 @@ TValueCC calcCC(
         double nom = sum01*ncc - sum0*sum1;
         double den2a = sum02*ncc - sum0*sum0;
         double den2b = sum12*ncc - sum1*sum1;
+        cc = (nom)/(sqrt(den2a*den2b));
+    }
+
+    return cc;
+}
+
+template<>
+TValueCC calcCC(
+    const TWaveformViewT<TSampleMI16> & waveform0,
+    const TWaveformViewT<TSampleMI16> & waveform1,
+    int64_t sum0, int64_t sum02) {
+    TValueCC cc = -1.0f;
+
+    int64_t sum1 = 0;
+    int64_t sum12 = 0;
+    int64_t sum01 = 0;
+
+    auto samples0 = waveform0.samples;
+    auto n0       = waveform0.n;
+
+    auto samples1 = waveform1.samples;
+    auto n1       = waveform1.n;
+
+#ifdef MY_DEBUG
+    if (n0 != n1) {
+        printf("BUG 234f8273\n");
+    }
+#endif
+    auto n = std::min(n0, n1);
+
+    for (int64_t is = 0; is < n; ++is) {
+        for (int j = 0; j < TSampleMI16::N; j++) {
+            int32_t a0 = samples0[is][j];
+            int32_t a1 = samples1[is][j];
+
+            sum1 += a1;
+            sum12 += a1*a1;
+            sum01 += a0*a1;
+        }
+    }
+
+    n *= TSampleMI16::N;
+
+    {
+        double nom   = sum01*n - sum0*sum1;
+        double den2a = sum02*n - sum0*sum0;
+        double den2b = sum12*n - sum1*sum1;
         cc = (nom)/(sqrt(den2a*den2b));
     }
 
@@ -435,6 +605,85 @@ template std::tuple<TValueCC, TOffset> findBestCC<TSampleI16>(
 // calculateSimilarityMap
 //
 
+template<>
+bool calculateSimilartyMap(
+        const int32_t keyPressWidth_samples,
+        const int32_t alignWindow_samples,
+        const int32_t offsetFromPeak_samples,
+        TKeyPressCollectionT<TSampleMI16> & keyPresses,
+        TSimilarityMap & res) {
+    int nPresses = keyPresses.size();
+
+    int w = keyPressWidth_samples;
+    int a = alignWindow_samples;
+
+    res.clear();
+    res.resize(nPresses);
+    for (auto & x : res) x.resize(nPresses);
+
+    int nFinished = 0;
+#ifdef __EMSCRIPTEN__
+    int nWorkers = std::max(1, std::min(4, int(std::thread::hardware_concurrency()) - 4));
+#else
+    int nWorkers = std::thread::hardware_concurrency();
+#endif
+
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::vector<std::thread> workers(nWorkers);
+    for (int iw = 0; iw < (int) workers.size(); ++iw) {
+        auto & worker = workers[iw];
+        worker = std::thread([&](int ith) {
+            for (int i = ith; i < nPresses; i += nWorkers) {
+                res[i][i].cc = 1.0f;
+                res[i][i].offset = 0;
+
+                const auto & waveform0 = keyPresses[i].waveform;
+                const auto & pos0      = keyPresses[i].pos;
+
+                auto & avgcc = keyPresses[i].ccAvg;
+
+                const auto samples0 = waveform0.samples;
+
+                for (int j = i + 1; j < nPresses; ++j) {
+                    if (i == j) continue;
+
+                    const auto waveform1 = keyPresses[j].waveform;
+                    const auto pos1      = keyPresses[j].pos;
+
+                    const auto samples1 = waveform1.samples;
+                    const auto ret = findBestCC(TWaveformViewT<TSampleMI16> { samples0 + pos0 + offsetFromPeak_samples - w,     2*w },
+                                                TWaveformViewT<TSampleMI16> { samples1 + pos1 + offsetFromPeak_samples - w - a, 2*w + 2*a }, a);
+
+                    const auto bestcc     = std::get<0>(ret);
+                    const auto bestoffset = std::get<1>(ret);
+
+                    res[i][j].cc = bestcc;
+                    res[i][j].offset = bestoffset;
+
+                    res[j][i].cc = bestcc;
+                    res[j][i].offset = -bestoffset;
+
+                    avgcc += bestcc;
+                }
+                avgcc /= (nPresses - 1);
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                ++nFinished;
+                cv.notify_one();
+            }
+        }, iw);
+        worker.detach();
+    }
+
+    std::unique_lock<std::mutex> lock(mutex);
+    cv.wait(lock, [&]() { return nFinished == nWorkers; });
+
+    return true;
+}
+
 template<typename T>
 bool calculateSimilartyMap(
         const int32_t keyPressWidth_samples,
@@ -475,7 +724,7 @@ bool calculateSimilartyMap(
 
                 const auto samples0 = waveform0.samples;
 
-                for (int j = 0; j < nPresses; ++j) {
+                for (int j = i + 1; j < nPresses; ++j) {
                     if (i == j) continue;
 
                     const auto waveform1 = keyPresses[j].waveform;
@@ -490,6 +739,9 @@ bool calculateSimilartyMap(
 
                     res[i][j].cc = bestcc;
                     res[i][j].offset = bestoffset;
+
+                    res[j][i].cc = bestcc;
+                    res[j][i].offset = -bestoffset;
 
                     avgcc += bestcc;
                 }
@@ -522,6 +774,116 @@ template bool calculateSimilartyMap<TSampleI16>(
 // findKeyPresses
 //
 
+template<>
+bool findKeyPresses(
+        const TWaveformViewT<TSampleMI16> & waveform,
+        TKeyPressCollectionT<TSampleMI16> & res,
+        TWaveformT<TSampleMI16> & waveformThreshold,
+        TWaveformT<TSampleMI16> & waveformMax,
+        double thresholdBackground,
+        int historySize,
+        int historySizeReset,
+        bool removeLowPower) {
+    res.clear();
+    waveformThreshold.resize(waveform.n);
+    waveformMax.resize(waveform.n);
+
+    int rbBegin = 0;
+    double rbAverage = 0.0;
+    std::vector<double> rbSamples(8*historySize, 0.0);
+
+    int k = historySize;
+    std::deque<int64_t> que(k);
+
+    auto samples = waveform.samples;
+    auto n       = waveform.n;
+
+    TWaveformT<TSampleMI16> waveformAbs(n);
+    for (int64_t i = 0; i < n; ++i) {
+        waveformAbs[i][0] = std::abs(samples[i][0]);
+    }
+
+    for (int64_t i = 0; i < n; ++i) {
+        {
+            int64_t ii = i - k/2;
+            if (ii >= 0) {
+                rbAverage *= rbSamples.size();
+                rbAverage -= rbSamples[rbBegin];
+                double acur = waveformAbs[i][0];
+                rbSamples[rbBegin] = acur;
+                rbAverage += acur;
+                rbAverage /= rbSamples.size();
+                if (++rbBegin >= (int) rbSamples.size()) {
+                    rbBegin = 0;
+                }
+            }
+        }
+
+        if (i < k) {
+            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
+                que.pop_back();
+            }
+            que.push_back(i);
+        } else {
+            while((!que.empty()) && que.front() <= i - k) {
+                que.pop_front();
+            }
+
+            while((!que.empty()) && waveformAbs[i] >= waveformAbs[que.back()]) {
+                que.pop_back();
+            }
+
+            que.push_back(i);
+
+            int64_t itest = i - k/2;
+            if (itest >= 2*k && itest < n - 2*k && que.front() == itest) {
+                double acur = waveformAbs[itest][0];
+                if (acur > thresholdBackground*rbAverage) {
+                    res.emplace_back(TKeyPressDataT<TSampleMI16> { std::move(waveform), itest, 0.0, -1, -1, '?' });
+                }
+            }
+            waveformThreshold[itest][0] = thresholdBackground*rbAverage;
+            waveformMax[itest] = waveformAbs[que.front()];
+        }
+    }
+
+    if (removeLowPower) {
+        while (true) {
+            auto oldn = res.size();
+
+            double avgPower = 0.0;
+            for (const auto & kp : res) {
+                avgPower += waveformAbs[kp.pos][0];
+            }
+            avgPower /= res.size();
+
+            auto tmp = std::move(res);
+            for (const auto & kp : tmp) {
+                if (waveformAbs[kp.pos][0] > 0.3*avgPower) {
+                    res.push_back(kp);
+                }
+            }
+
+            if (res.size() == oldn) break;
+        }
+    }
+
+    if (res.size() > 1) {
+        TKeyPressCollectionT<TSampleMI16> res2;
+        res2.push_back(res.front());
+
+        for (int i = 1; i < (int) res.size(); ++i) {
+            if (res[i].pos - res2.back().pos > historySizeReset || waveformMax[res[i].pos] > waveformMax[res2.back().pos]) {
+                res2.push_back(res[i]);
+            }
+        }
+
+        std::swap(res, res2);
+    }
+
+    return true;
+}
+
 template<typename T>
 bool findKeyPresses(
         const TWaveformViewT<T> & waveform,
@@ -530,6 +892,7 @@ bool findKeyPresses(
         TWaveformT<T> & waveformMax,
         double thresholdBackground,
         int historySize,
+        int historySizeReset,
         bool removeLowPower) {
     res.clear();
     waveformThreshold.resize(waveform.n);
@@ -615,6 +978,19 @@ bool findKeyPresses(
         }
     }
 
+    if (res.size() > 1) {
+        TKeyPressCollectionT<T> res2;
+        res2.push_back(res.front());
+
+        for (int i = 1; i < (int) res.size(); ++i) {
+            if (res[i].pos - res2.back().pos > historySizeReset || waveformMax[res[i].pos] > waveformMax[res2.back().pos]) {
+                res2.push_back(res[i]);
+            }
+        }
+
+        std::swap(res, res2);
+    }
+
     return true;
 }
 
@@ -625,6 +1001,7 @@ template bool findKeyPresses<TSampleI16>(
         TWaveformT<TSampleI16> & waveformMax,
         double thresholdBackground,
         int historySize,
+        int historySizeReset,
         bool removeLowPower);
 
 template<typename T>

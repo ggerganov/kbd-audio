@@ -5,7 +5,7 @@
 
 #include "constants.h"
 #include "common.h"
-#include "audio_logger.h"
+#include "audio-logger.h"
 
 #include <stdio.h>
 #include <termios.h>

@@ -66,10 +66,10 @@ for sear3ches made through apple prod6u4cts such as the Safa=ri browser a0nd Sir
         params.maxClusters = std::max(params.maxClusters, c + 1);
     }
 
-    TClusterToLetterMap clMap;
-    Cipher::subbreak(params, freqMap, enc, clMap);
+    Cipher::TResult result;
+    Cipher::subbreak(params, freqMap, result);
 
-    Cipher::printText(enc, clMap);
+    Cipher::printText(enc, result.clMap);
 
     return 0;
 }

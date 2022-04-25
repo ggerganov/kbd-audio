@@ -334,6 +334,7 @@ namespace {
     };
 
 // generate k random distinct ints in [0..n)
+[[maybe_unused]]
 std::vector<int> subset(int k, int n) {
     std::vector<int> res(k);
     for (int i = 0; i < k; ++i) res[i] = i;

@@ -49,12 +49,24 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
 endif()
 
-set (CMAKE_CXX_STANDARD 14)
+set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (EMSCRIPTEN)
     set (CMAKE_CXX_FLAGS " \
     -s USE_SDL=2 \
+    -s USE_PTHREADS=1 \
+    ")
+    #-s DISABLE_EXCEPTION_CATCHING=1 \
+
+    set(CMAKE_EXE_LINKER_FLAGS " \
+    --bind \
+    --use-preload-cache \
+    --closure 1 \
+    -s ASSERTIONS=1 \
+    -s NO_EXIT_RUNTIME=0 \
+    -s PTHREAD_POOL_SIZE=8 \
+    -s INITIAL_MEMORY=536870912 \
     ")
 elseif(MINGW)
     find_package(PkgConfig REQUIRED)
@@ -101,7 +113,7 @@ include_directories(${OPENGL_INCLUDE_DIR})
 
 add_library(Core STATIC
     common.cpp
-    audio_logger.cpp
+    audio-logger.cpp
     )
 
 target_include_directories(Core PRIVATE
@@ -158,11 +170,17 @@ else()
         )
 endif()
 
+add_executable(keytap-gui keytap-gui.cpp)
+target_link_libraries(keytap-gui PRIVATE Core Gui)
+
 add_executable(keytap2-gui keytap2-gui.cpp subbreak2.cpp)
 target_link_libraries(keytap2-gui PRIVATE Core Gui)
 
-add_executable(keytap-gui keytap-gui.cpp)
-target_link_libraries(keytap-gui PRIVATE Core Gui)
+add_executable(keytap3-gui keytap3-gui.cpp subbreak3.cpp)
+target_link_libraries(keytap3-gui PRIVATE Core Gui)
+
+add_executable(keytap3-app keytap3-app.cpp subbreak3.cpp)
+target_link_libraries(keytap3-app PRIVATE Core)
 
 add_executable(view-full-gui view-full-gui.cpp)
 target_link_libraries(view-full-gui PRIVATE Core Gui)
@@ -175,7 +193,7 @@ if (EMSCRIPTEN)
     set_target_properties(${TARGET} PROPERTIES LINK_FLAGS " \
     -s TOTAL_MEMORY=536870912 \
     -s LZ4=1 \
-    --preload-file ${PROJECT_SOURCE_DIR}/chal/record@/ \  \
+    --preload-file ${PROJECT_SOURCE_DIR}/chal/record@/chal/record/ \  \
     ")
 
     ## keytap-gui
@@ -195,7 +213,20 @@ if (EMSCRIPTEN)
     -s TOTAL_MEMORY=536870912 \
     -s FORCE_FILESYSTEM=1 \
     -s LZ4=1 \
-    --preload-file ${PROJECT_SOURCE_DIR}/data@/ \
+    --preload-file ${PROJECT_SOURCE_DIR}/data/@/data/ \
+    ")
+
+    configure_file(${CMAKE_SOURCE_DIR}/index-${TARGET}-tmpl.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html @ONLY)
+    configure_file(${CMAKE_SOURCE_DIR}/style.css ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/style.css @ONLY)
+
+    # keytap3-app
+    set(TARGET keytap3-app)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${TARGET})
+
+    set_target_properties(${TARGET} PROPERTIES LINK_FLAGS " \
+    -s FORCE_FILESYSTEM=1 \
+    -s LZ4=1 \
+    --preload-file ${PROJECT_SOURCE_DIR}/data/ggwords-6-gram.dat.binary@/data/ \
     ")
 
     configure_file(${CMAKE_SOURCE_DIR}/index-${TARGET}-tmpl.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html @ONLY)
@@ -203,11 +234,17 @@ if (EMSCRIPTEN)
 endif()
 
 if (NOT EMSCRIPTEN)
+    add_executable(key-detector key-detector.cpp)
+    target_link_libraries(key-detector PRIVATE Core)
+
     add_executable(keytap keytap.cpp)
     target_link_libraries(keytap PRIVATE Core)
 
     add_executable(keytap2 keytap2.cpp)
     target_link_libraries(keytap2 PRIVATE Core)
+
+    add_executable(keytap3 keytap3.cpp subbreak3.cpp)
+    target_link_libraries(keytap3 PRIVATE Core)
 
     add_executable(play play.cpp)
     target_link_libraries(play PRIVATE Core)
@@ -227,26 +264,29 @@ if (NOT EMSCRIPTEN)
     add_executable(view-gui view-gui.cpp)
     target_link_libraries(view-gui PRIVATE Core Gui)
 
+    add_executable(compress-n-grams compress-n-grams.cpp subbreak3.cpp)
+    target_link_libraries(compress-n-grams PRIVATE Core)
+
     #
     ## Experimental stuff
 
     if (BUILD_EXPERIMENTAL)
         if (FFTW_FOUND)
-            add_executable(key_average_gui key_average_gui.cpp)
-            target_include_directories(key_average_gui PRIVATE ${FFTW_INCLUDE_DIRS})
-            target_link_libraries(key_average_gui PRIVATE Core Gui ${FFTW_LIBRARIES})
+            add_executable(key-average-gui key-average-gui.cpp)
+            target_include_directories(key-average-gui PRIVATE ${FFTW_INCLUDE_DIRS})
+            target_link_libraries(key-average-gui PRIVATE Core Gui ${FFTW_LIBRARIES})
         else()
-            message(WARNING "Skipping 'key_average_gui' target because FFTW is not available")
+            message(WARNING "Skipping 'key-average-gui' target because FFTW is not available")
         endif()
 
-        add_executable(guess_qp guess_qp.cpp)
-        target_link_libraries(guess_qp PRIVATE Core)
+        add_executable(keytap3-multi keytap3-multi.cpp subbreak3.cpp)
+        target_link_libraries(keytap3-multi PRIVATE Core)
 
-        add_executable(guess_qp2 guess_qp2.cpp)
-        target_link_libraries(guess_qp2 PRIVATE Core)
+        add_executable(guess-qp guess-qp.cpp)
+        target_link_libraries(guess-qp PRIVATE Core)
 
-        add_executable(key_detector key_detector.cpp)
-        target_link_libraries(key_detector PRIVATE Core)
+        add_executable(guess-qp2 guess-qp2.cpp)
+        target_link_libraries(guess-qp2 PRIVATE Core)
 
         add_executable(scale scale.cpp)
         target_link_libraries(scale PRIVATE Core)
@@ -262,6 +302,9 @@ if (NOT EMSCRIPTEN)
 
         add_executable(generate-clusters generate-clusters.cpp subbreak2.cpp)
         target_link_libraries(generate-clusters PRIVATE Core)
+
+        add_executable(test-subbreak3 test-subbreak3.cpp subbreak3.cpp)
+        target_link_libraries(test-subbreak3 PRIVATE Core)
     endif()
 
 endif()

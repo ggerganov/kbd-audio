@@ -36,14 +36,14 @@ for searches made through apple products such as the safari browser and siri.
     TSimilarityMap logMapInv;
     Cipher::normalizeSimilarityMap(params, ccMap, logMap, logMapInv);
 
-    TClusters clusters;
-    Cipher::generateClustersInitialGuess(params, ccMap, clusters);
+    Cipher::TResult result;
+    Cipher::generateClustersInitialGuess(params, ccMap, result.clusters);
 
-    auto pCur = Cipher::calcPClusters(params, ccMap, logMap, logMapInv, clusters);
+    auto pCur = Cipher::calcPClusters(params, ccMap, logMap, logMapInv, result.clusters, result.clMap);
     while (true) {
-        auto clustersNew = clusters;
+        auto clustersNew = result.clusters;
         Cipher::mutateClusters(params, clustersNew);
-        auto pNew = Cipher::calcPClusters(params, ccMap, logMap, logMapInv, clustersNew);
+        auto pNew = Cipher::calcPClusters(params, ccMap, logMap, logMapInv, clustersNew, result.clMap);
 
         //printf("pNew = %g, pCur = %g\n", pNew, pCur);
 
@@ -54,15 +54,15 @@ for searches made through apple products such as the safari browser and siri.
         //printf("alpha = %g\n", alpha);
 
         if (u <= alpha) {
-            clusters = clustersNew;
+            result.clusters = clustersNew;
             pCur = pNew;
 
             int n = plain.size();
             int nMatch = 0;
             for (int j = 0; j < n - 1; ++j) {
                 for (int i = j + 1; i < n; ++i) {
-                    if ((plain[i] == plain[j] && clusters[i] == clusters[j]) ||
-                        (plain[i] != plain[j] && clusters[i] != clusters[j])) {
+                    if ((plain[i] == plain[j] && result.clusters[i] == result.clusters[j]) ||
+                        (plain[i] != plain[j] && result.clusters[i] != result.clusters[j])) {
                         ++nMatch;
                     }
                 }
@@ -77,7 +77,7 @@ for searches made through apple products such as the safari browser and siri.
                 cnt = 0;
                 params.nSubbreakIterations = 1000;
                 TClusterToLetterMap clMap;
-                Cipher::subbreak(params, freqMap, clusters, clMap);
+                Cipher::subbreak(params, freqMap, result);
             }
         }
     }

@@ -13,9 +13,8 @@
 #include "constants.h"
 #include "common.h"
 #include "common-gui.h"
-#include "subbreak.h"
 #include "subbreak2.h"
-#include "audio_logger.h"
+#include "audio-logger.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
@@ -618,8 +617,8 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         //ImGui::Text("Keys pressed:");   for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyPressed(i))             { ImGui::SameLine(); ImGui::Text("%d", i); }
 
         static bool playHalfSpeed = false;
-        static int historySize = 3*1024;
-        static float thresholdBackground = 10.0;
+        static int historySize = 2*1024;
+        static float thresholdBackground = 8.0;
         ImGui::PushItemWidth(100.0);
 
         if (stateUI.recording == false) {
@@ -722,7 +721,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         }
 
         if (recalculateKeyPresses) {
-            findKeyPresses(getView(waveform, 0), keyPresses, waveformThreshold, waveformMax, thresholdBackground, historySize, true);
+            findKeyPresses(getView(waveform, 0), keyPresses, waveformThreshold, waveformMax, thresholdBackground, 512, historySize, true);
             recalculateKeyPresses = false;
         }
 
@@ -1246,18 +1245,23 @@ int main(int argc, char ** argv) {
     srand(time(0));
 
     printf("Build: %s, (%s)\n", kGIT_DATE, kGIT_SHA1);
-    printf("Usage: %s record.kbd n-gram-dir [-pN] [-cN] [-CN]\n", argv[0]);
+    printf("Usage: %s record.kbd n-gram-dir [-pN] [-cN] [-CN] [-FN] [-fN]\n", argv[0]);
     printf("    -pN - select playback device N\n");
     printf("    -cN - select capture device N\n");
     printf("    -CN - select number N of capture channels to use\n");
+    printf("    -FN - select filter type, (0 - none, 1 - first order high-pass, 2 - second order high-pass)\n");
+    printf("    -fN - cutoff frequency in Hz\n");
+
     if (argc < 3) {
         return -1;
     }
 
-    auto argm = parseCmdArguments(argc, argv);
-    int playbackId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
-    int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
-    int nChannels = argm["C"].empty() ? 0 : std::stoi(argm["C"]);
+    const auto argm = parseCmdArguments(argc, argv);
+    const int playbackId    = argm.count("p") == 0 ? 0 : std::stoi(argm.at("p"));
+    const int captureId     = argm.count("c") == 0 ? 0 : std::stoi(argm.at("c"));
+    const int nChannels     = argm.count("C") == 0 ? 0 : std::stoi(argm.at("C"));
+    const int filterId      = argm.count("F") == 0 ? EAudioFilter::FirstOrderHighPass : std::stoi(argm.at("F"));
+    const int freqCutoff_Hz = argm.count("f") == 0 ? kFreqCutoff_Hz : std::stoi(argm.at("f"));
 
     stateUI.params.playbackId = playbackId;
     stateUI.fnameRecord = argv[1];
@@ -1296,6 +1300,7 @@ int main(int argc, char ** argv) {
         parameters.captureId = captureId;
         parameters.nChannels = nChannels;
         parameters.sampleRate = kSampleRate;
+        parameters.filter = (EAudioFilter) filterId;
         parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
         if (audioLogger.install(std::move(parameters)) == false) {
@@ -1325,6 +1330,9 @@ int main(int argc, char ** argv) {
         printf("Specified file '%s' does not exist\n", argv[1]);
         //return -4;
     } else {
+        printf("[+] Filtering waveform with filter type = %d and cutoff frequency = %d Hz\n", filterId, freqCutoff_Hz);
+        ::filter(stateUI.waveformOriginal, (EAudioFilter) filterId, freqCutoff_Hz, kSampleRate);
+
         printf("[+] Converting waveform to i16 format ...\n");
         if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
             printf("Conversion failed\n");
@@ -1760,8 +1768,6 @@ int main(int argc, char ** argv) {
             }
 
             if (stateCore.processing && stateCore.keyPresses.size() >= 3) {
-                static auto tStart = t_ms();
-
                 {
                     int n = stateCore.keyPresses.size();
                     stateCore.params.cipher.hint.clear();
@@ -1814,9 +1820,6 @@ int main(int argc, char ** argv) {
                 std::unique_lock<std::mutex> lock(mutex);
                 cv.wait(lock, [&]() { return nFinished == nWorkers; });
 #endif
-
-                auto tEnd = t_ms();
-                //printf("Performance: %g iters/sec\n", 1000.0*stateCore.processors[0].getIters()/(tEnd - tStart));
             } else {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }

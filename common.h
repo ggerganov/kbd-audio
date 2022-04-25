@@ -14,16 +14,19 @@
 // types
 
 struct stMatch;
+template<typename T, int N> struct stSampleMulti;
 template<typename T> struct stWaveformView;
 template<typename T> struct stKeyPressData;
+template<typename T> struct stKeyPressDataNew;
 template<typename T> struct stKeyPressCollection;
+template<typename T> struct stKeyPressCollectionNew;
 template<typename T> struct stPlaybackData;
 
-template<typename T> using TWaveformT           = std::vector<T>;
-template<typename T> using TWaveformViewT       = stWaveformView<T>;
-template<typename T> using TKeyPressDataT       = stKeyPressData<T>;
-template<typename T> using TKeyPressCollectionT = stKeyPressCollection<T>;
-template<typename T> using TPlaybackDataT       = stPlaybackData<T>;
+template<typename T> using TWaveformT              = std::vector<T>;
+template<typename T> using TWaveformViewT          = stWaveformView<T>;
+template<typename T> using TKeyPressDataT          = stKeyPressData<T>;
+template<typename T> using TKeyPressCollectionT    = stKeyPressCollection<T>;
+template<typename T> using TPlaybackDataT          = stPlaybackData<T>;
 
 using TConfidence   = float;
 using TValueCC      = double;
@@ -32,6 +35,7 @@ using TClusterId    = int32_t;
 
 using TSampleF      = float;
 using TSampleI16    = int16_t;
+using TSampleMI16   = stSampleMulti<TSampleI16, 4>;
 
 using TKey              = int32_t;
 using TKeyPressPosition = int64_t;
@@ -52,16 +56,34 @@ using TKeyPressDataI16          = TKeyPressDataT<TSampleI16>;
 using TKeyPressCollectionI16    = TKeyPressCollectionT<TSampleI16>;
 using TPlaybackDataI16          = TPlaybackDataT<TSampleI16>;
 
+using TWaveformMI16             = TWaveformT<TSampleMI16>;
+using TWaveformViewMI16         = TWaveformViewT<TSampleMI16>;
+using TKeyPressDataMI16         = TKeyPressDataT<TSampleMI16>;
+using TKeyPressCollectionMI16   = TKeyPressCollectionT<TSampleMI16>;
+using TPlaybackDataMI16         = TPlaybackDataT<TSampleMI16>;
+
 // - float samples
 
 using TWaveformF    = TWaveformT<TSampleF>;
 using TKeyWaveformF = std::vector<TSampleF>;
 using TKeyHistoryF  = std::vector<TKeyWaveformF>;
 
+enum EAudioFilter {
+    None = 0,
+    FirstOrderHighPass,
+    SecondOrderButterworthHighPass,
+};
+
 // structs
 struct stMatch {
     TValueCC    cc      = 0.0;
     TOffset     offset  = 0;
+};
+
+template<typename T, int SIZE>
+struct stSampleMulti : public std::array<T, SIZE> {
+    static const int N = SIZE;
+    using std::array<T, SIZE>::array;
 };
 
 template<typename T>
@@ -95,6 +117,21 @@ struct stPlaybackData {
     TWaveformViewT<T> waveform;
 };
 
+struct TFilterCoefficients {
+    float a0 = 0.0f;
+    float a1 = 0.0f;
+    float a2 = 0.0f;
+    float b1 = 0.0f;
+    float b2 = 0.0f;
+    float c0 = 0.0f;
+    float d0 = 0.0f;
+
+    float xnz1 = 0.0f;
+    float xnz2 = 0.0f;
+    float ynz1 = 0.0f;
+    float ynz2 = 0.0f;
+};
+
 // helpers
 
 float frand();
@@ -126,6 +163,9 @@ template <typename TSample>
 double calcAbsMax(const TWaveformT<TSample> & waveform);
 
 template <typename TSample>
+void filter(TWaveformT<TSample> & waveform, EAudioFilter filter, float freqCutoff_Hz, int64_t sampleRate);
+
+template <typename TSample>
 bool saveToFile(const std::string & fname, TWaveformT<TSample> & waveform);
 
 template <typename TSampleInput, typename TSample>
@@ -133,6 +173,18 @@ bool readFromFile(const std::string & fname, TWaveformT<TSample> & res);
 
 template <typename TSampleInput, typename TSample>
 bool readFromFile(const std::string & fname, TWaveformT<TSample> & res, TTrainKeys & trainKeys, int32_t & bufferSize_frames);
+
+//
+// filters
+//
+
+TFilterCoefficients calculateCoefficientsFirstOrderHighPass(int fc, int fs);
+
+TFilterCoefficients calculateCoefficientsSecondOrderButterworthHighPass(int fc, int fs);
+
+TSampleF filterFirstOrderHighPass(TFilterCoefficients & coefficients, TSampleF sample);
+
+TSampleF filterSecondOrderButterworthHighPass(TFilterCoefficients & coefficients, TSampleF sample);
 
 //
 // calcSum
@@ -199,7 +251,8 @@ bool findKeyPresses(
         TWaveformT<T> & waveformMax,
         double thresholdBackground,
         int historySize,
-        bool removeLowPower = false);
+        int historySizeReset,
+        bool removeLowPower);
 
 template<typename T>
 bool saveKeyPresses(const std::string & fname, const TKeyPressCollectionT<T> & keyPresses);
