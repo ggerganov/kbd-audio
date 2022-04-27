@@ -54,8 +54,8 @@ jobs:
             - name: Build
               run: make
 
-    macOS-10_14-clang:
-        runs-on: macOS-10.14
+    macOS-latest:
+        runs-on: macOS-latest
 
         strategy:
             matrix:
