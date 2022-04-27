@@ -50,6 +50,7 @@ struct StateRecording {
 
     int nKeysHave = 0;
     bool isStarted = false;
+    std::atomic_bool interrupt = false;
     std::atomic_bool doRecord = false;
     std::atomic_bool doneRecording = false;
     size_t totalSize_bytes = 0;
@@ -73,6 +74,7 @@ struct StateRecording {
 
         nKeysHave = 0;
         isStarted = true;
+        interrupt = false;
         doRecord = true;
         doneRecording = false;
         totalSize_bytes = 0;
@@ -90,6 +92,11 @@ struct StateRecording {
                     waveformF.insert(waveformF.end(), frame.begin(), frame.end());
                 }
 
+                if (interrupt) {
+                    doneRecording = true;
+                    printf("\n[!] Recoding interrupted\n");
+                    return;
+                }
                 if (nKeysToCapture <= nKeysHave && !doneRecording) {
                     doneRecording = true;
                     printf("\n[+] Done recording\n");
@@ -130,7 +137,7 @@ struct StateRecording {
         }
     }
 
-    void updateWorker(std::string & dataOutput, float tElapsed) {
+    void updateWorker(std::string & dataOutput, float tElapsed_s) {
         {
             std::lock_guard lock(mutex);
             waveformFWork = waveformF;
@@ -154,16 +161,23 @@ struct StateRecording {
         {
             std::lock_guard lock(mutex);
 
+            float cpm = 0.0f;
+            if (keyPresses.size() > 0) {
+                int idx = 0;
+                while (idx < (int) keyPresses.size() && keyPresses[idx].pos < ((int) waveformF.size() - 10*kSampleRate)) {
+                    ++idx;
+                }
+                cpm = 60.0f*(nKeysHave - idx)/std::min(10.0f, (float) waveformF.size()/kSampleRate);
+                dataOutput = "recording " + std::to_string(nKeysHave) + " " + std::to_string(cpm);
+            }
+
             if (nKeysHave < (int) keyPresses.size()) {
                 nKeysHave = keyPresses.size();
-
-                const float cpm = 60.0f*(nKeysHave/tElapsed);
-                dataOutput = "recording " + std::to_string(nKeysHave) + " " + std::to_string(cpm);
 
                 printf("    Detected %d keys. %d left. Average typing speed: %5.2f cpm\n", nKeysHave, nKeysToCapture - nKeysHave, cpm);
             }
 
-            if (tElapsed > 2*60.0f) {
+            if (tElapsed_s > 2*60.0f) {
                 printf("[!] Recording limit reached\n");
                 doneRecording = true;
             }
@@ -173,6 +187,7 @@ struct StateRecording {
 
 struct StateDecoding {
     std::string pathData = "./data";
+    std::atomic_bool interrupt = false;
     TWaveform waveformInput;
     Cipher::TFreqMap freqMap6;
 };
@@ -249,7 +264,7 @@ bool AppInterface::init(State & state) {
     };
 
     setData = [&](const std::string & data) {
-        printf("Received some data from the JS layer: %s\n", data.c_str());
+        //printf("Received some data from the JS layer: %s\n", data.c_str());
 
         std::stringstream ss(data);
 
@@ -270,7 +285,12 @@ bool AppInterface::init(State & state) {
                 state.recording.init();
             }
         } else if (cmd == "stop") {
-            state.state = State::Idle;
+            if (state.state == State::Recording) {
+                state.recording.interrupt = true;
+            }
+            if (state.state == State::Decoding) {
+                state.decoding.interrupt = true;
+            }
         } else {
             printf("Unknown cmd: %s\n", cmd.c_str());
         }
@@ -320,14 +340,15 @@ bool AppInterface::init(State & state) {
                     state.recording.update();
 
                     if (state.worker.joinable() == false) {
+                        state.dataOutput = "recording 0 0";
                         state.worker = std::thread([&]() {
                             const auto tStart = std::chrono::high_resolution_clock::now();
 
                             while (state.recording.doneRecording == false) {
                                 const auto tNow = std::chrono::high_resolution_clock::now();
-                                const float tElapsed = std::chrono::duration<float>(tNow - tStart).count();
+                                const float tElapsed_s = std::chrono::duration<float>(tNow - tStart).count();
 
-                                state.recording.updateWorker(state.dataOutput, tElapsed);
+                                state.recording.updateWorker(state.dataOutput, tElapsed_s);
 
                                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                             }
@@ -364,6 +385,7 @@ bool AppInterface::init(State & state) {
                 {
                     if (state.worker.joinable() == false) {
                         state.workDone = false;
+                        state.decoding.interrupt = false;
                         state.worker = std::thread([&]() {
                             TKeyPressCollection keyPresses;
                             {
@@ -457,6 +479,7 @@ bool AppInterface::init(State & state) {
 
                                 params.hint.clear();
                                 params.hint.resize(n, -1);
+                                printf("\n[+] Recovering the unknown text:\n\n");
 
                                 [[maybe_unused]] int nConverged = 0;
                                 while (true) {
@@ -464,9 +487,17 @@ bool AppInterface::init(State & state) {
                                     {
                                         for (int i = 0; i < (int) clusterings.size(); ++i) {
                                             Cipher::beamSearch(params, state.decoding.freqMap6, clusterings[i]);
-                                            printf("%8.3f %8.3f ", clusterings[i].p, clusterings[i].pClusters);
+                                            printf(" ");
                                             Cipher::printDecoded(clusterings[i].clusters, clusterings[i].clMap, params.hint);
+                                            printf(" [%8.3f %8.3f]\n", clusterings[i].p, clusterings[i].pClusters);
+                                            printf(" ");
                                             Cipher::refineNearby(params, state.decoding.freqMap6, clusterings[i]);
+                                            printf("\n");
+
+                                            if (state.decoding.interrupt) {
+                                                printf("\n[!] Analysis interrupted\n");
+                                                break;
+                                            }
                                         }
                                     }
 

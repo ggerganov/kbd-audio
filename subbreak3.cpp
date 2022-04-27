@@ -847,8 +847,8 @@ namespace Cipher {
                 if (converged) break;
             }
 
-            printf("%8.3f %8.3f ", (double) hbest.p, (double) result.p);
             printPlain(hbest.plain);
+            printf(" [%8.3f %8.3f]", (double) hbest.p, (double) result.p);
         }
 
         return true;
@@ -1065,8 +1065,6 @@ namespace Cipher {
         for (const auto & cid : t) {
             printf("%c", getEncodedChar(cid));
         }
-
-        printf("\n");
     }
 
     void printDecoded(const TClusters & t, const TClusterToLetterMap & clMap, const THint & hint) {
@@ -1081,8 +1079,6 @@ namespace Cipher {
                 printf(".");
             }
         }
-
-        printf("\n");
     }
 
     void printPlain(const std::vector<TLetter> & t) {
@@ -1097,8 +1093,6 @@ namespace Cipher {
                 printf(".");
             }
         }
-
-        printf("\n");
     }
 
     //

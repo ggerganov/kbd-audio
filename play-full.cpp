@@ -84,7 +84,7 @@ int main(int argc, char ** argv) {
 
     SDL_PauseAudioDevice(deviceIdOut, 0);
 
-    while(g_terminate == false) {
+    while (g_terminate == false) {
         SDL_Delay(100);
     }
 

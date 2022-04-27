@@ -170,6 +170,7 @@ int main(int argc, char ** argv) {
 
         params.hint.clear();
         params.hint.resize(n, -1);
+        printf("\n[+] Recovering the unknown text:\n\n");
 
         [[maybe_unused]] int nConverged = 0;
         while (true) {
@@ -177,88 +178,16 @@ int main(int argc, char ** argv) {
             {
                 for (int i = 0; i < (int) clusterings.size(); ++i) {
                     Cipher::beamSearch(params, freqMap6, clusterings[i]);
-                    printf("%8.3f %8.3f ", clusterings[i].p, clusterings[i].pClusters);
+                    printf(" ");
                     Cipher::printDecoded(clusterings[i].clusters, clusterings[i].clMap, params.hint);
+                    printf(" [%8.3f %8.3f]\n", clusterings[i].p, clusterings[i].pClusters);
+                    printf(" ");
                     Cipher::refineNearby(params, freqMap6, clusterings[i]);
+                    printf("\n");
                 }
             }
+
             break;
-
-            // hint refinement
-            //{
-            //    const auto tStart = std::chrono::high_resolution_clock::now();
-
-            //    std::vector<std::map<int, int>> nOccurances(n);
-            //    for (int i = 0; i < (int) clusterings.size(); ++i) {
-            //        for (int j = 0; j < n; ++j) {
-            //            nOccurances[j][Cipher::decode(clusterings[i].clusters, j, clusterings[i].clMap, params.hint)]++;
-            //        }
-            //    }
-
-            //    // for each position j determine the most frequent cluster
-            //    struct Entry {
-            //        int pos;
-            //        TLetter letter;
-            //        int nOccurances;
-            //    };
-
-            //    std::vector<Entry> mostFrequentClusters(n);
-            //    for (int j = 0; j < n; ++j) {
-            //        int maxOccurances = 0;
-            //        for (const auto& p : nOccurances[j]) {
-            //            if (p.second > maxOccurances) {
-            //                maxOccurances = p.second;
-            //                mostFrequentClusters[j].pos = j;
-            //                mostFrequentClusters[j].letter = p.first;
-            //                mostFrequentClusters[j].nOccurances = p.second;
-            //            }
-            //        }
-            //    }
-
-            //    std::sort(mostFrequentClusters.begin(), mostFrequentClusters.end(), [](const Entry& a, const Entry& b) {
-            //        return a.nOccurances > b.nOccurances;
-            //    });
-
-            //    [[maybe_unused]] bool converged = true;
-            //    for (int i = 0; i < (int) clusterings.size(); ++i) {
-            //        for (int j = 0; j < n; ++j) {
-            //            if (mostFrequentClusters[j].nOccurances > (int) (0.90*clusterings.size())) {
-            //                if (params.hint[mostFrequentClusters[j].pos] != mostFrequentClusters[j].letter &&
-            //                    mostFrequentClusters[j].letter != 27 &&
-            //                    mostFrequentClusters[j].letter != 'e' - 'a' + 1) {
-            //                    params.hint[mostFrequentClusters[j].pos] = mostFrequentClusters[j].letter;
-            //                    converged = false;
-            //                    if (i == 0) {
-            //                        printf("    - %2d: pos = %d, %c %d\n", i, mostFrequentClusters[j].pos, 'a' + mostFrequentClusters[j].letter - 1, mostFrequentClusters[j].nOccurances);
-            //                    }
-            //                }
-            //            }
-            //        }
-            //    }
-
-            //    const auto tEnd = std::chrono::high_resolution_clock::now();
-            //    printf("[+] Hint refinement took %4.3f seconds\n", toSeconds(tStart, tEnd));
-            //}
-
-            //if (converged) {
-            //    ++nConverged;
-            //    printf("[+] Converged %d times\n", nConverged);
-            //    if (nConverged > 0) {
-            //        break;
-            //    }
-            //} else {
-            //    nConverged = 0;
-            //}
-
-            //for (int i = 0; i < (int) clusterings.size(); ++i) {
-            //    for (int j = 0; j < n; ++j) {
-            //        for (int k = 0; k < n; ++k) {
-            //            if (params.hint[j] != -1 && params.hint[j] == params.hint[k]) {
-            //                clusterings[i].clusters[k] = clusterings[i].clusters[j];
-            //            }
-            //        }
-            //    }
-            //}
         }
     }
 
