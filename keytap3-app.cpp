@@ -12,6 +12,9 @@
 #include "subbreak3.h"
 #include "audio-logger.h"
 
+#define DR_WAV_IMPLEMENTATION
+#include "dr_wav.h"
+
 #include <chrono>
 #include <cstdio>
 #include <fstream>
@@ -277,10 +280,10 @@ bool AppInterface::init(State & state) {
                 if (ss >> nKeysToCapture) {
                     state.recording.nKeysToCapture = nKeysToCapture;
                 } else {
-                    printf("Failed to parse nKeysToCapture. Using: %d\n", state.recording.nKeysToCapture);
+                    printf("[!] Failed to parse nKeysToCapture. Using: %d\n", state.recording.nKeysToCapture);
                 }
 
-                printf("Starting recording. nKeysToCapture: %d\n", state.recording.nKeysToCapture);
+                printf("[+] Starting recording. nKeysToCapture: %d\n", state.recording.nKeysToCapture);
                 state.state = State::Recording;
                 state.recording.init();
             }
@@ -363,22 +366,46 @@ bool AppInterface::init(State & state) {
                         state.recording.audioLogger.terminate();
                         state.worker.join();
 
-                        std::ofstream fout(state.recording.pathOutput, std::ios::binary);
-                        if (fout.good() == false) {
-                            fprintf(stderr, "Failed to open file '%s'\n", state.recording.pathOutput.c_str());
-                            return false;
+                        // write record.kbd
+                        {
+                            std::ofstream fout(state.recording.pathOutput, std::ios::binary);
+                            if (fout.good() == false) {
+                                fprintf(stderr, "Failed to open file '%s'\n", state.recording.pathOutput.c_str());
+                                return false;
+                            }
+
+                            state.recording.totalSize_bytes = sizeof(state.recording.waveformF[0])*state.recording.waveformF.size();
+                            fout.write((char *)(state.recording.waveformF.data()), sizeof(state.recording.waveformF[0])*state.recording.waveformF.size());
+                            fout.close();
+
+                            printf("[+] Total data saved: %g MB\n", ((float)(state.recording.totalSize_bytes)/1024.0f/1024.0f));
                         }
 
-                        state.recording.totalSize_bytes = sizeof(state.recording.waveformF[0])*state.recording.waveformF.size();
-                        fout.write((char *)(state.recording.waveformF.data()), sizeof(state.recording.waveformF[0])*state.recording.waveformF.size());
-                        fout.close();
+                        // write record.wav
+                        {
+                            drwav_data_format format;
+                            format.container = drwav_container_riff;
+                            format.format = DR_WAVE_FORMAT_PCM;
+                            format.channels = 1;
+                            format.sampleRate = kSampleRate;
+                            format.bitsPerSample = 16;
 
-                        printf("Total data saved: %g MB\n", ((float)(state.recording.totalSize_bytes)/1024.0f/1024.0f));
+                            printf("[+] Writing WAV data ...\n");
+
+                            drwav wav;
+                            drwav_init_file_write(&wav, "record.wav", &format, NULL);
+                            drwav_uint64 framesWritten = drwav_write_pcm_frames(&wav, state.recording.waveformI16.size(), state.recording.waveformI16.data());
+
+                            printf("[+] WAV frames written = %d\n", (int) framesWritten);
+
+                            drwav_uninit(&wav);
+                        }
+
                         state.dataOutput = "decoding";
 
                         state.decoding.waveformInput = state.recording.waveformI16;
                         state.state = State::Decoding;
-                        printf("Starting decoding\n");
+                        printf("[+] Starting decoding\n");
                     }
                 } break;
             case State::Decoding:
