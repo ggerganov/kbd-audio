@@ -366,6 +366,8 @@ bool AppInterface::init(State & state) {
                         state.recording.audioLogger.terminate();
                         state.worker.join();
 
+                        state.recording.updateWorker(state.dataOutput, 0.0f);
+
                         // write record.kbd
                         {
                             std::ofstream fout(state.recording.pathOutput, std::ios::binary);
@@ -489,7 +491,7 @@ bool AppInterface::init(State & state) {
                                     const auto tStart = std::chrono::high_resolution_clock::now();
 
                                     for (int nIter = 0; nIter < 16; ++nIter) {
-                                        auto clusteringsCur = processor.getClusterings(params, 32);
+                                        auto clusteringsCur = processor.getClusterings(32);
 
                                         for (int i = 0; i < (int) clusteringsCur.size(); ++i) {
                                             printf("[+] Clustering %d: pClusters = %g\n", i, clusteringsCur[i].pClusters);

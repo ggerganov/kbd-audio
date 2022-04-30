@@ -153,7 +153,7 @@ int main(int argc, char ** argv) {
             const auto tStart = std::chrono::high_resolution_clock::now();
 
             for (int nIter = 0; nIter < 16; ++nIter) {
-                auto clusteringsCur = processor.getClusterings(params, 32);
+                auto clusteringsCur = processor.getClusterings(32);
 
                 for (int i = 0; i < (int) clusteringsCur.size(); ++i) {
                     printf("[+] Clustering %d: pClusters = %g\n", i, clusteringsCur[i].pClusters);

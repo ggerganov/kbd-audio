@@ -940,7 +940,10 @@ namespace Cipher {
         for (int i = 0; i < 1; ++i) {
             int idx = rand()%n;
 
-            clusters[idx] = 1 + rand()%(params.maxClusters - 1);
+            auto old = clusters[idx];
+            do {
+                clusters[idx] = 1 + rand()%(params.maxClusters - 1);
+            } while (clusters[idx] == old);
         }
 
         return true;
@@ -1000,12 +1003,12 @@ namespace Cipher {
                 }
 
                 auto & v = ccMap[j][i].cc;
-                //v = (v - ccMin)/(ccMax - ccMin);
-                if (v < 0.50*(ccMin + ccMax)) {
-                    v = ccMin;
-                } else {
-                    v = (v - ccMin)/(ccMax - ccMin);
-                }
+                v = (v - ccMin)/(ccMax - ccMin);
+                //if (v < 0.50*(ccMin + ccMax)) {
+                //    v = ccMin;
+                //} else {
+                //    v = (v - ccMin)/(ccMax - ccMin);
+                //}
                 //v = 1.0 - std::exp(-1.1f*v);
             }
         }
@@ -1129,28 +1132,62 @@ namespace Cipher {
         return true;
     }
 
-    std::vector<TResult> Processor::getClusterings(const TParameters & params, int nClusterings) {
+    std::vector<TResult> Processor::getClusterings(int nClusterings) {
         const auto p0 = m_curResult.pClusters;
         printf("    [getClusterings] p0 = %g\n", p0);
 
         int nNoImprovement = 0;
         int nTotalIterations = 0;
         auto clustersNew = m_curResult.clusters;
+        const int n = clustersNew.size();
 
         std::vector<TResult> all;
         all.push_back(m_curResult);
 
         // simulated annealing
-        double T = params.temp0;
-        double TMin = 0.000001;
-        double alpha = params.coolingRate;
+        double T = m_params.temp0;
+        const double TMin = 0.000001;
+        const double alpha = m_params.coolingRate;
+        const double pScale = ((n*(n-1))/2.0);
 
         while (true) {
             clustersNew = m_curResult.clusters;
-            Cipher::mutateClusters(m_params, clustersNew);
 
-            // m_pCur is the old value
-            const auto pNew = calcPClusters(m_params, m_similarityMap, m_logMap, m_logMapInv, clustersNew, m_curResult.clMap);
+            // mutate
+            int idxChanged = -1;
+            {
+                idxChanged = rand()%n;
+
+                auto old = clustersNew[idxChanged];
+                do {
+                    clustersNew[idxChanged] = 1 + rand()%(m_params.maxClusters - 1);
+                } while (clustersNew[idxChanged] == old);
+            }
+
+            // compute pNew
+            auto pNew = m_pCur*pScale;
+            {
+                const int j = idxChanged;
+                for (int i = 0; i < n; ++i) {
+                    if (i == j) {
+                        continue;
+                    }
+
+                    if (m_curResult.clusters[i] == m_curResult.clusters[j]) {
+                        pNew -= m_logMap[j][i].cc;
+                    } else {
+                        pNew -= m_logMapInv[j][i].cc;
+                    }
+
+                    if (clustersNew[i] == clustersNew[j]) {
+                        pNew += m_logMap[j][i].cc;
+                    } else {
+                        pNew += m_logMapInv[j][i].cc;
+                    }
+                }
+
+                pNew /= pScale;
+            }
 
             // check if we should accept the new value
             if (pNew >= m_pCur) {
@@ -1161,7 +1198,7 @@ namespace Cipher {
                 // accept with probability
                 const auto pAccept = std::exp((pNew - m_pCur)/T);
                 if (pAccept > frand()) {
-                    //printf("    [getClusterings] N = %d, T = %8.3f, pNew = %g, pCur = %g, pAccept = %g\n", nNoImprovement, T, pNew, m_pCur, pAccept);
+                    //printf("    [getClusterings] N = %5d, T = %8.8f, pNew = %g, pCur = %g, pAccept = %g\n", nNoImprovement, T, pNew, m_pCur, pAccept);
                     m_curResult.clusters = clustersNew;
                     m_curResult.pClusters = pNew;
                     m_pCur = pNew;

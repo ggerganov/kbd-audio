@@ -32,8 +32,8 @@ namespace Cipher {
         int nIters = 100;
 
         // simulated annealing params
-        float temp0 = 0.00001;
-        float coolingRate = 0.9;
+        float temp0 = 0.0001;
+        float coolingRate = 0.95;
 
         // language model
         float wEnglishFreq = 10.0f;
@@ -119,7 +119,7 @@ namespace Cipher {
 
         bool setHint(const THint & hint);
 
-        std::vector<TResult> getClusterings(const TParameters & params, int nClusterings);
+        std::vector<TResult> getClusterings(int nClusterings);
         bool compute();
 
         int getIters() const { return m_nInitialIters; }
