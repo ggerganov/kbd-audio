@@ -1134,7 +1134,7 @@ namespace Cipher {
 
     std::vector<TResult> Processor::getClusterings(int nClusterings) {
         const auto p0 = m_curResult.pClusters;
-        printf("    [getClusterings] p0 = %g\n", p0);
+        //printf("    [getClusterings] p0 = %g\n", p0);
 
         int nNoImprovement = 0;
         int nTotalIterations = 0;
@@ -1228,8 +1228,8 @@ namespace Cipher {
             }
         }
 
-        printf("    [getClusterings] nTotalIterations = %d\n", nTotalIterations);
-        printf("    [getClusterings] pFinal = %g\n", m_curResult.pClusters);
+        //printf("    [getClusterings] nTotalIterations = %d\n", nTotalIterations);
+        //printf("    [getClusterings] pFinal = %g\n", m_curResult.pClusters);
 
         const auto pClustersBest = all.back().pClusters;
 

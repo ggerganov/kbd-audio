@@ -88,9 +88,9 @@ TPlaybackData g_playbackData;
 struct stParameters {
     int32_t playbackId              = 0;
 
-    int32_t keyPressWidth_samples   = 512;
-    int32_t offsetFromPeak_samples  = keyPressWidth_samples - 128;
-    int32_t alignWindow_samples     = 128;
+    int32_t keyPressWidth_samples   = kKeyWidth_samples;
+    int32_t offsetFromPeak_samples  = kKeyWidth_samples - kKeyOffset_samples;
+    int32_t alignWindow_samples     = kKeyAlign_samples;
 
     std::vector<int>   valuesClusters       = { 40, 50, 60, 70, };
     std::vector<float> valuesWEnglishFreq   = { 1, 2, 5, 10, };

@@ -443,7 +443,7 @@ bool AppInterface::init(State & state) {
 
                                 printf("[+] Calculating CC similarity map\n");
 
-                                if (calculateSimilartyMap(3*256, 3*32, 3*256 - 128, keyPresses, similarityMap) == false) {
+                                if (calculateSimilartyMap(kKeyWidth_samples, kKeyAlign_samples, kKeyWidth_samples - kKeyOffset_samples, keyPresses, similarityMap) == false) {
                                     printf("Failed to calculate similariy map\n");
                                     return;
                                 }
