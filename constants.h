@@ -11,7 +11,8 @@
 #include <cstdint>
 
 #ifdef __EMSCRIPTEN__
-static constexpr int64_t kSamplesPerFrame = 2048;
+static constexpr int32_t kMaxThreads = 8;
+static constexpr int64_t kSamplesPerFrame = 1024;
 #else
 static constexpr int64_t kSamplesPerFrame = 512;
 #endif

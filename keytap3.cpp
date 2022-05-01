@@ -178,10 +178,10 @@ int main(int argc, char ** argv) {
         Cipher::Processor processor;
 
         Cipher::TParameters params;
-        params.fSpread = 0.5 + 0.1*iMain;
         params.maxClusters = 30;
         params.wEnglishFreq = 30.0;
-        params.nHypothesesToKeep = std::max(100, 500 - 10*std::min(200, std::max(0, ((int) keyPresses.size() - 100))));
+        params.fSpread = 0.5 + 0.1*iMain;
+        params.nHypothesesToKeep = std::max(100, 500 - 2*std::min(200, std::max(0, ((int) keyPresses.size() - 100))));
         processor.init(params, freqMap6, similarityMap);
 
         std::vector<Cipher::TResult> clusterings;

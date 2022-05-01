@@ -78,10 +78,12 @@ bool AudioLogger::install(Parameters && parameters) {
         return false;
     }
 
-    if (SDL_Init(SDL_INIT_AUDIO) < 0) {
+    static bool isInitialized = false;
+    if (!isInitialized && SDL_Init(SDL_INIT_AUDIO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
         return false;
     }
+    isInitialized = true;
 
     int nDevices = SDL_GetNumAudioDevices(SDL_TRUE);
     printf("Found %d capture devices:\n", nDevices);
@@ -134,6 +136,7 @@ bool AudioLogger::install(Parameters && parameters) {
     }
 
     printf("Opened capture device succesfully!\n");
+    printf("    DeviceId:   %d\n", data.deviceIdIn);
     printf("    Frequency:  %d\n", obtainedSpec.freq);
     printf("    Format:     %d (%d bytes)\n", obtainedSpec.format, data.sampleSize_bytes);
     printf("    Channels:   %d\n", obtainedSpec.channels);

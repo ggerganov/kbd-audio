@@ -62,10 +62,9 @@ if (EMSCRIPTEN)
     set(CMAKE_EXE_LINKER_FLAGS " \
     --bind \
     --use-preload-cache \
-    --closure 1 \
     -s ASSERTIONS=1 \
     -s NO_EXIT_RUNTIME=0 \
-    -s PTHREAD_POOL_SIZE=8 \
+    -s PTHREAD_POOL_SIZE=16 \
     -s INITIAL_MEMORY=536870912 \
     ")
 elseif(MINGW)

@@ -12,7 +12,6 @@
 #include <fstream>
 #include <deque>
 #include <algorithm>
-#include <condition_variable>
 
 #ifndef pi
 #define  pi 3.1415926535897932384626433832795
@@ -511,21 +510,7 @@ std::tuple<TValueCC, TOffset> findBestCC(
     auto sum02 = std::get<1>(ret);
 
 #ifdef __EMSCRIPTEN__
-    TOffset cbesto = -1;
-    TValueCC cbestcc = -1.0f;
-
-    for (int o = -alignWindow; o <= alignWindow; ++o) {
-        auto cc = calcCC(waveform0, waveform1, sum0, sum02, is00, is0 + o, is1 + o);
-        if (cc > cbestcc) {
-            cbesto = o;
-            cbestcc = cc;
-        }
-    }
-
-    if (cbestcc > bestcc) {
-        bestcc = cbestcc;
-        besto = cbesto;
-    }
+    int nWorkers = std::min(4, std::max(1, int(std::thread::hardware_concurrency()) - 2));
 #else
     int nWorkers = std::min(4u, std::thread::hardware_concurrency());
     std::mutex mutex;
@@ -621,15 +606,12 @@ bool calculateSimilartyMap(
     res.resize(nPresses);
     for (auto & x : res) x.resize(nPresses);
 
-    int nFinished = 0;
 #ifdef __EMSCRIPTEN__
-    int nWorkers = std::max(1, std::min(4, int(std::thread::hardware_concurrency()) - 4));
+    int nWorkers = std::min(kMaxThreads, std::max(1, int(std::thread::hardware_concurrency()) - 2));
 #else
     int nWorkers = std::thread::hardware_concurrency();
 #endif
 
-    std::mutex mutex;
-    std::condition_variable cv;
     std::vector<std::thread> workers(nWorkers);
     for (int iw = 0; iw < (int) workers.size(); ++iw) {
         auto & worker = workers[iw];
@@ -668,18 +650,10 @@ bool calculateSimilartyMap(
                 }
                 avgcc /= (nPresses - 1);
             }
-
-            {
-                std::lock_guard<std::mutex> lock(mutex);
-                ++nFinished;
-                cv.notify_one();
-            }
         }, iw);
-        worker.detach();
     }
 
-    std::unique_lock<std::mutex> lock(mutex);
-    cv.wait(lock, [&]() { return nFinished == nWorkers; });
+    for (auto & worker : workers) worker.join();
 
     return true;
 }
@@ -700,15 +674,12 @@ bool calculateSimilartyMap(
     res.resize(nPresses);
     for (auto & x : res) x.resize(nPresses);
 
-    int nFinished = 0;
 #ifdef __EMSCRIPTEN__
-    int nWorkers = std::max(1, std::min(4, int(std::thread::hardware_concurrency()) - 4));
+    int nWorkers = std::min(kMaxThreads, std::max(1, int(std::thread::hardware_concurrency()) - 2));
 #else
     int nWorkers = std::thread::hardware_concurrency();
 #endif
 
-    std::mutex mutex;
-    std::condition_variable cv;
     std::vector<std::thread> workers(nWorkers);
     for (int iw = 0; iw < (int) workers.size(); ++iw) {
         auto & worker = workers[iw];
@@ -747,18 +718,10 @@ bool calculateSimilartyMap(
                 }
                 avgcc /= (nPresses - 1);
             }
-
-            {
-                std::lock_guard<std::mutex> lock(mutex);
-                ++nFinished;
-                cv.notify_one();
-            }
         }, iw);
-        worker.detach();
     }
 
-    std::unique_lock<std::mutex> lock(mutex);
-    cv.wait(lock, [&]() { return nFinished == nWorkers; });
+    for (auto & worker : workers) worker.join();
 
     return true;
 }
