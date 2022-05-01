@@ -38,7 +38,8 @@ int main(int argc, char ** argv) {
 
     const auto argm = parseCmdArguments(argc, argv);
     const int filterId      = argm.count("F") == 0 ? EAudioFilter::FirstOrderHighPass : std::stoi(argm.at("F"));
-    const int freqCutoff_Hz = argm.count("f") == 0 ? kFreqCutoff_Hz : std::stoi(argm.at("f"));
+
+    int freqCutoff_Hz = argm.count("f") == 0 ? 0 : std::stoi(argm.at("f"));
 
     Cipher::TFreqMap freqMap6;
     {
@@ -55,75 +56,6 @@ int main(int argc, char ** argv) {
         printf("[+] Loading took %4.3f seconds\n", toSeconds(tStart, tEnd));
     }
 
-    int freqCutoffBest_Hz = freqCutoff_Hz;
-    double pClustersBest = -1e10;
-    for (int i = 1; i <= 10; ++i) {
-        int freqCutoff_Hz = 100*i;
-
-        TWaveform waveformInput;
-        {
-            TWaveformF waveformInputF;
-            if (readFromFile<TSampleF>(argv[1], waveformInputF) == false) {
-                printf("Specified file '%s' does not exist\n", argv[1]);
-                return -1;
-            } else {
-                ::filter(waveformInputF, (EAudioFilter) filterId, freqCutoff_Hz, kSampleRate);
-
-                if (convert(waveformInputF, waveformInput) == false) {
-                    printf("Conversion failed\n");
-                    return -4;
-                }
-            }
-        }
-
-        TKeyPressCollection keyPresses;
-        {
-            TWaveform waveformMax;
-            TWaveform waveformThreshold;
-            if (findKeyPresses(getView(waveformInput, 0), keyPresses, waveformThreshold, waveformMax, 8.0, 512, 2*1024, true) == false) {
-                printf("Failed to detect keypresses\n");
-                return -2;
-            }
-        }
-
-        const int n = keyPresses.size();
-
-        TSimilarityMap similarityMap;
-        {
-            if (calculateSimilartyMap(kKeyWidth_samples, kKeyAlign_samples, kKeyWidth_samples - kKeyOffset_samples, keyPresses, similarityMap) == false) {
-                printf("Failed to calculate similariy map\n");
-                return -3;
-            }
-
-            auto minCC = similarityMap[0][1].cc;
-            auto maxCC = similarityMap[0][1].cc;
-            for (int j = 0; j < n - 1; ++j) {
-                for (int i = j + 1; i < n; ++i) {
-                    minCC = std::min(minCC, similarityMap[j][i].cc);
-                    maxCC = std::max(maxCC, similarityMap[j][i].cc);
-                }
-            }
-        }
-
-        {
-            Cipher::Processor processor;
-
-            Cipher::TParameters params;
-            params.maxClusters = 50;
-            params.wEnglishFreq = 20.0;
-            processor.init(params, freqMap6, similarityMap);
-
-            auto clusteringsCur = processor.getClusterings(32);
-            if (clusteringsCur[0].pClusters > pClustersBest) {
-                pClustersBest = clusteringsCur[0].pClusters;
-                freqCutoffBest_Hz = freqCutoff_Hz;
-            }
-            printf("[+] freqCutoff_Hz = %d, pClusters = %f\n", freqCutoff_Hz, clusteringsCur[0].pClusters);
-        }
-    }
-
-    printf("[+] Found better clustering with pClusters = %g, freqCutoff = %d Hz\n", pClustersBest, freqCutoffBest_Hz);
-
     // Main algorithm
 
     TWaveform waveformInput;
@@ -134,8 +66,17 @@ int main(int argc, char ** argv) {
             printf("Specified file '%s' does not exist\n", argv[1]);
             return -1;
         } else {
-            printf("[+] Filtering waveform with filter type = %d and cutoff frequency = %d Hz\n", filterId, freqCutoffBest_Hz);
-            ::filter(waveformInputF, (EAudioFilter) filterId, freqCutoffBest_Hz, kSampleRate);
+            if (freqCutoff_Hz == 0) {
+                const auto tStart = std::chrono::high_resolution_clock::now();
+
+                freqCutoff_Hz = Cipher::findBestCutoffFreq(waveformInputF, (EAudioFilter) filterId, kSampleRate, 100.0f, 1000.0f, 100.0f);
+
+                const auto tEnd = std::chrono::high_resolution_clock::now();
+                printf("[+] Found best freqCutoff = %d Hz, took %4.3f seconds\n", freqCutoff_Hz, toSeconds(tStart, tEnd));
+            }
+
+            printf("[+] Filtering waveform with filter type = %d and cutoff frequency = %d Hz\n", filterId, freqCutoff_Hz);
+            ::filter(waveformInputF, (EAudioFilter) filterId, freqCutoff_Hz, kSampleRate);
 
             printf("[+] Converting waveform to i16 format ...\n");
             if (convert(waveformInputF, waveformInput) == false) {
@@ -159,7 +100,8 @@ int main(int argc, char ** argv) {
 
         TWaveform waveformMax;
         TWaveform waveformThreshold;
-        if (findKeyPresses(getView(waveformInput, 0), keyPresses, waveformThreshold, waveformMax, 8.0, 512, 2*1024, true) == false) {
+        if (findKeyPresses(getView(waveformInput, 0), keyPresses, waveformThreshold, waveformMax,
+                           kFindKeysThreshold, kFindKeysHistorySize, kFindKeysHistorySizeReset, kFindKeysRemoveLowPower) == false) {
             printf("Failed to detect keypresses\n");
             return -2;
         }
@@ -209,13 +151,14 @@ int main(int argc, char ** argv) {
         printf("[+] Similarity map: min = %g, max = %g\n", minCC, maxCC);
     }
 
-    {
+    for (int iMain = 0; iMain < 16; ++iMain) {
         Cipher::Processor processor;
 
         Cipher::TParameters params;
-        params.maxClusters = 29;
-        params.wEnglishFreq = 20.0;
-        params.nHypothesesToKeep = std::max(100, 2100 - 10*std::min(200, std::max(0, ((int) keyPresses.size() - 100))));
+        params.fSpread = 0.5 + 0.1*iMain;
+        params.maxClusters = 30;
+        params.wEnglishFreq = 30.0;
+        params.nHypothesesToKeep = std::max(100, 500 - 10*std::min(200, std::max(0, ((int) keyPresses.size() - 100))));
         processor.init(params, freqMap6, similarityMap);
 
         printf("[+] Attempting to recover the text from the recording ...\n");
@@ -227,14 +170,14 @@ int main(int argc, char ** argv) {
             const auto tStart = std::chrono::high_resolution_clock::now();
 
             for (int nIter = 0; nIter < 16; ++nIter) {
-                auto clusteringsCur = processor.getClusterings(32);
+                auto clusteringsCur = processor.getClusterings(2);
 
                 for (int i = 0; i < (int) clusteringsCur.size(); ++i) {
                     printf("[+] Clustering %d: pClusters = %g\n", i, clusteringsCur[i].pClusters);
                     clusterings.push_back(std::move(clusteringsCur[i]));
                 }
 
-                params.maxClusters = 29 + 4*(nIter + 1);
+                params.maxClusters = 30 + 4*(nIter + 1);
                 processor.init(params, freqMap6, similarityMap);
             }
 
@@ -244,45 +187,40 @@ int main(int argc, char ** argv) {
 
         params.hint.clear();
         params.hint.resize(n, -1);
-        printf("\n[+] Recovering the unknown text:\n\n");
+        printf("\n[+] Recovering the unknown text (fSpread = %g):\n", params.fSpread);
 
-        [[maybe_unused]] int nConverged = 0;
-        while (true) {
-            // beam search
-            int nThread = std::min((int) std::thread::hardware_concurrency(), (int) clusterings.size());
-            {
-                std::vector<std::thread> workers(nThread);
+        // beam search
+        int nThread = std::min((int) std::thread::hardware_concurrency(), (int) clusterings.size());
+        {
+            std::vector<std::thread> workers(nThread);
 
-                //for (int i = 0; i < (int) clusterings.size(); ++i) {
-                //    Cipher::beamSearch(params, freqMap6, clusterings[i]);
-                //    printf(" ");
-                //    Cipher::printDecoded(clusterings[i].clusters, clusterings[i].clMap, params.hint);
-                //    printf(" [%8.3f %8.3f]\n", clusterings[i].p, clusterings[i].pClusters);
-                //    printf(" ");
-                //    Cipher::refineNearby(params, freqMap6, clusterings[i]);
-                //    printf("\n");
-                //}
+            //for (int i = 0; i < (int) clusterings.size(); ++i) {
+            //    Cipher::beamSearch(params, freqMap6, clusterings[i]);
+            //    printf(" ");
+            //    Cipher::printDecoded(clusterings[i].clusters, clusterings[i].clMap, params.hint);
+            //    printf(" [%8.3f %8.3f]\n", clusterings[i].p, clusterings[i].pClusters);
+            //    printf(" ");
+            //    Cipher::refineNearby(params, freqMap6, clusterings[i]);
+            //    printf("\n");
+            //}
 
-                std::mutex mutexPrint;
-                for (int i = 0; i < nThread; ++i) {
-                    workers[i] = std::thread([&, i]() {
-                        for (int j = i; j < (int) clusterings.size(); j += nThread) {
-                            Cipher::beamSearch(params, freqMap6, clusterings[j]);
-                            mutexPrint.lock();
-                            printf(" ");
-                            Cipher::printDecoded(clusterings[j].clusters, clusterings[j].clMap, params.hint);
-                            printf(" [%8.3f %8.3f]\n", clusterings[j].p, clusterings[j].pClusters);
-                            mutexPrint.unlock();
-                        }
-                    });
-                }
-
-                for (auto& worker : workers) {
-                    worker.join();
-                }
+            std::mutex mutexPrint;
+            for (int i = 0; i < nThread; ++i) {
+                workers[i] = std::thread([&, i]() {
+                    for (int j = i; j < (int) clusterings.size(); j += nThread) {
+                        Cipher::beamSearch(params, freqMap6, clusterings[j]);
+                        mutexPrint.lock();
+                        printf(" ");
+                        Cipher::printDecoded(clusterings[j].clusters, clusterings[j].clMap, params.hint);
+                        printf(" [%8.3f %8.3f]\n", clusterings[j].p, clusterings[j].pClusters);
+                        mutexPrint.unlock();
+                    }
+                });
             }
 
-            break;
+            for (auto& worker : workers) {
+                worker.join();
+            }
         }
     }
 

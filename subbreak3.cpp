@@ -974,7 +974,7 @@ namespace Cipher {
     }
 
     bool normalizeSimilarityMap(
-            const TParameters & ,
+            const TParameters & params,
             TSimilarityMap & ccMap,
             TSimilarityMap & logMap,
             TSimilarityMap & logMapInv) {
@@ -1004,10 +1004,9 @@ namespace Cipher {
 
                 auto & v = ccMap[j][i].cc;
                 v = (v - ccMin)/(ccMax - ccMin);
-                //if (v < 0.50*(ccMin + ccMax)) {
-                //    v = ccMin;
-                //} else {
-                //    v = (v - ccMin)/(ccMax - ccMin);
+                v = std::pow(v, params.fSpread);
+                //if (v < 0.50) {
+                //    v = 1e-6;
                 //}
                 //v = 1.0 - std::exp(-1.1f*v);
             }
@@ -1306,6 +1305,58 @@ namespace Cipher {
 
     const TSimilarityMap & Processor::getSimilarityMap() const {
         return m_similarityMap;
+    }
+
+    float findBestCutoffFreq(const TWaveformF & waveform, EAudioFilter filterId, int64_t sampleRate, float minCutoffFreq_Hz, float maxCutoffFreq_Hz, float step_Hz) {
+        double pClustersBest = -1e10;
+        float freqCutoffBest_Hz = minCutoffFreq_Hz;
+
+        for (float freqCutoff_Hz = minCutoffFreq_Hz; freqCutoff_Hz <= maxCutoffFreq_Hz; freqCutoff_Hz += step_Hz) {
+            TWaveformI16 waveformInput;
+            TWaveformF waveformFiltered = waveform;
+            filter(waveformFiltered, (EAudioFilter) filterId, freqCutoff_Hz, sampleRate);
+
+            if (convert(waveformFiltered, waveformInput) == false) {
+                fprintf(stderr, "%s:%d: convert() failed\n", __FILE__, __LINE__);
+                return minCutoffFreq_Hz;
+            }
+
+            TKeyPressCollectionI16 keyPresses;
+            {
+                TWaveformI16 waveformMax;
+                TWaveformI16 waveformThreshold;
+                if (findKeyPresses(getView(waveformInput, 0), keyPresses, waveformThreshold, waveformMax,
+                                   kFindKeysThreshold, kFindKeysHistorySize, kFindKeysHistorySizeReset, kFindKeysRemoveLowPower) == false) {
+                    fprintf(stderr, "%s:%d: findKeyPresses() failed\n", __FILE__, __LINE__);
+                    return minCutoffFreq_Hz;
+                }
+            }
+
+            TSimilarityMap similarityMap;
+            if (calculateSimilartyMap(kKeyWidth_samples, kKeyAlign_samples, kKeyWidth_samples - kKeyOffset_samples, keyPresses, similarityMap) == false) {
+                fprintf(stderr, "%s:%d: calculateSimilartyMap() failed\n", __FILE__, __LINE__);
+                return minCutoffFreq_Hz;
+            }
+
+            {
+                Cipher::TFreqMap freqMap; // not used for anything
+                Cipher::Processor processor;
+
+                Cipher::TParameters params;
+                params.maxClusters = 50;
+                params.wEnglishFreq = 20.0;
+                processor.init(params, freqMap, similarityMap);
+
+                auto clusteringsCur = processor.getClusterings(1);
+                if (clusteringsCur[0].pClusters > pClustersBest) {
+                    pClustersBest = clusteringsCur[0].pClusters;
+                    freqCutoffBest_Hz = freqCutoff_Hz;
+                }
+                printf("    [findBestCutoffFreq] freqCutoff_Hz = %g, pClusters = %g\n", freqCutoff_Hz, pClustersBest);
+            }
+        }
+
+        return freqCutoffBest_Hz;
     }
 
 }

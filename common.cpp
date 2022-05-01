@@ -107,8 +107,8 @@ bool convert(const TWaveformT<TSampleSrc> & src, TWaveformT<TSampleDst> & dst) {
 template bool convert<TSampleF, TSampleI16>(const TWaveformT<TSampleF> & src, TWaveformT<TSampleI16> & dst);
 
 template <typename TSample>
-void filter(TWaveformT<TSample> & waveform, EAudioFilter filter, float freqCutoff_Hz, int64_t sampleRate) {
-    switch (filter) {
+void filter(TWaveformT<TSample> & waveform, EAudioFilter filterId, float freqCutoff_Hz, int64_t sampleRate) {
+    switch (filterId) {
         case EAudioFilter::None:
             {
                 return;
@@ -134,10 +134,10 @@ void filter(TWaveformT<TSample> & waveform, EAudioFilter filter, float freqCutof
             break;
     }
 
-    fprintf(stderr, "Unknown filter type: %d\n", filter);
+    fprintf(stderr, "Unknown filter type: %d\n", filterId);
 }
 
-template void filter<TSampleF>(TWaveformT<TSampleF> & waveform, EAudioFilter filter, float freqCutoff_Hz, int64_t sampleRate);
+template void filter<TSampleF>(TWaveformT<TSampleF> & waveform, EAudioFilter filterId, float freqCutoff_Hz, int64_t sampleRate);
 
 template <typename TSample>
 double calcAbsMax(const TWaveformT<TSample> & waveform) {

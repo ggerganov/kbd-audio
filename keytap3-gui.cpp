@@ -602,8 +602,8 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         //ImGui::Text("Keys pressed:");   for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyPressed(i))             { ImGui::SameLine(); ImGui::Text("%d", i); }
 
         static bool playHalfSpeed = false;
-        static int historySize = 2*1024;
-        static float thresholdBackground = 8.0;
+        static int historySizeReset = kFindKeysHistorySizeReset;
+        static float thresholdBackground = kFindKeysThreshold;
         ImGui::PushItemWidth(100.0);
 
         if (stateUI.recording == false) {
@@ -656,7 +656,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
             ImGui::SameLine();
             ImGui::SliderFloat("Threshold background", &thresholdBackground, 0.1f, 50.0f) && (recalculateKeyPresses = true);
             ImGui::SameLine();
-            ImGui::SliderInt("History Size", &historySize, 512, 1024*16) && (recalculateKeyPresses = true);
+            ImGui::SliderInt("History Size", &historySizeReset, 512, 1024*16) && (recalculateKeyPresses = true);
             ImGui::SameLine();
             if (ImGui::Button("Recalculate")) {
                 recalculateKeyPresses = true;
@@ -706,7 +706,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         }
 
         if (recalculateKeyPresses) {
-            findKeyPresses(getView(waveform, 0), keyPresses, waveformThreshold, waveformMax, thresholdBackground, 512, historySize, true);
+            findKeyPresses(getView(waveform, 0), keyPresses, waveformThreshold, waveformMax, thresholdBackground, kFindKeysHistorySize, historySizeReset, kFindKeysRemoveLowPower);
             recalculateKeyPresses = false;
         }
 

@@ -157,7 +157,8 @@ struct StateRecording {
 
         TWaveformI16 waveformMax;
         TWaveformI16 waveformThreshold;
-        if (findKeyPresses(getView(waveformI16, 0), keyPresses, waveformThreshold, waveformMax, 8.0, 512, 2*1024, true) == false) {
+        if (findKeyPresses(getView(waveformI16, 0), keyPresses, waveformThreshold, waveformMax,
+                           kFindKeysThreshold, kFindKeysHistorySize, kFindKeysHistorySizeReset, kFindKeysRemoveLowPower) == false) {
             printf("Failed to detect keypresses\n");
         }
 
@@ -424,7 +425,8 @@ bool AppInterface::init(State & state) {
 
                                 TWaveform waveformMax;
                                 TWaveform waveformThreshold;
-                                if (findKeyPresses(getView(state.decoding.waveformInput, 0), keyPresses, waveformThreshold, waveformMax, 8.0, 512, 2*1024, true) == false) {
+                                if (findKeyPresses(getView(state.decoding.waveformInput, 0), keyPresses, waveformThreshold, waveformMax,
+                                                   kFindKeysThreshold, kFindKeysHistorySize, kFindKeysHistorySizeReset, kFindKeysRemoveLowPower) == false) {
                                     printf("Failed to detect keypresses\n");
                                     return;
                                 }

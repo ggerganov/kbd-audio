@@ -163,7 +163,7 @@ template <typename TSample>
 double calcAbsMax(const TWaveformT<TSample> & waveform);
 
 template <typename TSample>
-void filter(TWaveformT<TSample> & waveform, EAudioFilter filter, float freqCutoff_Hz, int64_t sampleRate);
+void filter(TWaveformT<TSample> & waveform, EAudioFilter filterId, float freqCutoff_Hz, int64_t sampleRate);
 
 template <typename TSample>
 bool saveToFile(const std::string & fname, TWaveformT<TSample> & waveform);

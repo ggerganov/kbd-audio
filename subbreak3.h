@@ -30,6 +30,7 @@ namespace Cipher {
         int maxClusters = 32;
         int nInitialIters = 1000;
         int nIters = 100;
+        double fSpread = 1.0;
 
         // simulated annealing params
         float temp0 = 0.0001;
@@ -139,4 +140,12 @@ namespace Cipher {
 
         TResult m_curResult;
     };
+
+    float findBestCutoffFreq(
+            const TWaveformF & waveform,
+            EAudioFilter filterId,
+            int64_t sampleRate,
+            float minCutoffFreq_Hz,
+            float maxCutoffFreq_Hz,
+            float step_Hz);
 }
