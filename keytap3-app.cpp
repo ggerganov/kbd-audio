@@ -121,7 +121,7 @@ struct StateRecording {
         parameters.nChannels = nChannels;
         parameters.sampleRate = kSampleRate;
         parameters.filter = EAudioFilter::None;
-        parameters.freqCutoff_Hz = freqCutoff_Hz;
+        parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
         if (audioLogger.install(std::move(parameters)) == false) {
             fprintf(stderr, "Failed to install audio logger\n");
@@ -146,9 +146,22 @@ struct StateRecording {
             waveformFWork = waveformF;
         }
         {
+            auto freqCutoffCur_Hz = freqCutoff_Hz;
+
+            if (tElapsed_s < 0.0f && freqCutoffCur_Hz == 0) {
+                const auto tStart = std::chrono::high_resolution_clock::now();
+
+                freqCutoffCur_Hz = Cipher::findBestCutoffFreq(waveformFWork, EAudioFilter::FirstOrderHighPass, kSampleRate, 100.0f, 1000.0f, 100.0f);
+
+                const auto tEnd = std::chrono::high_resolution_clock::now();
+                printf("[+] Found best freqCutoff = %d Hz, took %4.3f seconds\n", freqCutoffCur_Hz, toSeconds(tStart, tEnd));
+            } else {
+                freqCutoffCur_Hz = kFreqCutoff_Hz;
+            }
+
             // apply default filtering, because keypress detection without it is impossible
             auto waveformFFiltered = waveformFWork;
-            ::filter(waveformFFiltered, EAudioFilter::FirstOrderHighPass, kFreqCutoff_Hz, kSampleRate);
+            ::filter(waveformFFiltered, EAudioFilter::FirstOrderHighPass, freqCutoffCur_Hz, kSampleRate);
 
             if (convert(waveformFFiltered, waveformI16) == false) {
                 printf("Conversion failed\n");
@@ -367,7 +380,7 @@ bool AppInterface::init(State & state) {
                         state.recording.audioLogger.terminate();
                         state.worker.join();
 
-                        state.recording.updateWorker(state.dataOutput, 0.0f);
+                        state.recording.updateWorker(state.dataOutput, -1.0f);
 
                         // write record.kbd
                         {
@@ -437,7 +450,7 @@ bool AppInterface::init(State & state) {
                                 printf("[+] Search took %4.3f seconds\n", toSeconds(tStart, tEnd));
                             }
 
-                            const int n = keyPresses.size();
+                            int n = keyPresses.size();
 
                             TSimilarityMap similarityMap;
                             {
@@ -453,6 +466,27 @@ bool AppInterface::init(State & state) {
                                 const auto tEnd = std::chrono::high_resolution_clock::now();
 
                                 printf("[+] Calculation took %4.3f seconds\n", toSeconds(tStart, tEnd));
+
+                                {
+                                    const auto tStart = std::chrono::high_resolution_clock::now();
+
+                                    printf("[+] Removing low-similarity keys\n");
+
+                                    const int n0 = keyPresses.size();
+
+                                    if (removeLowSimilarityKeys(keyPresses, similarityMap, 0.3f) == false) {
+                                        printf("Failed to remove low-similarity keys\n");
+                                        return;
+                                    }
+
+                                    const int n1 = keyPresses.size();
+
+                                    const auto tEnd = std::chrono::high_resolution_clock::now();
+
+                                    printf("[+] Removed %d low-similarity keys, took %4.3f seconds\n", n0 - n1, toSeconds(tStart, tEnd));
+                                }
+
+                                n = keyPresses.size();
 
                                 const int ncc = std::min(32, n);
                                 for (int j = 0; j < ncc; ++j) {
@@ -576,7 +610,7 @@ int main(int argc, char ** argv) {
     const int captureId     = argm.count("c") == 0 ? 0 : std::stoi(argm.at("c"));
     const int nChannels     = argm.count("C") == 0 ? 0 : std::stoi(argm.at("C"));
     const int filterId      = argm.count("F") == 0 ? EAudioFilter::FirstOrderHighPass : std::stoi(argm.at("F"));
-    const int freqCutoff_Hz = argm.count("f") == 0 ? kFreqCutoff_Hz : std::stoi(argm.at("f"));
+    const int freqCutoff_Hz = argm.count("f") == 0 ? 0 : std::stoi(argm.at("f"));
 
     const int nKeysToCapture = atoi(argv[3]);
 

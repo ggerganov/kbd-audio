@@ -112,7 +112,7 @@ int main(int argc, char ** argv) {
         printf("[+] Search took %4.3f seconds\n", toSeconds(tStart, tEnd));
     }
 
-    const int n = keyPresses.size();
+    int n = keyPresses.size();
 
     TSimilarityMap similarityMap;
     {
@@ -128,6 +128,27 @@ int main(int argc, char ** argv) {
         const auto tEnd = std::chrono::high_resolution_clock::now();
 
         printf("[+] Calculation took %4.3f seconds\n", toSeconds(tStart, tEnd));
+
+        {
+            const auto tStart = std::chrono::high_resolution_clock::now();
+
+            printf("[+] Removing low-similarity keys\n");
+
+            const int n0 = keyPresses.size();
+
+            if (removeLowSimilarityKeys(keyPresses, similarityMap, 0.3f) == false) {
+                printf("Failed to remove low-similarity keys\n");
+                return -4;
+            }
+
+            const int n1 = keyPresses.size();
+
+            const auto tEnd = std::chrono::high_resolution_clock::now();
+
+            printf("[+] Removed %d low-similarity keys, took %4.3f seconds\n", n0 - n1, toSeconds(tStart, tEnd));
+        }
+
+        n = keyPresses.size();
 
         const int ncc = std::min(32, n);
         for (int j = 0; j < ncc; ++j) {
@@ -151,6 +172,8 @@ int main(int argc, char ** argv) {
         printf("[+] Similarity map: min = %g, max = %g\n", minCC, maxCC);
     }
 
+    printf("[+] Attempting to recover the text from the recording ...\n");
+
     for (int iMain = 0; iMain < 16; ++iMain) {
         Cipher::Processor processor;
 
@@ -160,8 +183,6 @@ int main(int argc, char ** argv) {
         params.wEnglishFreq = 30.0;
         params.nHypothesesToKeep = std::max(100, 500 - 10*std::min(200, std::max(0, ((int) keyPresses.size() - 100))));
         processor.init(params, freqMap6, similarityMap);
-
-        printf("[+] Attempting to recover the text from the recording ...\n");
 
         std::vector<Cipher::TResult> clusterings;
 
@@ -173,7 +194,6 @@ int main(int argc, char ** argv) {
                 auto clusteringsCur = processor.getClusterings(2);
 
                 for (int i = 0; i < (int) clusteringsCur.size(); ++i) {
-                    printf("[+] Clustering %d: pClusters = %g\n", i, clusteringsCur[i].pClusters);
                     clusterings.push_back(std::move(clusteringsCur[i]));
                 }
 
@@ -187,22 +207,11 @@ int main(int argc, char ** argv) {
 
         params.hint.clear();
         params.hint.resize(n, -1);
-        printf("\n[+] Recovering the unknown text (fSpread = %g):\n", params.fSpread);
 
         // beam search
         int nThread = std::min((int) std::thread::hardware_concurrency(), (int) clusterings.size());
         {
             std::vector<std::thread> workers(nThread);
-
-            //for (int i = 0; i < (int) clusterings.size(); ++i) {
-            //    Cipher::beamSearch(params, freqMap6, clusterings[i]);
-            //    printf(" ");
-            //    Cipher::printDecoded(clusterings[i].clusters, clusterings[i].clMap, params.hint);
-            //    printf(" [%8.3f %8.3f]\n", clusterings[i].p, clusterings[i].pClusters);
-            //    printf(" ");
-            //    Cipher::refineNearby(params, freqMap6, clusterings[i]);
-            //    printf("\n");
-            //}
 
             std::mutex mutexPrint;
             for (int i = 0; i < nThread; ++i) {

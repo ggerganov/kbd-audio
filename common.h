@@ -276,3 +276,6 @@ bool generateLowResWaveform(const TWaveformT<T> & waveform, TWaveformT<T> & wave
 
 template<typename T>
 bool adjustKeyPresses(TKeyPressCollectionT<T> & keyPresses, TSimilarityMap & sim);
+
+template<typename T>
+bool removeLowSimilarityKeys(TKeyPressCollectionT<T> & keyPresses, TSimilarityMap & sim, double threshold);

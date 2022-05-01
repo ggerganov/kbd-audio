@@ -1188,3 +1188,72 @@ bool adjustKeyPresses(TKeyPressCollectionT<T> & keyPresses, TSimilarityMap & sim
 }
 
 template bool adjustKeyPresses<TSampleI16>(TKeyPressCollectionT<TSampleI16> & keyPresses, TSimilarityMap & sim);
+
+
+template<typename T>
+bool removeLowSimilarityKeys(TKeyPressCollectionT<T> & keyPresses, TSimilarityMap & sim, double threshold) {
+    const int n = keyPresses.size();
+    if (n != (int) sim.size()) {
+        fprintf(stderr, "removeLowSimilarityKeys: n != sim.size()\n");
+        return false;
+    }
+
+    std::vector<bool> used(n, false);
+
+    for (int i = 0; i < n; ++i) {
+        if (used[i]) continue;
+
+        for (int j = 0 ; j < n; ++j) {
+            if (i == j) continue;
+
+            if (sim[i][j].cc > threshold) {
+                used[i] = true;
+                used[j] = true;
+                break;
+            }
+        }
+    }
+
+    int nRemoved = 0;
+    for (int i = 0; i < n; ++i) {
+        if (used[i]) continue;
+
+        //keyPresses.erase(keyPresses.begin() + i - nRemoved);
+        ++nRemoved;
+    }
+
+    if (nRemoved == 0) {
+        return true;
+    }
+
+    auto keyPresses0 = keyPresses;
+    keyPresses.clear();
+
+    for (int i = 0; i < n; ++i) {
+        if (used[i]) {
+            keyPresses.push_back(keyPresses0[i]);
+        }
+    }
+
+    for (int i = 0; i < n; ++i) {
+        auto cur = sim[i];
+        sim[i].clear();
+        for (int j = 0; j < n; ++j) {
+            if (used[j]) {
+                sim[i].push_back(cur[j]);
+            }
+        }
+    }
+
+    auto sim0 = sim;
+    sim.clear();
+    for (int i = 0; i < n; ++i) {
+        if (used[i]) {
+            sim.push_back(sim0[i]);
+        }
+    }
+
+    return true;
+}
+
+template bool removeLowSimilarityKeys<TSampleI16>(TKeyPressCollectionT<TSampleI16> & keyPresses, TSimilarityMap & sim, double threshold);

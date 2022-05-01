@@ -1352,7 +1352,7 @@ namespace Cipher {
                     pClustersBest = clusteringsCur[0].pClusters;
                     freqCutoffBest_Hz = freqCutoff_Hz;
                 }
-                printf("    [findBestCutoffFreq] freqCutoff_Hz = %g, pClusters = %g\n", freqCutoff_Hz, pClustersBest);
+                printf("    [findBestCutoffFreq] freqCutoff_Hz = %g, pClusters = %g\n", freqCutoff_Hz, clusteringsCur[0].pClusters);
             }
         }
 
