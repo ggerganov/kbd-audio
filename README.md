@@ -37,6 +37,8 @@ A more detailed description of the tool is available here: [Keytap2 discussion](
 This version introduces significant algorithm improvements and better n-gram statistics compared to keytap2. The attack is now fully
 automated and does not require any manual intervation during the text recovery process.
 
+[Video: short demo of using Keytap3](https://youtu.be/5aphvxpSt3o)
+
 [Check if your keyboard is vulnerable to Keytap:](https://keytap3.ggerganov.com)
 
 <a href="https://keytap3.ggerganov.com" target="_blank"><img src="https://user-images.githubusercontent.com/1991296/166096331-ab26f7f8-08e0-48d6-abd7-57017ebf1866.JPEG" style="display: inline-block; overflow: hidden; width: 99%;"></img></a>
