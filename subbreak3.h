@@ -40,7 +40,7 @@ namespace Cipher {
         float wEnglishFreq = 10.0f;
 
         // beam search
-        int nHypothesesToKeep = 100;
+        int nHypothesesToKeep = 500;
 
         THint hint = {};
     };

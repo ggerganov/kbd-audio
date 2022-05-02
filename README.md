@@ -29,7 +29,7 @@ A more detailed description of the tool is available here: [Keytap2 discussion](
 [CTF: can you guess the text being typed?](https://ggerganov.github.io/keytap-challenge/)
 
 [Try it online:](https://keytap2.ggerganov.com)
-  
+
 <a href="https://keytap2.ggerganov.com" target="_blank"><img src="https://i.imgur.com/nPlLEDN.jpg" style="display: inline-block; overflow: hidden; width: 99%;"></img></a>
 
 ### Keytap3
@@ -38,6 +38,8 @@ This version introduces significant algorithm improvements and better n-gram sta
 automated and does not require any manual intervation during the text recovery process.
 
 [Video: short demo of using Keytap3](https://youtu.be/5aphvxpSt3o)
+
+[GUI for Keytap3](https://keytap3.ggerganov.com)
 
 [Check if your keyboard is vulnerable to Keytap:](https://keytap3.ggerganov.com)
 
@@ -99,6 +101,7 @@ Short summary of the available tools. If the status of the tool is not **stable*
 | **keytap-gui**      | gui     | **stable**  |
 | **keytap2-gui**     | gui     | **stable**  |
 | **keytap3**         | text    | **stable**  |
+| **keytap3-gui**     | gui     | **stable**  |
 | -                   | *extra* | -           |
 | **guess-qp**        | text    | experiment  |
 | **guess-qp2**       | text    | experiment  |
@@ -107,7 +110,6 @@ Short summary of the available tools. If the status of the tool is not **stable*
 | **subreak**         | text    | experiment  |
 | **key-average-gui** | gui     | experiment  |
 | **keytap2**         | text    | experiment  |
-| **keytap3-gui**     | gui     | experiment  |
 
 ## Tool details
 
@@ -157,6 +159,8 @@ Short summary of the available tools. If the status of the tool is not **stable*
 
       ./keytap-gui input0.kbd [input1.kbd] [input2.kbd] ... [-cN] [-CN]
 
+  Online demo: https://keytap.ggerganov.com
+
   ---
 
 * **keytap2-gui** record.kbd n-gram-dir [-pN] [-cN] [-CN]
@@ -164,6 +168,8 @@ Short summary of the available tools. If the status of the tool is not **stable*
   Detect pressed keys via microphone audio capture. Uses statistical information (n-gram frequencies) about the language. **No training data is required**. The *'record.kbd'* input file has to be generated via the **record-full** tool and contains the audio data that will be analyzed. The *'n-gram-dir'* folder file has to contain n-gram probability files for the corresponding language.
 
       ./keytap2-gui record.kbd ../data
+
+  Online demo: https://keytap2.ggerganov.com
 
   ---
 
@@ -174,6 +180,16 @@ Short summary of the available tools. If the status of the tool is not **stable*
       ./keytap3 input.kbd ../data [-cN] [-CN] [-pF] [-tF] [-FN] [-fN]
 
   Online demo: https://keytap3.ggerganov.com
+
+  ---
+
+* **keytap3-gui**
+
+  GUI version of the **keytap3** tool.
+
+      ./keytap3-gui input.kbd ../data [-cN] [-CN] [-pF] [-tF] [-FN] [-fN]
+
+  Online demo: https://keytap3-gui.ggerganov.com
 
   ---
 

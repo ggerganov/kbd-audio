@@ -92,19 +92,22 @@ struct stParameters {
     int32_t offsetFromPeak_samples  = kKeyWidth_samples - kKeyOffset_samples;
     int32_t alignWindow_samples     = kKeyAlign_samples;
 
-    std::vector<int>   valuesClusters       = { 40, 50, 60, 70, };
-    std::vector<float> valuesWEnglishFreq   = { 1, 2, 5, 10, };
+    float wEnglish = 30.0f;
+    int nHypothesesToKeep = 500;
+
+    std::vector<int>   valuesClusters = { 40, 60, 80, 100, };
+    std::vector<float> valuesFSpread  = { 0.5f, 0.75f, 1.0f, 1.5f, 2.0f, };
 
     int32_t nProcessors() const {
-        return valuesClusters.size()*valuesWEnglishFreq.size();
+        return valuesClusters.size()*valuesFSpread.size();
     }
 
     int32_t valueForProcessorClusters(int idx) const {
-      return valuesClusters[idx/(valuesWEnglishFreq.size())];
+      return valuesClusters[idx/(valuesFSpread.size())];
     }
 
-    float valueForProcessorWEnglishFreq(int idx) const {
-        return valuesWEnglishFreq[idx%valuesWEnglishFreq.size()];
+    float valueForProcessorFSpread(int idx) const {
+        return valuesFSpread[idx%valuesFSpread.size()];
     }
 
     Cipher::TParameters cipher;
@@ -117,7 +120,7 @@ struct stStateUI {
         bool recalculateSimilarityMap = false;
         bool resetOptimization = false;
         bool changeProcessing = false;
-        bool applyClusters = false;
+        bool applyParameters = false;
         bool applyHints = false;
 
         void clear() { memset(this, 0, sizeof(Flags)); }
@@ -161,6 +164,7 @@ struct stStateUI {
     bool openParametersWindow = false;
     bool loadRecord = false;
     bool loadKeyPresses = false;
+    bool findBestCutoffFreq = false;
     bool rescaleWaveform = true;
 
     int outputRecordId = 0;
@@ -264,7 +268,7 @@ template<> bool TripleBuffer<stStateUI>::update(bool force) {
         buffer.processing = this->processing;
     }
 
-    if (this->flags.applyClusters) {
+    if (this->flags.applyParameters) {
         buffer.params = this->params;
     }
 
@@ -391,7 +395,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
         }
     }
 
-#ifndef __EMSCRIPTEN__
+#if 0
     if ((int) keyPresses.size() >= lastKeyPresses + 10) {
         lastKeyPresses = keyPresses.size();
 
@@ -683,6 +687,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
                 stateUI.recalculateKeyPresses = true;
                 stateUI.lastSize = stateUI.lastSize - 1;
                 stateUI.recording = false;
+                stateUI.findBestCutoffFreq = true;
                 stateUI.rescaleWaveform = true;
             }
             {
@@ -720,7 +725,7 @@ bool renderKeyPresses(stStateUI & stateUI, const TWaveform & waveform, TKeyPress
 }
 
 bool renderResults(stStateUI & stateUI) {
-    float curHeight = std::min(g_windowSizeY - stateUI.windowHeightTitleBar - stateUI.windowHeightKeyPesses, (12 + stateUI.results.size()*kTopResultsPerProcessor)*ImGui::GetTextLineHeightWithSpacing());
+    float curHeight = std::min(g_windowSizeY - stateUI.windowHeightTitleBar - stateUI.windowHeightKeyPesses, (12 + std::min(8lu, stateUI.results.size())*kTopResultsPerProcessor)*ImGui::GetTextLineHeightWithSpacing());
     ImGui::SetNextWindowPos(ImVec2(0, stateUI.windowHeightTitleBar + stateUI.windowHeightKeyPesses), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(1.0f*g_windowSizeX, curHeight), ImGuiCond_Always);
     if (ImGui::Begin("Results", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoMove)) {
@@ -796,19 +801,30 @@ bool renderResults(stStateUI & stateUI) {
 
         ImGui::PushItemWidth(200.0);
 
-        if (ImGui::SliderInt("Clusters", &stateUI.params.valuesClusters[0], 30, 150.0)) {
-            stateUI.flags.applyClusters = true;
+        //if (ImGui::SliderInt("Clusters", &stateUI.params.valuesClusters[0], 30, 150.0)) {
+        //    stateUI.flags.applyParameters = true;
+        //    stateUI.doUpdate = true;
+        //}
+
+        //if (ImGui::SliderFloat("Spread", &stateUI.params.fSpread, 0.1f, 3.0f)) {
+        //    stateUI.flags.applyParameters = true;
+        //    stateUI.doUpdate = true;
+        //}
+
+        ImGui::SameLine();
+        if (ImGui::SliderInt("Keep", &stateUI.params.nHypothesesToKeep, 20, 2000)) {
+            stateUI.flags.applyParameters = true;
             stateUI.doUpdate = true;
         }
 
-        ImGui::SameLine();
-        if (ImGui::Checkbox("Auto", &stateUI.autoHint)) {
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::BeginTooltip();
-            ImGui::Text("If checked, hints will be updated automatically based on the suggestions");
-            ImGui::EndTooltip();
-        }
+        //ImGui::SameLine();
+        //if (ImGui::Checkbox("Auto", &stateUI.autoHint)) {
+        //}
+        //if (ImGui::IsItemHovered()) {
+        //    ImGui::BeginTooltip();
+        //    ImGui::Text("If checked, hints will be updated automatically based on the suggestions");
+        //    ImGui::EndTooltip();
+        //}
 
         if (stateUI.results.size() > 0) {
             int nPerAutoHint = 10;
@@ -1243,7 +1259,7 @@ int main(int argc, char ** argv) {
     const int captureId     = argm.count("c") == 0 ? 0 : std::stoi(argm.at("c"));
     const int nChannels     = argm.count("C") == 0 ? 0 : std::stoi(argm.at("C"));
     const int filterId      = argm.count("F") == 0 ? EAudioFilter::FirstOrderHighPass : std::stoi(argm.at("F"));
-    const int freqCutoff_Hz = argm.count("f") == 0 ? kFreqCutoff_Hz : std::stoi(argm.at("f"));
+    const int freqCutoff_Hz = argm.count("f") == 0 ? 0 : std::stoi(argm.at("f"));
 
     stateUI.params.playbackId = playbackId;
     stateUI.fnameRecord = argv[1];
@@ -1252,7 +1268,7 @@ int main(int argc, char ** argv) {
     stateUI.waveformInput.reserve(kSamplesPerFrame*kMaxRecordSize_frames);
     stateUI.waveformOriginal.reserve(kSamplesPerFrame*kMaxRecordSize_frames);
 
-    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return -2;
     }
@@ -1282,7 +1298,7 @@ int main(int argc, char ** argv) {
         parameters.captureId = captureId;
         parameters.nChannels = nChannels;
         parameters.sampleRate = kSampleRate;
-        parameters.filter = (EAudioFilter) filterId;
+        parameters.filter = EAudioFilter::None;
         parameters.freqCutoff_Hz = kFreqCutoff_Hz;
 
         if (audioLogger.install(std::move(parameters)) == false) {
@@ -1312,8 +1328,18 @@ int main(int argc, char ** argv) {
         printf("Specified file '%s' does not exist\n", argv[1]);
         //return -4;
     } else {
-        printf("[+] Filtering waveform with filter type = %d and cutoff frequency = %d Hz\n", filterId, freqCutoff_Hz);
-        ::filter(stateUI.waveformOriginal, (EAudioFilter) filterId, freqCutoff_Hz, kSampleRate);
+        auto freqCutoffCur_Hz = freqCutoff_Hz;
+        if (freqCutoffCur_Hz == 0) {
+            const auto tStart = std::chrono::high_resolution_clock::now();
+
+            freqCutoffCur_Hz = Cipher::findBestCutoffFreq(stateUI.waveformOriginal, (EAudioFilter) filterId, kSampleRate, 100.0f, 1000.0f, 100.0f);
+
+            const auto tEnd = std::chrono::high_resolution_clock::now();
+            printf("[+] Found best freqCutoff = %d Hz, took %4.3f seconds\n", freqCutoffCur_Hz, toSeconds(tStart, tEnd));
+        }
+
+        printf("[+] Filtering waveform with filter type = %d and cutoff frequency = %d Hz\n", filterId, freqCutoffCur_Hz);
+        ::filter(stateUI.waveformOriginal, (EAudioFilter) filterId, freqCutoffCur_Hz, kSampleRate);
 
         printf("[+] Converting waveform to i16 format ...\n");
         if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
@@ -1325,36 +1351,12 @@ int main(int argc, char ** argv) {
         stateUI.maxSample = calcAbsMax(stateUI.waveformOriginal);
     }
 
-    Cipher::TFreqMap freqMap3;
-    Cipher::TFreqMap freqMap4;
-    Cipher::TFreqMap freqMap5;
     Cipher::TFreqMap freqMap6;
 
-    //if (Cipher::loadFreqMap((std::string(argv[2]) + "/./ggwords-3-gram.dat").c_str(), freqMap3) == false) {
-    //    return -5;
-    //}
-    //if (Cipher::loadFreqMap((std::string(argv[2]) + "/./ggwords-4-gram.dat").c_str(), freqMap4) == false) {
-    //    return -5;
-    //}
-    //if (Cipher::loadFreqMap((std::string(argv[2]) + "/./ggwords-5-gram.dat").c_str(), freqMap5) == false) {
-    //    return -5;
-    //}
-    //stateCore.freqMap[0] = &freqMap3;
-    //stateCore.freqMap[1] = &freqMap4;
-    //stateCore.freqMap[2] = &freqMap5;
-
-    if (Cipher::loadFreqMapBinary((std::string(argv[2]) + "/./ggwords-3-gram.dat.binary").c_str(), freqMap3) == false) {
-        return -5;
-    }
-    if (Cipher::loadFreqMapBinary((std::string(argv[2]) + "/./ggwords-4-gram.dat.binary").c_str(), freqMap4) == false) {
-        return -5;
-    }
-    if (Cipher::loadFreqMapBinary((std::string(argv[2]) + "/./ggwords-5-gram.dat.binary").c_str(), freqMap5) == false) {
-        return -5;
-    }
     if (Cipher::loadFreqMapBinary((std::string(argv[2]) + "/./ggwords-6-gram.dat.binary").c_str(), freqMap6) == false) {
         return -5;
     }
+
     stateCore.freqMap[0] = &freqMap6;
     stateCore.freqMap[1] = &freqMap6;
     stateCore.freqMap[2] = &freqMap6;
@@ -1410,6 +1412,7 @@ int main(int argc, char ** argv) {
                 }
             }
 
+            recalcSuggestions = false;
             if (recalcSuggestions) {
                 int n = stateUI.keyPresses.size();
                 stateUI.suggestions.resize(n);
@@ -1437,6 +1440,9 @@ int main(int argc, char ** argv) {
                         stateUI.suggestions[i] = -1;
                     }
                 }
+            } else {
+                int n = stateUI.keyPresses.size();
+                stateUI.suggestions.resize(n);
             }
         }
 
@@ -1604,8 +1610,18 @@ int main(int argc, char ** argv) {
             if (readFromFile<TSampleF>(stateUI.fnameRecord, stateUI.waveformOriginal) == false) {
                 printf("Specified file '%s' does not exist\n", argv[1]);
             } else {
-                printf("[+] Filtering waveform with filter type = %d and cutoff frequency = %d Hz\n", filterId, freqCutoff_Hz);
-                ::filter(stateUI.waveformOriginal, (EAudioFilter) filterId, freqCutoff_Hz, kSampleRate);
+                auto freqCutoffCur_Hz = freqCutoff_Hz;
+                if (freqCutoffCur_Hz == 0) {
+                    const auto tStart = std::chrono::high_resolution_clock::now();
+
+                    freqCutoffCur_Hz = Cipher::findBestCutoffFreq(stateUI.waveformOriginal, (EAudioFilter) filterId, kSampleRate, 100.0f, 1000.0f, 100.0f);
+
+                    const auto tEnd = std::chrono::high_resolution_clock::now();
+                    printf("[+] Found best freqCutoff = %d Hz, took %4.3f seconds\n", freqCutoffCur_Hz, toSeconds(tStart, tEnd));
+                }
+
+                printf("[+] Filtering waveform with filter type = %d and cutoff frequency = %d Hz\n", filterId, freqCutoffCur_Hz);
+                ::filter(stateUI.waveformOriginal, (EAudioFilter) filterId, freqCutoffCur_Hz, kSampleRate);
 
                 printf("[+] Converting waveform to i16 format ...\n");
                 if (convert(stateUI.waveformOriginal, stateUI.waveformInput) == false) {
@@ -1625,6 +1641,23 @@ int main(int argc, char ** argv) {
         if (stateUI.loadKeyPresses) {
             loadKeyPresses(stateUI.fnameKeyPressess.c_str(), getView(stateUI.waveformInput, 0), stateUI.keyPresses);
             stateUI.loadKeyPresses = false;
+        }
+
+        if (stateUI.findBestCutoffFreq) {
+            auto freqCutoffCur_Hz = freqCutoff_Hz;
+            if (freqCutoffCur_Hz == 0) {
+                const auto tStart = std::chrono::high_resolution_clock::now();
+
+                freqCutoffCur_Hz = Cipher::findBestCutoffFreq(stateUI.waveformOriginal, (EAudioFilter) filterId, kSampleRate, 100.0f, 1000.0f, 100.0f);
+
+                const auto tEnd = std::chrono::high_resolution_clock::now();
+                printf("[+] Found best freqCutoff = %d Hz, took %4.3f seconds\n", freqCutoffCur_Hz, toSeconds(tStart, tEnd));
+            }
+
+            printf("[+] Filtering waveform with filter type = %d and cutoff frequency = %d Hz\n", filterId, freqCutoffCur_Hz);
+            ::filter(stateUI.waveformOriginal, (EAudioFilter) filterId, freqCutoffCur_Hz, kSampleRate);
+
+            stateUI.findBestCutoffFreq = false;
         }
 
         if (stateUI.rescaleWaveform) {
@@ -1708,19 +1741,24 @@ int main(int argc, char ** argv) {
 
                     int n = stateCore.params.nProcessors();
                     for (int i = 0; i < n; ++i) {
-                        int nClusters = stateCore.params.valueForProcessorClusters(i);
-                        double w = stateCore.params.valueForProcessorWEnglishFreq(i);
+                        const auto nClusters = stateCore.params.valueForProcessorClusters(i);
+                        const auto wEnglish = stateCore.params.wEnglish;
+                        const auto fSpread = stateCore.params.valueForProcessorFSpread(i);
+                        const auto nHypothesesToKeep = stateCore.params.nHypothesesToKeep;
 
                         Cipher::TParameters params;
                         params.maxClusters = nClusters;
-                        params.wEnglishFreq = w;
+                        params.wEnglishFreq = wEnglish;
+                        params.fSpread = fSpread;
+                        params.nHypothesesToKeep = nHypothesesToKeep;
                         stateCore.processors[i] = Cipher::Processor();
                         stateCore.processors[i].init(
                                 params,
                                 *stateCore.freqMap[i%3],
                                 stateCore.similarityMap);
 
-                        printf("[+] Processor %d initialized: cluster = %d, w = %g\n", i, nClusters, w);
+                        printf("[+] Processor %d initialized: cluster = %d, wEnglish = %g, fSpread = %g, nHypothesesToKeep = %d\n",
+                                i, nClusters, wEnglish, fSpread, nHypothesesToKeep);
                     }
                 }
 
@@ -1728,17 +1766,21 @@ int main(int argc, char ** argv) {
                     stateCore.processing = stateUINew.processing;
                 }
 
-                if (stateUINew.flags.applyClusters) {
+                if (stateUINew.flags.applyParameters) {
                     stateCore.params = stateUINew.params;
 
                     int n = stateCore.params.nProcessors();
                     for (int i = 0; i < n; ++i) {
-                        int nClusters = stateCore.params.valueForProcessorClusters(i);
-                        double w = stateCore.params.valueForProcessorWEnglishFreq(i);
+                        const auto nClusters = stateCore.params.valueForProcessorClusters(i);
+                        const auto wEnglish = stateCore.params.valueForProcessorFSpread(i);
+                        const auto fSpread = stateCore.params.valueForProcessorFSpread(i);
+                        const auto nHypothesesToKeep = stateCore.params.nHypothesesToKeep;
 
                         Cipher::TParameters params;
                         params.maxClusters = nClusters;
-                        params.wEnglishFreq = w;
+                        params.wEnglishFreq = wEnglish;
+                        params.fSpread = fSpread;
+                        params.nHypothesesToKeep = nHypothesesToKeep;
                         stateCore.processors[i].init(
                                 params,
                                 *stateCore.freqMap[i%3],

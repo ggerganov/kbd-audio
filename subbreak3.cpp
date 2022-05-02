@@ -703,17 +703,17 @@ namespace Cipher {
         hypothesesCur.resize(nHypothesesToKeep);
         hypothesesNew.resize(nHypothesesToKeep*nSymbols);
 
-        int nHints = 0;
         {
             auto & hcur = hypothesesCur[0];
             hcur = { 0.0, getNullCLMap(clusters), {}, std::vector<int>(nSymbols + 1, 0), {}};
-            translate(hcur.clMap, clusters, hcur.plain);
             for (int i = 0; i < (int) params.hint.size(); ++i) {
                 if (params.hint[i] != -1) {
-                    hcur.plain[i] = params.hint[i];
-                    ++nHints;
+                    if (frand() > 0.5) {
+                        hcur.clMap[clusters[i]] = params.hint[i];
+                    }
                 }
             }
+            translate(hcur.clMap, clusters, hcur.plain);
             hcur.memo.resize(N, 1.0);
             hcur.p = calcScore(params, freqMap, hcur.plain, hcur.memo);
             ++nCur;
@@ -742,6 +742,10 @@ namespace Cipher {
 
             //printf("Processing cluster %2d ('%c') - count = %d\n", kvSorted.first, getEncodedChar(kvSorted.first), (int) kvSorted.second.size());
 
+            if (hypothesesCur[0].clMap.at(kvSorted.first) != 0) {
+                continue;
+            }
+
             int nNew = 0;
             for (int j = 0; j < nCur; ++j) {
                 const auto & hcur = hypothesesCur[j];
@@ -757,9 +761,6 @@ namespace Cipher {
                     hnew.nused[a]++;
                     for (int k = 0; k < (int) kvSorted.second.size(); ++k) {
                         const auto idx = kvSorted.second[k];
-                        if ((int) params.hint.size() > idx && params.hint[idx] != -1) {
-                            continue;
-                        }
                         hnew.plain[idx] = a;
 
                         const auto idx0 = std::max(0, idx - freqMap.len + 1);
@@ -1272,29 +1273,10 @@ namespace Cipher {
     }
 
     bool Processor::compute() {
-        auto clustersNew = m_curResult.clusters;
-
-        for (int iter = 0; iter < m_params.nIters; ++iter) {
-            clustersNew = m_curResult.clusters;
-            Cipher::mutateClusters(m_params, clustersNew);
-            const auto pNew = calcPClusters(m_params, m_similarityMap, m_logMap, m_logMapInv, clustersNew, m_curResult.clMap);
-
-            ++m_nInitialIters;
-            if (pNew > m_pCur) {
-                m_curResult.clusters = clustersNew;
-                m_pCur = pNew;
-                if (m_pCur > m_pZero) {
-                    m_pZero = m_pCur;
-                }
-
-                if (m_nInitialIters > m_params.nInitialIters) {
-                    Cipher::beamSearch(m_params, *m_freqMap, m_curResult);
-                }
-            }
-
-            m_curResult.pClusters = m_pCur;
-            ++m_curResult.id;
-        }
+        auto clusterings = getClusterings(1);
+        m_curResult = clusterings[0];
+        Cipher::beamSearch(m_params, *m_freqMap, m_curResult);
+        m_curResult.id++;
 
         return true;
     }

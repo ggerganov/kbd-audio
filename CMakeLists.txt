@@ -230,6 +230,20 @@ if (EMSCRIPTEN)
 
     configure_file(${CMAKE_SOURCE_DIR}/index-${TARGET}-tmpl.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html @ONLY)
     configure_file(${CMAKE_SOURCE_DIR}/style.css ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/style.css @ONLY)
+
+    # keytap3-gui
+    set(TARGET keytap3-gui)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${TARGET})
+
+    set_target_properties(${TARGET} PROPERTIES LINK_FLAGS " \
+    -s TOTAL_MEMORY=536870912 \
+    -s FORCE_FILESYSTEM=1 \
+    -s LZ4=1 \
+    --preload-file ${PROJECT_SOURCE_DIR}/data/ggwords-6-gram.dat.binary@/data/ \
+    ")
+
+    configure_file(${CMAKE_SOURCE_DIR}/index-${TARGET}-tmpl.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html @ONLY)
+    configure_file(${CMAKE_SOURCE_DIR}/style.css ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/style.css @ONLY)
 endif()
 
 if (NOT EMSCRIPTEN)
