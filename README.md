@@ -39,6 +39,8 @@ automated and does not require any manual intervation during the text recovery p
 
 [Video: short demo of using Keytap3](https://youtu.be/5aphvxpSt3o)
 
+[Video: another example of using Keytap3](https://youtu.be/5aphvxpSt3o)
+
 [GUI for Keytap3](https://keytap3-gui.ggerganov.com)
 
 [Check if your keyboard is vulnerable to Keytap:](https://keytap3.ggerganov.com)
