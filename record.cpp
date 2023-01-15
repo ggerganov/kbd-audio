@@ -76,6 +76,11 @@ int main(int argc, char ** argv) {
         return -1;
     }
 
+    printf("\n");
+    printf("To stop capturing press Ctrl+C\n");
+    printf("On some systems (e.g. MacOS), this may not work. In this case, you have to kill the process manually\n");
+    printf("\n");
+
     std::thread keyReader = std::thread([&]() {
         struct termios oldt, newt;
         tcgetattr ( STDIN_FILENO, &oldt );
@@ -93,7 +98,11 @@ int main(int argc, char ** argv) {
         tcsetattr ( STDIN_FILENO, TCSANOW, &oldt );
     });
 
-    while (true) {}
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    keyReader.join();
 
     fout.close();
 
